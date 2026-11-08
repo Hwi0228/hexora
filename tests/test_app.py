@@ -518,7 +518,7 @@ class QuestionRegistrationTests(unittest.TestCase):
         )
         self.assertEqual(converted.status_code, 200)
         latex = converted.get_json()["latex"]
-        self.assertEqual(latex, r"\\frac{1}{2}")
+        self.assertEqual(latex, r"\frac{1}{2}")
 
         self.csrf_post(
             self.client,
@@ -537,7 +537,7 @@ class QuestionRegistrationTests(unittest.TestCase):
         rendered = self.client.get("/questions")
         self.assertEqual(rendered.status_code, 200)
         self.assertIn("변환 수식".encode(), rendered.data)
-        self.assertIn(r"\\frac{1}{2}".encode(), rendered.data)
+        self.assertIn(r"\frac{1}{2}".encode(), rendered.data)
         self.assertIn(b'class="math-content"', rendered.data)
         self.assertIn(b"scripts/katex-render.js", rendered.data)
 
