@@ -1,7 +1,7 @@
 import tempfile
 import unittest
-from pathlib import Path
 from unittest.mock import patch
+from pathlib import Path
 
 from parse_hwp import (
     _equation_to_latex,
@@ -124,8 +124,8 @@ class HwpParsingTests(unittest.TestCase):
             r"풀이 $\angle \mathrm{C} = 90 ^\circ$",
         )
 
-    def test_preserves_fraction_commands_when_converting_hancom(self):
-        xml = """\
+    def test_preserves_original_fraction_commands_when_parsing_hwp(self):
+        xml = """
 <hs:sec xmlns:hs="http://www.hancom.co.kr/hwpml/2011/section"
          xmlns:hp="http://www.hancom.co.kr/hwpml/2011/paragraph">
   <hp:tbl><hp:tr><hp:tc><hp:subList>
@@ -165,9 +165,11 @@ class HwpParsingTests(unittest.TestCase):
             r"\begin{aligned} & \text{가입비 15000원} \\ & \text{- 가입 시 추가 요금 없이 무제한 편집 가능} \end{aligned}",
         )
 
-    def test_normalizes_legacy_formula_markup_for_existing_db_questions(self):
+    def test_fraction_commands_are_preserved_for_katex(self):
         expression = r"\frac{a}{b} + \tfrac{c}{d} + \cfrac{1}{2} + \dfrac{3}{4}"
         self.assertEqual(normalize_katex_expression(expression), expression)
+
+    def test_normalizes_legacy_formula_markup_for_existing_db_questions(self):
         self.assertEqual(
             normalize_katex_expression(
                 r"\eqalign{ & \mathrm{가입비 15000원} \\ & \mathrm{- 가입 시 추가 요금 없이 가능} }"
@@ -184,4 +186,3 @@ class HwpParsingTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
-
