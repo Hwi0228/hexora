@@ -311,8 +311,14 @@
       const Delta = Quill.import("delta");
       const InlineEmbed = Quill.import("blots/embed");
       const BlockEmbed = Quill.import("blots/block/embed");
-      function renderMath(node, latex, displayMode) {
+      function renderMath(node, value, displayMode) {
+        const equation = value && typeof value === "object"
+          ? value
+          : { latex: String(value || ""), inputFormat: "latex", inputSource: String(value || "") };
+        const latex = String(equation.latex || "");
         node.dataset.latex = latex;
+        node.dataset.inputFormat = equation.inputFormat === "hancom" ? "hancom" : "latex";
+        node.dataset.inputSource = String(equation.inputSource || latex);
         node.dataset.mathObject = displayMode ? "block" : "inline";
         node.setAttribute("contenteditable", "false");
         node.setAttribute("aria-label", displayMode ? "블록 수식" : "인라인 수식");
@@ -329,10 +335,16 @@
         static className = "ql-math-inline";
         static create(value) {
           const node = super.create();
-          renderMath(node, String(value || ""), false);
+          renderMath(node, value, false);
           return node;
         }
-        static value(node) { return node.dataset.latex || ""; }
+        static value(node) {
+          return {
+            latex: node.dataset.latex || "",
+            inputFormat: node.dataset.inputFormat || "latex",
+            inputSource: node.dataset.inputSource || node.dataset.latex || ""
+          };
+        }
       }
 
       class BlockMathBlot extends BlockEmbed {
@@ -341,7 +353,7 @@
         static className = "ql-math-block";
         static create(value) {
           const node = super.create();
-          renderMath(node, String(value || ""), true);
+          renderMath(node, value, true);
           return node;
         }
         static value(node) { return node.dataset.latex || ""; }
@@ -368,8 +380,11 @@
       }
 
       function openMathDialog(initialValue, action) {
-        mathInput.value = initialValue || "";
-        mathFormat.value = "latex";
+        const equation = initialValue && typeof initialValue === "object"
+          ? initialValue
+          : { latex: String(initialValue || ""), inputFormat: "latex", inputSource: String(initialValue || "") };
+        mathInput.value = equation.inputSource || equation.latex || "";
+        mathFormat.value = equation.inputFormat === "hancom" ? "hancom" : "latex";
         updateMathInputHelp();
         mathDialogAction = action;
         mathDialog.hidden = false;
@@ -392,6 +407,7 @@
         mathInput.setCustomValidity("");
         const action = mathDialogAction;
         let latex = source;
+        const inputFormat = mathFormat.value;
         mathSubmit.disabled = true;
         try {
           if (mathFormat.value === "hancom") {
@@ -401,7 +417,7 @@
             latex = result.latex;
           }
           closeMathDialog();
-          if (action) action(latex);
+          if (action) action({ latex, inputFormat, inputSource: source });
         } catch (error) { window.alert(error.message || "수식 변환 중 오류가 발생했습니다."); }
         finally { mathSubmit.disabled = false; }
       });
@@ -419,11 +435,11 @@
         const range = quill.getSelection(true) || {
           index: Math.max(0, quill.getLength() - 1), length: 0
         };
-        openMathDialog("", (latex) => {
+        openMathDialog("", (equation) => {
           quill.focus();
           if (range.length) quill.deleteText(range.index, range.length, "user");
           const index = range.index;
-          quill.insertEmbed(index, format, latex, "user");
+          quill.insertEmbed(index, format, equation, "user");
           quill.setSelection(index + 1, 0, "silent");
         });
       }
@@ -451,9 +467,14 @@
         function legacyMathEmbed(node, displayMode) {
           const latex = node.getAttribute("data-latex") ||
             node.getAttribute("data-tex") || node.textContent || "";
+          const equation = {
+            latex: latex.trim(),
+            inputFormat: node.getAttribute("data-input-format") === "hancom" ? "hancom" : "latex",
+            inputSource: node.getAttribute("data-input-source") || latex.trim()
+          };
           return new Delta().insert(displayMode
-            ? { blockMath: latex.trim() }
-            : { inlineMath: latex.trim() }).concat(
+            ? { blockMath: equation }
+            : { inlineMath: equation }).concat(
               displayMode ? new Delta().insert("\\n") : new Delta()
             );
         }
@@ -480,10 +501,14 @@
           if (!blot) return;
           const index = quill.getIndex(blot);
           const format = mathNode.classList.contains("ql-math-block") ? "blockMath" : "inlineMath";
-          openMathDialog(mathNode.dataset.latex || "", (nextLatex) => {
+          openMathDialog({
+            latex: mathNode.dataset.latex || "",
+            inputFormat: mathNode.dataset.inputFormat || "latex",
+            inputSource: mathNode.dataset.inputSource || mathNode.dataset.latex || ""
+          }, (nextEquation) => {
             quill.focus();
             quill.deleteText(index, 1, "user");
-            quill.insertEmbed(index, format, nextLatex, "user");
+            quill.insertEmbed(index, format, nextEquation, "user");
             quill.setSelection(index + 1, 0, "silent");
           });
         });
