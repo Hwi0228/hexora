@@ -23,13 +23,19 @@ class HmleqConversionError(ValueError):
 def _executable() -> str | None:
     configured = os.environ.get("HMLEQ_BIN", "").strip()
     if configured:
-        return configured
+        configured_path = Path(configured)
+        if configured_path.is_file() and os.access(configured_path, os.X_OK):
+            return str(configured_path)
 
     executable = shutil.which("hmleq")
     if executable:
         return executable
 
     cargo_executable = "hmleq.exe" if os.name == "nt" else "hmleq"
+    project_path = Path(__file__).resolve().parent / ".render-tools" / "bin" / cargo_executable
+    if project_path.is_file():
+        return str(project_path)
+
     cargo_path = Path.home() / ".cargo" / "bin" / cargo_executable
     return str(cargo_path) if cargo_path.is_file() else None
 
@@ -68,4 +74,3 @@ def convert_hancom_to_latex(script: str) -> str:
     if not latex:
         raise HmleqConversionError("수식 변환 결과가 비어 있습니다.")
     return latex
-
