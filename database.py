@@ -272,7 +272,6 @@ def _create_workbook_tables(connection):
     )
 
 
-
 class HybridRow(dict):
     """Mapping-style row that also preserves sqlite3.Row-style integer indexing."""
 
@@ -280,6 +279,7 @@ class HybridRow(dict):
         if isinstance(key, int):
             return tuple(self.values())[key]
         return super().__getitem__(key)
+
 
 
 class PostgresCursor:
