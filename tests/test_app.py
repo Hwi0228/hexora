@@ -760,10 +760,10 @@ class QuestionRegistrationTests(unittest.TestCase):
         self.assertIn(r'{ left: "\\[", right: "\\]", display: true }', renderer)
 
 
-    def test_quill_math_embeds_are_stored_as_latex_text_and_rendered_in_question_bank(self):
+    def test_quill_math_embeds_preserve_source_format_and_render_in_question_bank(self):
         prompt_html = (
             '<p>인라인 수식 '
-            '<span class="ql-math-inline" data-latex="x^2 + 1">'
+            '<span class="ql-math-inline" data-latex="x^2 + 1" data-input-format="hancom" data-input-source="{x} over {y}">'
             '<span class="katex">rendered inline markup</span></span></p>'
             '<div class="ql-math-block" data-latex="y = x + 2">'
             '<span class="katex-display">rendered block markup</span></div>'
@@ -776,17 +776,17 @@ class QuestionRegistrationTests(unittest.TestCase):
         self.assertEqual(response.status_code, 302)
 
         stored_prompt = self.query_one("SELECT prompt FROM questions LIMIT 1")
-        self.assertIn("$x^2 + 1$", stored_prompt)
-        self.assertIn("$$y = x + 2$$", stored_prompt)
-        self.assertNotIn("ql-math", stored_prompt)
-        self.assertNotIn("data-latex", stored_prompt)
+        self.assertIn('data-latex="x^2 + 1"', stored_prompt)
+        self.assertIn('data-input-format="hancom"', stored_prompt)
+        self.assertIn('data-input-source="{x} over {y}"', stored_prompt)
+        self.assertIn('data-input-format="latex"', stored_prompt)
         self.assertNotIn("rendered inline markup", stored_prompt)
         self.assertNotIn("rendered block markup", stored_prompt)
 
         question_response = self.client.get("/questions")
         self.assertEqual(question_response.status_code, 200)
-        self.assertIn("$x^2 + 1$".encode(), question_response.data)
-        self.assertIn("$$y = x + 2$$".encode(), question_response.data)
+        self.assertIn('data-latex="x^2 + 1"'.encode(), question_response.data)
+        self.assertIn('data-input-source="{x} over {y}"'.encode(), question_response.data)
         self.assertIn(b"scripts/katex-render.js", question_response.data)
         self.assertIn(b'class="math-content"', question_response.data)
 
