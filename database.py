@@ -647,3 +647,4 @@ def close_db(_error=None):
         if _error is not None:
             connection.rollback()
         connection.close()
+
