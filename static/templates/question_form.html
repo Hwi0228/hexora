@@ -356,7 +356,13 @@
           renderMath(node, value, true);
           return node;
         }
-        static value(node) { return node.dataset.latex || ""; }
+        static value(node) {
+          return {
+            latex: node.dataset.latex || "",
+            inputFormat: node.dataset.inputFormat || "latex",
+            inputSource: node.dataset.inputSource || node.dataset.latex || ""
+          };
+        }
       }
 
       Quill.register(InlineMathBlot, true);
