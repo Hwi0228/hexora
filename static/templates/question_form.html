@@ -14,6 +14,17 @@
   <link rel="stylesheet" href="{{ url_for('static', filename='styles/layout.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='styles/components.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='styles/pages/question-editor.css') }}">
+  <style>
+    /* Quill must not inherit the semibold weight of its surrounding field label. */
+    .rich-editor.ql-container.ql-snow,
+    .rich-editor .ql-editor {
+      font-weight: 400 !important;
+    }
+    .rich-editor .ql-editor strong,
+    .rich-editor .ql-editor b {
+      font-weight: 700 !important;
+    }
+  </style>
   </head>
 <body>
   <div class="app app-standard">
@@ -510,6 +521,14 @@
         const mount = document.querySelector('[data-editor="' + key + '"]');
         const toolbar = document.querySelector('[data-toolbar="' + key + '"]');
         if (!mount || !toolbar) throw new Error("Missing editor mount or toolbar: " + key);
+
+        // Keep Quill's current range when a formatting button receives the mouse.
+        // Without this, the editor can blur before the toolbar click is processed,
+        // leaving the toolbar to act on a stale or collapsed selection.
+        toolbar.addEventListener("mousedown", (event) => {
+          if (event.target.closest("button")) event.preventDefault();
+        });
+
         const quill = new Quill(mount, {
           theme: "snow",
           placeholder: "내용을 입력하세요.",
@@ -524,6 +543,9 @@
             history: { delay: 1000, maxStack: 100, userOnly: true }
           }
         });
+
+        // Establish a normal-weight baseline independent of the parent form label.
+        quill.root.style.fontWeight = "400";
 
         function legacyMathEmbed(node, displayMode) {
           const latex = node.getAttribute("data-latex") ||
