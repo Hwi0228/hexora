@@ -1,0 +1,161 @@
+name: HWP Equation Converter Benchmark
+on:
+  push:
+    branches: [test/hwp-equation-converters]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  benchmark:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Test hmleq (Rust AST parser)
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/hmleq-test/src
+          cat > /tmp/hmleq-test/Cargo.toml <<'EOF'
+          [package]
+          name = "hmleq-benchmark"
+          version = "0.1.0"
+          edition = "2021"
+          [dependencies]
+          hmleq = { git = "https://github.com/alphaiv-project/hmleq", version = "0.2.0" }
+          EOF
+          cat > /tmp/hmleq-test/src/main.rs <<'EOF'
+          fn main() {
+              let cases = [
+                  ("a over b", r"\\frac{a}{b}"),
+                  ("{a+b} over {c+d}", r"\\frac"),
+                  ("sqrt {a over b}", r"\\sqrt"),
+                  ("x^2 + y_1", "^"),
+                  ("matrix {a & b # c & d}", r"\\begin{matrix}"),
+              ];
+              for (input, expected) in cases {
+                  let output = hmleq::eq_to_latex(input).unwrap_or_else(|e| panic!("{input}: {e}"));
+                  println!("[hmleq] {} => {}", input, output);
+                  assert!(output.contains(expected), "unexpected output for {}: {}", input, output);
+              }
+          }
+          EOF
+          cd /tmp/hmleq-test
+          cargo run
+      - name: Test unhwp (Rust equation converter)
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/unhwp-test/src
+          cat > /tmp/unhwp-test/Cargo.toml <<'EOF'
+          [package]
+          name = "unhwp-equation-benchmark"
+          version = "0.1.0"
+          edition = "2021"
+          [dependencies]
+          unhwp = { git = "https://github.com/iyulab/unhwp", default-features = false }
+          EOF
+          cat > /tmp/unhwp-test/src/main.rs <<'EOF'
+          fn main() {
+              let cases = [
+                  ("a over b", "\\frac"),
+                  ("{a+b} over {c+d}", "\\frac"),
+                  ("sqrt {a over b}", "\\sqrt"),
+                  ("x^2 + y_1", "^"),
+              ];
+              for (input, expected) in cases {
+                  let output = unhwp::equation::to_latex(input);
+                  println!("[unhwp] {} => {}", input, output);
+                  assert!(output.contains(expected), "unexpected output for {}: {}", input, output);
+              }
+          }
+          EOF
+          cd /tmp/unhwp-test
+          cargo run
+      - name: Test easyconvert (TypeScript parser)
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/easyconvert/src/lib/conversions /tmp/easyconvert/src/lib
+          curl -fsSL https://raw.githubusercontent.com/AquilaXk/easyconvert/main/src/lib/conversions/hwp-equation.ts -o /tmp/easyconvert/src/lib/conversions/hwp-equation.ts
+          cat > /tmp/easyconvert/src/lib/types.ts <<'EOF'
+          export class CorruptStreamError extends Error {}
+          EOF
+          cat > /tmp/easyconvert/package.json <<'EOF'
+          {"type":"module","devDependencies":{"tsx":"^4.20.0"}}
+          EOF
+          cat > /tmp/easyconvert/test.ts <<'EOF'
+          import { hwpEquationToLaTeX } from "./src/lib/conversions/hwp-equation.ts";
+          const cases: [string, string][] = [
+            ["a over b", "\\frac"],
+            ["{a+b} over {c+d}", "\\frac"],
+            ["sqrt {a over b}", "\\sqrt"],
+            ["x^2 + y_1", "^"],
+            ["matrix {a & b # c & d}", "\\begin{matrix}"],
+          ];
+          for (const [input, expected] of cases) {
+            const output = hwpEquationToLaTeX(input);
+            console.log("[easyconvert] " + input + " => " + output);
+            if (!output.includes(expected)) throw new Error("unexpected output for " + input + ": " + output);
+          }
+          let rejected = false;
+          try { hwpEquationToLaTeX("{a over b"); } catch { rejected = true; }
+          if (!rejected) throw new Error("malformed braces were not rejected");
+          EOF
+          cd /tmp/easyconvert
+          npm install --no-audit --no-fund
+          npx tsx test.ts
+      - name: Test KRX Python converter
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/krx-test/krx_rule_markdown/converters
+          curl -fsSL https://raw.githubusercontent.com/chromato99/krx-rule-markdown/main/krx_rule_markdown/converters/equation_latex.py -o /tmp/krx-test/krx_rule_markdown/converters/equation_latex.py
+          cat > /tmp/krx-test/test.py <<'EOF'
+          import importlib.util, re, sys, types
+          root = types.ModuleType("krx_rule_markdown")
+          root.__path__ = []
+          converters = types.ModuleType("krx_rule_markdown.converters")
+          converters.__path__ = []
+          base = types.ModuleType("krx_rule_markdown.converters.base")
+          base.normalize_text = lambda value: re.sub(r"\s+", " ", value).strip()
+          sys.modules.update({
+              "krx_rule_markdown": root,
+              "krx_rule_markdown.converters": converters,
+              "krx_rule_markdown.converters.base": base,
+          })
+          spec = importlib.util.spec_from_file_location(
+              "krx_rule_markdown.converters.equation_latex",
+              "krx_rule_markdown/converters/equation_latex.py")
+          module = importlib.util.module_from_spec(spec)
+          sys.modules[spec.name] = module
+          spec.loader.exec_module(module)
+          cases = [
+              ("a over b", r"\frac"),
+              ("{a+b} over {c+d}", r"\frac"),
+              ("sqrt {a over b}", r"\sqrt"),
+              ("x^2 + y_1", "^"),
+              ("matrix {a & b # c & d}", r"\begin{matrix}"),
+          ]
+          for source, expected in cases:
+              output = module.hwp_equation_to_latex(source)
+              print("[krx] {} => {}".format(source, output))
+              assert expected in output, (source, output)
+          EOF
+          cd /tmp/krx-test
+          python test.py
+      - name: Inspect LibreOffice converter (source-only)
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -fsSL https://raw.githubusercontent.com/LibreOffice/core/master/hwpfilter/source/hwpeq.cxx -o /tmp/hwpeq.cxx
+          test -s /tmp/hwpeq.cxx
+          echo "[LibreOffice] Source retrieved ($(wc -l < /tmp/hwpeq.cxx) lines)."
+          echo "[LibreOffice] Not runtime-tested: coupled to LibreOffice C++ HWP filter/build system."
+          grep -Ein "latex|over|sqrt|matrix|fraction" /tmp/hwpeq.cxx | head -40 || true
