@@ -8,7 +8,7 @@ import subprocess
 from pathlib import Path
 
 
-MAX_SCRIPT_LENGTH = 4096
+MAX_SCRIPT_LENGTH = 5000
 CONVERSION_TIMEOUT_SECONDS = 5
 
 
