@@ -88,7 +88,7 @@
         {% if selected_folder_name %}<p class="success-message">{{ selected_folder_name }} 폴더의 문제</p>{% endif %}
         <div class="question-grid">
           {% for question in questions %}
-          <article class="question-card">
+          <article class="question-card" id="question-{{ question.id }}">
             <div class="card-top">
               <input class="question-check" type="checkbox" form="exam-export-form" name="question_ids" value="{{ question.id }}" aria-label="문제 선택: {{ question.display_id }}">
               <span class="tag question-id-tag">{{ question.display_id }}</span>
@@ -121,6 +121,7 @@
             <div class="question-wiki-meta">작성자 {{ question.author_name or "탈퇴한 사용자" }} · 현재 v{{ question.revision_number }}</div>
             <div class="question-wiki-actions">
               <a class="detail-button" href="{{ url_for('edit_question', question_id=question.id) }}">편집</a>
+              <a class="detail-button" href="{{ url_for('question_links', question_id=question.id) }}">출처·변형 링크</a>
               <a class="detail-button" href="{{ url_for('question_history', question_id=question.id) }}">수정 이력</a>
             </div>
             <details class="question-more">

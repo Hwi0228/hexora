@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 import sys
 import xml.etree.ElementTree as ET
@@ -10,6 +11,7 @@ from pathlib import Path
 from typing import Iterable
 
 from hml_equation_parser import eq2latex
+from hmleq_converter import convert_hancom_to_latex, HmleqUnavailable
 
 
 HP_NAMESPACE = "http://www.hancom.co.kr/hwpml/2011/paragraph"
@@ -98,7 +100,6 @@ def normalize_katex_expression(expression: str) -> str:
         ),
         expression,
     )
-    expression = re.sub(r"\\frac\b", r"\\dfrac", expression)
     return expression
 
 
@@ -140,7 +141,17 @@ def _equation_to_latex(script: str) -> str:
             + script[argument_end:]
         )
         search_from = match.start() + 4
-    converted = eq2latex(script).strip()
+    try:
+        converted = convert_hancom_to_latex(script)
+    except HmleqUnavailable:
+        # Keep local parsing usable before Rust is installed; the Render build
+        # script writes a marker so production cannot silently use the legacy parser.
+        if (
+            os.environ.get("HMLEQ_REQUIRED") == "1"
+            or Path(__file__).with_name(".render-require-hmleq").exists()
+        ):
+            raise
+        converted = eq2latex(script).strip()
     converted = re.sub(
         r'\brm\s+"([^"]*)"(?:\s+it\b)?',
         lambda match: (

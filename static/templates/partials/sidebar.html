@@ -7,6 +7,7 @@
   <nav class="nav-section" aria-label="주 메뉴">
     <a class="nav-link{% if request.endpoint == 'dashboard' %} active{% endif %}" href="{{ url_for('dashboard') }}"{% if request.endpoint == 'dashboard' %} aria-current="page"{% endif %}><span class="nav-icon" aria-hidden="true">⌂</span><span class="nav-label-text">대시보드</span></a>
     <a class="nav-link{% if request.endpoint == 'main' %} active{% endif %}" href="{{ url_for('main') }}"{% if request.endpoint == 'main' %} aria-current="page"{% endif %}><span class="nav-icon" aria-hidden="true">▤</span><span class="nav-label-text">문제 DB</span></a>
+    <a class="nav-link{% if request.endpoint in ['workbooks', 'workbook_detail', 'question_links'] %} active{% endif %}" href="{{ url_for('workbooks') }}"{% if request.endpoint in ['workbooks', 'workbook_detail', 'question_links'] %} aria-current="page"{% endif %}><span class="nav-icon" aria-hidden="true">▣</span><span class="nav-label-text">문제집</span></a>
     <a class="nav-link{% if request.endpoint == 'hwp_parser_page' %} active{% endif %}" href="{{ url_for('hwp_parser_page') }}"{% if request.endpoint == 'hwp_parser_page' %} aria-current="page"{% endif %}><span class="nav-icon" aria-hidden="true">◇</span><span class="nav-label-text">HWP 파싱</span></a>
     <a class="nav-link{% if request.endpoint == 'new_question' %} active{% endif %}" href="{{ url_for('new_question') }}"{% if request.endpoint == 'new_question' %} aria-current="page"{% endif %}><span class="nav-icon" aria-hidden="true">＋</span><span class="nav-label-text">문제 등록</span></a>
   </nav>

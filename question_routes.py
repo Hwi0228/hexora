@@ -12,6 +12,11 @@ from auth import admin_required, login_required
 from constants import NAV_ITEMS, SUBJECTS
 from database import begin_write_transaction, get_db
 from parse_hwp import normalize_katex_markup, strip_choice_label
+from hmleq_converter import (
+    HmleqConversionError,
+    HmleqUnavailable,
+    convert_hancom_to_latex as run_hmleq,
+)
 from curriculum_data import (
     DATASET_URL as CURRICULUM_DATASET_URL,
     DATASET_VERSION as CURRICULUM_DATASET_VERSION,
@@ -117,6 +122,17 @@ def format_question_number(question_id):
         value, remainder = divmod(value, 36)
         encoded = BASE36_ALPHABET[remainder] + encoded
     return encoded.rjust(BASE36_WIDTH, "0")
+
+
+def parse_question_number(value):
+    value = (value or "").strip().upper()
+    if len(value) != BASE36_WIDTH or any(char not in BASE36_ALPHABET for char in value):
+        return None
+    try:
+        question_id = int(value, 36)
+    except ValueError:
+        return None
+    return question_id if format_question_number(question_id) == value else None
 
 
 class _RichTextSanitizer(HTMLParser):
@@ -254,6 +270,7 @@ def _save_question_draft(data, question_id=None, base_revision=None):
     payload["choices"] = data.get("choices") or []
     payload["folder_uuid"] = data.get("folder_uuid")
     payload["summary"] = data.get("summary", "")
+    payload["base_question_number"] = data.get("base_question_number", "")
     get_db().execute(
         """
         INSERT INTO question_drafts (
@@ -312,6 +329,8 @@ def _collect_question_data(form):
         "page": None,
         "source_url": form.get("source_url", "").strip(),
         "license": form.get("license", "").strip(),
+        "base_question_number": form.get("base_question_number", "").strip().upper(),
+        "base_question_id": None,
         "summary": form.get("summary", "").strip() or "문제 내용 수정",
         "folder_uuid": form.get("folder_uuid", "").strip() or None,
     }
@@ -328,6 +347,14 @@ def _collect_question_data(form):
         errors.append("출처 유형을 선택해 주세요.")
     if data["license"] not in LICENSE_CHOICES:
         errors.append("라이선스를 선택해 주세요.")
+    if data["base_question_number"]:
+        base_id = parse_question_number(data["base_question_number"])
+        if base_id is None:
+            errors.append("변형문제 기준 번호는 6자리 Base36 번호로 입력해 주세요.")
+        elif get_db().execute("SELECT 1 FROM questions WHERE id = ?", (base_id,)).fetchone() is None:
+            errors.append("해당 기준 문항을 찾을 수 없습니다.")
+        else:
+            data["base_question_id"] = base_id
     for field, label in (("grade", "학년"),):
         if not data[field]:
             errors.append(f"{label}을(를) 입력해 주세요.")
@@ -812,6 +839,14 @@ def _question_form_values(question):
         except json.JSONDecodeError:
             raw_choices = []
     values["choices"] = "\n".join(raw_choices)
+    base_link = get_db().execute(
+        "SELECT related_question_id FROM question_links WHERE question_id = ? "
+        "AND relation_type = 'variant' AND related_question_id IS NOT NULL "
+        "ORDER BY id LIMIT 1", (question["id"],),
+    ).fetchone()
+    values["base_question_number"] = (
+        format_question_number(base_link["related_question_id"]) if base_link else ""
+    )
     if values.get("difficulty") not in DIFFICULTIES:
         values["difficulty"] = "중"
     if values.get("question_type") not in QUESTION_TYPES:
@@ -881,6 +916,12 @@ def new_question():
             connection, question_id, 1, g.user["uuid"], "최초 등록",
             _question_snapshot(question),
         )
+        if data["base_question_id"] is not None:
+            connection.execute(
+                "INSERT INTO question_links (question_id, related_question_id, relation_type, created_by) "
+                "VALUES (?, ?, 'variant', ?)",
+                (question_id, data["base_question_id"], g.user["uuid"]),
+            )
         _delete_question_draft()
         connection.commit()
     except Exception:
@@ -923,6 +964,8 @@ def edit_question(question_id):
         )
 
     data, errors = _collect_question_data(request.form)
+    if data["base_question_id"] == question_id:
+        errors.append("현재 문항 자신을 변형문제 기준으로 지정할 수 없습니다.")
     try:
         base_revision = int(request.form.get("base_revision", ""))
     except (TypeError, ValueError):
@@ -982,6 +1025,16 @@ def edit_question(question_id):
             ),
         )
         snapshot = {field: data[field] for field in QUESTION_CONTENT_FIELDS}
+        connection.execute(
+            "DELETE FROM question_links WHERE question_id = ? AND relation_type = 'variant' "
+            "AND related_question_id IS NOT NULL", (question_id,),
+        )
+        if data["base_question_id"] is not None:
+            connection.execute(
+                "INSERT INTO question_links (question_id, related_question_id, relation_type, created_by) "
+                "VALUES (?, ?, 'variant', ?)",
+                (question_id, data["base_question_id"], g.user["uuid"]),
+            )
         _insert_question_revision(
             connection, question_id, next_revision, g.user["uuid"],
             data["summary"], snapshot,
@@ -1042,10 +1095,13 @@ def question_history(question_id):
                 before = "\n".join(before or [])
                 after = "\n".join(after or [])
             if before != after:
+                before_value = "" if before is None else str(before)
+                after_value = "" if after is None else str(after)
                 comparison.append({
                     "field": QUESTION_FIELD_LABELS[field],
-                    "before": "" if before is None else str(before),
-                    "after": "" if after is None else str(after),
+                    # Only sanitizer-produced markup reaches the template's safe renderer.
+                    "before_html": render_rich_html(before_value),
+                    "after_html": render_rich_html(after_value),
                 })
 
     return render_template(
@@ -1180,7 +1236,25 @@ def move_question(question_id):
         )
     )
 
+def hancom_to_latex():
+    payload = request.get_json(silent=True)
+    script = payload.get("script") if isinstance(payload, dict) else None
+    try:
+        latex = run_hmleq(script)
+    except HmleqConversionError as exc:
+        return jsonify(error=str(exc)), 422
+    except HmleqUnavailable as exc:
+        return jsonify(error=str(exc)), 503
+    return jsonify(latex=latex)
+
+
 def register_question_routes(app):
+    app.add_url_rule(
+        "/api/math/hancom-to-latex",
+        endpoint="hancom_to_latex",
+        view_func=login_required(hancom_to_latex),
+        methods=["POST"],
+    )
     app.add_url_rule(
         "/curriculum/standards",
         endpoint="curriculum_standards",

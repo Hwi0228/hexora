@@ -9,6 +9,7 @@ from dashboard_routes import register_dashboard_routes
 from changelog_routes import register_changelog_routes
 from hwp_routes import register_hwp_routes
 from question_routes import register_question_routes
+from workbook_routes import register_workbook_routes
 
 
 def _secret_key(app):
@@ -68,6 +69,7 @@ def create_app():
     register_dashboard_routes(app)
     register_changelog_routes(app)
     register_question_routes(app)
+    register_workbook_routes(app)
     register_hwp_routes(app)
     return app
 

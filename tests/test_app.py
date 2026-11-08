@@ -84,6 +84,22 @@ class QuestionRegistrationTests(unittest.TestCase):
         form.update(overrides)
         return form
 
+    @patch("question_routes.run_hmleq", return_value=r"\frac{a}{b}")
+    def test_hancom_math_endpoint_returns_hmleq_latex(self, convert):
+        self.client.get("/questions/new")
+        with self.client.session_transaction() as user_session:
+            token = user_session["csrf_token"]
+
+        response = self.client.post(
+            "/api/math/hancom-to-latex",
+            json={"script": "{a} over {b}"},
+            headers={"X-CSRF-Token": token},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json, {"latex": r"\frac{a}{b}"})
+        convert.assert_called_once_with("{a} over {b}")
+
     def create_folder(self, client, name, parent_uuid=""):
         response = self.csrf_post(
             client,
@@ -320,7 +336,7 @@ class QuestionRegistrationTests(unittest.TestCase):
             self.assertIn(b"scripts/katex-render.js", response.data)
             self.assertNotIn(b"katex@0.16.22/dist/katex.min.js", response.data)
             self.assertIn(r"\(x^2 + 1\)".encode("utf-8"), response.data)
-            self.assertIn(r"$$\dfrac{1}{2}$$".encode("utf-8"), response.data)
+            self.assertIn(r"$$\frac{1}{2}$$".encode("utf-8"), response.data)
 
         root = Path(__file__).resolve().parents[1]
         renderer = (root / "static/scripts/katex-render.js").read_text(encoding="utf-8")
@@ -851,20 +867,20 @@ class QuestionRegistrationTests(unittest.TestCase):
         self.csrf_post(
             self.client,
             "/questions/new",
-            data=self.valid_question(prompt="관리자 원본 문제"),
+            data=self.valid_question(prompt=r"<p>관리자 원본 <strong>문제</strong> $\frac{1}{2}$</p>"),
         )
         question_id = self.query_one("SELECT id FROM questions LIMIT 1")
 
         editor = app.test_client()
         self.register(editor, "wiki-editor@example.com", "위키 편집자")
-        self.assertIn("관리자 원본 문제".encode(), editor.get("/questions").data)
+        self.assertIn("관리자 원본".encode(), editor.get("/questions").data)
 
         edit_page = editor.get(f"/questions/{question_id}/edit")
         self.assertEqual(edit_page.status_code, 200)
         self.assertIn(b'name="base_revision" value="1"', edit_page.data)
 
         form = self.valid_question(
-            prompt="다른 회원이 수정한 문제",
+            prompt=r"<p>다른 회원이 <em>수정한</em> 문제 $\tfrac{2}{3}$</p>",
             explanation="수정한 해설",
         )
         form["base_revision"] = "1"
@@ -887,7 +903,10 @@ class QuestionRegistrationTests(unittest.TestCase):
         finally:
             connection.close()
         self.assertEqual(row[0], self.admin_uuid)
-        self.assertEqual(row[1:], ("다른 회원이 수정한 문제", "수정한 해설"))
+        self.assertEqual(
+            row[1:],
+            (r"<p>다른 회원이 <em>수정한</em> 문제 $\tfrac{2}{3}$</p>", "수정한 해설"),
+        )
         self.assertEqual(revisions, [
             (1, "최초 등록"),
             (2, "문제 문구와 해설 보완"),
@@ -897,6 +916,14 @@ class QuestionRegistrationTests(unittest.TestCase):
         self.assertEqual(history.status_code, 200)
         self.assertIn("위키 편집자".encode(), history.data)
         self.assertIn("변경 비교".encode(), history.data)
+        self.assertIn("<strong>문제</strong>".encode(), history.data)
+        self.assertIn(r"$\frac{1}{2}$".encode(), history.data)
+        self.assertIn("<em>수정한</em>".encode(), history.data)
+        self.assertIn(r"$\tfrac{2}{3}$".encode(), history.data)
+        self.assertNotIn("&lt;p&gt;관리자 원본".encode(), history.data)
+        self.assertNotIn("&lt;p&gt;다른 회원이".encode(), history.data)
+        self.assertIn(b'class="value before math-content"', history.data)
+        self.assertIn(b"scripts/katex-render.js", history.data)
 
         self.csrf_post(self.client, f"/questions/{question_id}/restore/1")
         connection = sqlite3.connect(self.database)
@@ -910,7 +937,7 @@ class QuestionRegistrationTests(unittest.TestCase):
             ).fetchone()[0]
         finally:
             connection.close()
-        self.assertEqual(prompt, "관리자 원본 문제")
+        self.assertEqual(prompt, r"<p>관리자 원본 <strong>문제</strong> $\frac{1}{2}$</p>")
         self.assertEqual(count, 3)
 
     def test_stale_question_edit_is_rejected(self):
@@ -1006,6 +1033,16 @@ class EditorFrontendRegressionTests(unittest.TestCase):
         self.assertNotIn("@tiptap/", template)
         self.assertIn("if (!window.Quill)", template)
         self.assertIn("new Quill(mount", template)
+
+    def test_question_editor_supports_converting_hancom_math_scripts(self):
+        template = (
+            Path(__file__).resolve().parents[1]
+            / "static/templates/question_form.html"
+        ).read_text(encoding="utf-8")
+        self.assertIn('<option value="hancom">한컴 한/글 수식</option>', template)
+        self.assertIn('id="math-hancom-input"', template)
+        self.assertIn("url_for('hancom_to_latex')", template)
+        self.assertIn('"X-CSRF-Token": token', template)
 
     def test_quill_math_remains_atomic_and_supports_clipboard_roundtrips(self):
         template = (Path(__file__).resolve().parents[1] / "static/templates/question_form.html").read_text(encoding="utf-8")

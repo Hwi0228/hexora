@@ -69,10 +69,9 @@
               <span class="section-hint"><span class="required">*</span> 필수</span>
             </div>
             <div class="fields">
-              <label class="field">문항 제목 <span class="required">*</span>
-                <input name="title" maxlength="200" value="{{ form_data.get('title', '') }}" placeholder="예: 함수의 극한과 연속성">
-                <small>목록에서 문항을 구분할 수 있는 제목</small>
-              </label>
+              <input type="hidden" name="title" value="{{ form_data.get('title', '') }}">
+              <input type="hidden" name="difficulty" value="{{ form_data.get('difficulty', '중') }}">
+              <input type="hidden" name="points" value="{{ form_data.get('points', 4)|default(4, true) }}">
               <label class="field">과목 <span class="required">*</span>
                 <select name="subject" required>
                   <option value="">과목 선택</option>
@@ -114,22 +113,12 @@
                   <a href="https://github.com/greatsong/k-curriculum-2022/tree/v3.0.1" target="_blank" rel="noopener noreferrer">데이터 출처</a>
                 </small>
               </label>
-              <label class="field">난이도 <span class="required">*</span>
-                <select name="difficulty" required>
-                  {% for value in difficulties %}
-                    <option value="{{ value }}"{% if form_data.get('difficulty', '중') == value %} selected{% endif %}>{{ value }}</option>
-                  {% endfor %}
-                </select>
-              </label>
               <label class="field">문항 유형 <span class="required">*</span>
                 <select name="question_type" id="question-type" required>
                   {% for value in question_types %}
                     <option value="{{ value }}"{% if form_data.get('question_type', '단답형') == value %} selected{% endif %}>{{ value }}</option>
                   {% endfor %}
                 </select>
-              </label>
-              <label class="field">배점
-                <input name="points" type="number" min="1" max="100" value="{{ form_data.get('points', 4)|default(4, true) }}">
               </label>
               <div class="field full standard-box">
                 <label>성취기준 <span class="standard-status" id="standard-status">목록에서 적용할 기준을 선택하세요.</span></label>
@@ -166,8 +155,20 @@
                   <div class="math-help">지문, 보기, 문제 본문을 이곳에 함께 작성할 수 있습니다. 수식은 LaTeX 문자열로 저장되고 문제 DB에서 렌더링됩니다.</div>
                 </div>
               </label>
-              <label class="field full">선택지 <span class="choice-help">객관식 문항은 한 줄에 하나씩 입력 · 수식 LaTeX 지원</span>
-                <textarea name="choices" placeholder="① 첫 번째 선택지&#10;② 두 번째 선택지&#10;③ 세 번째 선택지">{{ form_data.get('choices', '') }}</textarea>
+              <label class="field full">선택지 <span class="choice-help">한 문단에 하나씩 작성 · LaTeX 및 한컴 한/글 수식 삽입 지원</span>
+                <div class="rich-field">
+                  <div class="rich-toolbar" data-toolbar="choices">
+                    <button class="tool-button ql-bold" type="button" aria-label="굵게">B</button>
+                    <button class="tool-button ql-italic" type="button" aria-label="기울임"><i>I</i></button>
+                    <button class="tool-button ql-underline" type="button" aria-label="밑줄"><u>U</u></button>
+                    <span class="tool-divider"></span>
+                    <button class="tool-button ql-inlineMath" type="button">∑ 수식</button>
+                    <button class="tool-button ql-blockMath" type="button">∑ 블록</button>
+                  </div>
+                  <div class="rich-editor choices-editor" data-editor="choices"></div>
+                  <textarea class="rich-source choices-source" name="choices" data-source="choices" placeholder="① 첫 번째 선택지&#10;② 두 번째 선택지&#10;③ 세 번째 선택지">{{ form_data.get('choices', '') }}</textarea>
+                  <div class="math-help">각 문단을 선택지 하나로 저장합니다. 수식 버튼에서 LaTeX 또는 한컴 수식을 입력할 수 있습니다.</div>
+                </div>
               </label>
             </div>
           </section>
@@ -257,6 +258,10 @@
                     <option value="{{ value }}"{% if form_data.get('license') == value %} selected{% endif %}>{{ label }}</option>
                   {% endfor %}
                 </select>
+              </label>
+              <label class="field full">변형문제 기준 문항 번호
+                <input name="base_question_number" maxlength="6" minlength="6" pattern="[0-9A-Za-z]{6}" autocapitalize="characters" value="{{ form_data.get('base_question_number', '') }}" placeholder="예: 00000A">
+                <small>기준이 되는 HEXORA 문항의 6자리 Base36 번호를 입력하면 변형문제로 연결됩니다.</small>
               </label>
             </div>
             {% if mode == 'edit' %}
@@ -460,6 +465,13 @@
         });
       }
 
+      function serializeChoices(quill) {
+        return Array.from(quill.root.children)
+          .filter((node) => node.textContent.trim() ||
+            node.querySelector(".ql-math-inline, .ql-math-block"))
+          .map((node) => node.outerHTML).join("\n");
+      }
+
       sources.forEach((source) => {
         const key = source.dataset.source;
         const mount = document.querySelector('[data-editor="' + key + '"]');
@@ -503,7 +515,11 @@
           legacyMathEmbed(node, true));
         const initialHtml = source.value.trim();
         if (initialHtml) quill.setContents(quill.clipboard.convert({ html: initialHtml }), "silent");
-        quill.on("text-change", () => { source.value = quill.root.innerHTML; });
+        quill.on("text-change", () => {
+          source.value = key === "choices"
+            ? serializeChoices(quill)
+            : quill.root.innerHTML;
+        });
 
         mount.addEventListener("dblclick", (event) => {
           const mathNode = event.target.closest(".ql-math-inline, .ql-math-block");
@@ -528,7 +544,9 @@
       form.addEventListener("submit", (event) => {
         sources.forEach((source) => {
           const editor = editors.get(source.dataset.source);
-          if (editor) source.value = editor.root.innerHTML;
+          if (editor) source.value = source.dataset.source === "choices"
+            ? serializeChoices(editor)
+            : editor.root.innerHTML;
         });
         if (event.submitter && event.submitter.value === "draft") return;
         const missing = ["prompt", "answer"].find((key) => {

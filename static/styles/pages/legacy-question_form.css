@@ -51,6 +51,7 @@
     .rich-editor { min-height:130px; padding:14px 15px; color:#24364B; font-size:13px; line-height:1.8; outline:none; }
     .rich-editor.answer-editor { min-height:88px; }
     .rich-editor.explanation-editor { min-height:150px; }
+    .rich-editor.choices-editor { min-height:125px; }
     .rich-editor p { margin:0 0 8px; }
     .rich-editor ul, .rich-editor ol { padding-left:24px; }
     .rich-editor [data-type="block-math"] { margin:12px 0; padding:9px; overflow-x:auto; border-radius:7px; background:#F8FAFC; text-align:center; }
@@ -58,6 +59,7 @@
     .rich-source { width:100%; min-height:125px; border:0; border-radius:0; resize:vertical; }
     .rich-source.answer-source { min-height:80px; }
     .rich-source.explanation-source { min-height:145px; }
+    .rich-source.choices-source { min-height:125px; }
     .js-editor-ready .rich-source { display:none; }
     .js-editor-ready .rich-editor { display:block; }
     .rich-editor { display:none; }
