@@ -1,5 +1,6 @@
 import tempfile
 import unittest
+from unittest.mock import patch
 from pathlib import Path
 
 from parse_hwp import (
@@ -11,6 +12,12 @@ from parse_hwp import (
 
 
 class HwpParsingTests(unittest.TestCase):
+    @patch("parse_hwp.convert_hancom_to_latex", return_value=r"\frac{1}{2}")
+    def test_prefers_hmleq_for_equation_scripts(self, convert):
+        with patch.dict("os.environ", {"HMLEQ_USE_LEGACY": ""}):
+            self.assertEqual(_equation_to_latex("1 over 2 `"), r"\frac{1}{2}")
+        convert.assert_called_once_with("1 over 2")
+
     def test_extracts_question_choices_answer_explanation_and_math(self):
         xml = """\
 <hs:sec xmlns:hs="http://www.hancom.co.kr/hwpml/2011/section"

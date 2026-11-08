@@ -7,6 +7,7 @@ import uuid
 from pathlib import Path
 
 from app import app
+from hmleq_converter import _executable
 
 
 class QuestionRegistrationTests(unittest.TestCase):
@@ -490,17 +491,55 @@ class QuestionRegistrationTests(unittest.TestCase):
         self.assertIn(b'id="math-input-format"', form_response.data)
         self.assertNotIn(b"window.prompt(", form_response.data)
 
-    def test_hancom_math_input_endpoint_converts_to_latex(self):
+    @patch("question_routes.run_hmleq", return_value=r"\frac{ a+b } { c }")
+    def test_hancom_math_input_endpoint_converts_to_latex(self, convert):
         self.client.get("/questions/new")
         with self.client.session_transaction() as user_session:
             csrf = user_session["csrf_token"]
         response = self.client.post("/questions/math/convert-hancom", json={"expression": r"{a+b} over {c}"}, headers={"X-CSRF-Token": csrf})
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.get_json()["latex"], r"\frac{ a+b } { c }")
+        convert.assert_called_once_with("{a+b} over {c}")
         empty = self.client.post("/questions/math/convert-hancom", json={"expression": "   "}, headers={"X-CSRF-Token": csrf})
         self.assertEqual(empty.status_code, 400)
         too_long = self.client.post("/questions/math/convert-hancom", json={"expression": "x" * 5001}, headers={"X-CSRF-Token": csrf})
         self.assertEqual(too_long.status_code, 400)
+
+    @unittest.skipUnless(_executable(), "hmleq CLI is installed by build.sh")
+    def test_real_hmleq_math_input_can_be_saved_and_rendered(self):
+        self.client.get("/questions/new")
+        with self.client.session_transaction() as user_session:
+            csrf = user_session["csrf_token"]
+
+        converted = self.client.post(
+            "/questions/math/convert-hancom",
+            json={"expression": "1 over 2"},
+            headers={"X-CSRF-Token": csrf},
+        )
+        self.assertEqual(converted.status_code, 200)
+        latex = converted.get_json()["latex"]
+        self.assertEqual(latex, r"\frac{1}{2}")
+
+        self.csrf_post(
+            self.client,
+            "/questions/new",
+            data=self.valid_question(prompt=f"<p>변환 수식 ${latex}$</p>"),
+        )
+        connection = sqlite3.connect(self.database)
+        try:
+            stored_prompt = connection.execute(
+                "SELECT prompt FROM questions WHERE id = 1"
+            ).fetchone()[0]
+        finally:
+            connection.close()
+        self.assertEqual(stored_prompt, r"<p>변환 수식 $\frac{1}{2}$</p>")
+
+        rendered = self.client.get("/questions")
+        self.assertEqual(rendered.status_code, 200)
+        self.assertIn("변환 수식".encode(), rendered.data)
+        self.assertIn(r"\frac{1}{2}".encode(), rendered.data)
+        self.assertIn(b'class="math-content"', rendered.data)
+        self.assertIn(b"scripts/katex-render.js", rendered.data)
 
     def test_only_user_created_uuid_folders_and_nested_folders_appear(self):
         empty_response = self.client.get("/questions")

@@ -12,6 +12,7 @@ from auth import admin_required, login_required
 from constants import NAV_ITEMS, SUBJECTS
 from database import begin_write_transaction, get_db
 from parse_hwp import _equation_to_latex, normalize_katex_markup, strip_choice_label
+from hmleq_converter import HmleqConversionError, HmleqUnavailable, convert_hancom_to_latex as run_hmleq
 from curriculum_data import (
     DATASET_URL as CURRICULUM_DATASET_URL,
     DATASET_VERSION as CURRICULUM_DATASET_VERSION,
@@ -1191,9 +1192,11 @@ def convert_hancom_math():
     if len(expression) > 5000:
         return jsonify(error="수식 코드는 5,000자 이내로 입력해 주세요."), 400
     try:
-        latex = _equation_to_latex(expression)
-    except (ValueError, TypeError) as error:
+        latex = run_hmleq(expression)
+    except HmleqConversionError as error:
         return jsonify(error=f"한컴 수식을 변환하지 못했습니다: {error}"), 400
+    except HmleqUnavailable as error:
+        return jsonify(error=f"수식 변환기를 사용할 수 없습니다: {error}"), 503
     return jsonify(latex=latex)
 
 
