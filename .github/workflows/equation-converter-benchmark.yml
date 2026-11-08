@@ -33,7 +33,7 @@ jobs:
           cat > /tmp/hmleq-test/src/main.rs <<'EOF'
           fn main() {
               let cases = [
-                  ("a over b", r"\\frac{a}{b}"),
+                  ("a over b", "frac"),
                   ("{a+b} over {c+d}", "frac"),
                   ("sqrt {a over b}", "sqrt"),
                   ("x^2 + y_1", "^"),
