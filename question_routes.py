@@ -133,6 +133,7 @@ class _RichTextSanitizer(HTMLParser):
         self.parts = []
         self.stack = []
         self.math_skip_depth = None
+        self.math_close_tag = None
 
     def handle_starttag(self, tag, attrs):
         if self.math_skip_depth is not None:
@@ -158,11 +159,19 @@ class _RichTextSanitizer(HTMLParser):
 
         if tag in {"span", "div"} and math_type in {"inline-math", "block-math"}:
             latex = attr_map.get("data-latex", "") or ""
-            delimiter = "$$" if math_type == "block-math" else "$"
-            self.parts.append(html.escape(f"{delimiter}{latex}{delimiter}"))
-            # Quill embeds contain rendered KaTeX DOM. Store only the LaTeX text.
-            # Ignore the nested HTML so it cannot leak into the database field.
+            input_format = "hancom" if attr_map.get("data-input-format") == "hancom" else "latex"
+            input_source = attr_map.get("data-input-source") or latex
+            safe_class = "ql-math-block" if math_type == "block-math" else "ql-math-inline"
+            safe_tag = "div" if math_type == "block-math" else "span"
+            self.parts.append(
+                f'<{safe_tag} class="{safe_class}" '
+                f'data-latex="{html.escape(latex, quote=True)}" '
+                f'data-input-format="{input_format}" '
+                f'data-input-source="{html.escape(input_source, quote=True)}">'
+            )
+            # Keep only safe equation data. Drop any embedded KaTeX markup.
             self.math_skip_depth = 1
+            self.math_close_tag = safe_tag
             return
 
         self.parts.append(f"<{tag}>")
@@ -179,6 +188,9 @@ class _RichTextSanitizer(HTMLParser):
             self.math_skip_depth -= 1
             if self.math_skip_depth == 0:
                 self.math_skip_depth = None
+                if self.math_close_tag:
+                    self.parts.append(f"</{self.math_close_tag}>")
+                    self.math_close_tag = None
             return
         if self.stack and self.stack[-1].startswith("__literal__:"):
             literal_tag = self.stack[-1].split(":", 1)[1]
@@ -223,8 +235,8 @@ def _rich_text_has_content(value):
 
 
 def render_rich_html(value):
-    # Keep Tiptap math nodes intact for the client-side KaTeX renderer.
-    # The sanitizer preserves only the editor's safe data-type/data-latex attributes.
+    # Preserve sanitized equation source metadata so existing equations can be edited
+    # in the same input format while KaTeX renders only their LaTeX output.
     return sanitize_rich_html(normalize_katex_markup(value or ""))
 
 
