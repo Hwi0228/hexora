@@ -19,9 +19,8 @@ cargo install \
   --force
 
 hmleq_version=$("$HOME/.cargo/bin/hmleq" --version)
-[[ "$hmleq_version" == "hmleq 0.2.0" ]] || {
-  echo "Expected hmleq 0.2.0; found: $hmleq_version" >&2
+[[ "$hmleq_version" == "hmleq-cli 0.2.0" ]] || {
+  echo "Expected hmleq-cli 0.2.0; found: $hmleq_version" >&2
   exit 1
 }
 touch .render-require-hmleq
-
