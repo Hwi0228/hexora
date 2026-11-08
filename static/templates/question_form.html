@@ -283,10 +283,24 @@
     <section class="math-dialog" role="dialog" aria-modal="true" aria-labelledby="math-dialog-title">
       <form id="math-input-form">
         <h2 id="math-dialog-title">LaTeX 수식 입력</h2>
+        <label for="math-input-mode">입력 방식</label>
+        <select id="math-input-mode">
+          <option value="latex">LaTeX</option>
+          <option value="hancom">한컴 한/글 수식</option>
+        </select>
+        <div id="latex-math-fields">
         <label for="math-latex-input">수식 코드</label>
         <input id="math-latex-input" type="text" autocomplete="off" spellcheck="false"
                placeholder="예: \\frac{1}{2} 또는 x^2 + 1">
         <p>LaTeX 문법으로 입력하세요. 예: \\sqrt{x}, \\frac{a}{b}</p>
+        </div>
+        <div id="hancom-math-fields" hidden>
+          <label for="math-hancom-input">한컴 수식 스크립트</label>
+          <textarea id="math-hancom-input" rows="3" maxlength="4096" spellcheck="false"
+                    placeholder="예: {a+b} over {c}"></textarea>
+          <p>브라우저에서 변환합니다. 예: <code>sqrt {x}</code>, <code>root 3 of {x}</code>, <code>{a+b} over {c}</code></p>
+        </div>
+        <p id="math-conversion-error" class="errors" role="alert" hidden></p>
         <div class="math-dialog-actions">
           <button class="button" id="math-input-cancel" type="button">취소</button>
           <button class="button primary" type="submit">삽입</button>
@@ -296,6 +310,7 @@
   </div>
 
   <script defer src="{{ url_for('static', filename='scripts/katex-render.js') }}"></script>
+  <script src="{{ url_for('static', filename='scripts/hancom-equation.js') }}"></script>
   <script src="https://cdn.jsdelivr.net/npm/quill@2.0.3/dist/quill.js"></script>
   <script>
     const form = document.getElementById("question-form");
@@ -353,6 +368,11 @@
       const mathDialog = document.getElementById("math-input-dialog");
       const mathDialogForm = document.getElementById("math-input-form");
       const mathInput = document.getElementById("math-latex-input");
+      const hancomInput = document.getElementById("math-hancom-input");
+      const mathInputMode = document.getElementById("math-input-mode");
+      const latexMathFields = document.getElementById("latex-math-fields");
+      const hancomMathFields = document.getElementById("hancom-math-fields");
+      const conversionError = document.getElementById("math-conversion-error");
       const mathCancel = document.getElementById("math-input-cancel");
       let mathDialogAction = null;
 
@@ -362,6 +382,10 @@
       }
 
       function openMathDialog(initialValue, action) {
+        mathInputMode.value = "latex";
+        latexMathFields.hidden = false;
+        hancomMathFields.hidden = true;
+        conversionError.hidden = true;
         mathInput.value = initialValue || "";
         mathDialogAction = action;
         mathDialog.hidden = false;
@@ -371,9 +395,37 @@
         });
       }
 
+      mathInputMode.addEventListener("change", () => {
+        const hancomMode = mathInputMode.value === "hancom";
+        latexMathFields.hidden = hancomMode;
+        hancomMathFields.hidden = !hancomMode;
+        conversionError.hidden = true;
+        (hancomMode ? hancomInput : mathInput).focus();
+      });
+
       mathDialogForm.addEventListener("submit", (event) => {
         event.preventDefault();
-        const latex = mathInput.value.trim();
+        let latex = mathInput.value.trim();
+        if (mathInputMode.value === "hancom") {
+          const script = hancomInput.value.trim();
+          if (!script) {
+            hancomInput.setCustomValidity("한컴 수식 스크립트를 입력해 주세요.");
+            hancomInput.reportValidity();
+            return;
+          }
+          conversionError.hidden = true;
+          try {
+            latex = window.EasyConvertEquation.hwpEquationToLaTeX(script);
+          } catch (error) {
+            const invalidRootOrder = /^sqrt\s*\{[^}]+\}\s+of\b/i.test(script);
+            conversionError.textContent = invalidRootOrder
+              ? "'sqrt {3} of {5}' 형식은 사용할 수 없습니다. 다섯제곱근을 뜻한다면 'root 5 of {3}'처럼 입력해 주세요."
+              : (error.message || "수식 문법을 확인해 주세요.");
+            conversionError.hidden = false;
+            hancomInput.focus();
+            return;
+          }
+        }
         if (!latex) {
           mathInput.setCustomValidity("LaTeX 수식을 입력해 주세요.");
           mathInput.reportValidity();
@@ -385,6 +437,7 @@
         if (action) action(latex);
       });
       mathInput.addEventListener("input", () => mathInput.setCustomValidity(""));
+      hancomInput.addEventListener("input", () => hancomInput.setCustomValidity(""));
       mathCancel.addEventListener("click", closeMathDialog);
       mathDialog.addEventListener("click", (event) => {
         if (event.target === mathDialog) closeMathDialog();
