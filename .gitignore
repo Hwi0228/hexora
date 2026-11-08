@@ -5,4 +5,6 @@ instance/*.sqlite3
 instance/*.sqlite3-shm
 instance/*.sqlite3-wal
 instance/.secret_key
+.render-require-hmleq
 instance/curriculum/standards-v3.0.1.json
+
