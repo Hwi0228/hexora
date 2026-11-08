@@ -50,8 +50,8 @@ class HmleqConverterTests(unittest.TestCase):
     def test_rejects_empty_and_oversized_scripts(self):
         with self.assertRaises(HmleqConversionError):
             convert_hancom_to_latex("  ")
-        with self.assertRaisesRegex(HmleqConversionError, "4096"):
-            convert_hancom_to_latex("x" * 4097)
+        with self.assertRaisesRegex(HmleqConversionError, "5000"):
+            convert_hancom_to_latex("x" * 5001)
 
     @unittest.skipUnless(_executable(), "hmleq CLI is installed by build.sh")
     def test_real_hmleq_converts_fraction_radical_and_matrix(self):

@@ -70,7 +70,7 @@ class HwpParserRouteTests(unittest.TestCase):
         self.assertIn(b'accept=".hwp,.hwpx,.xml,application/xml,text/xml"', response.data)
         self.assertIn(b'href="/hwp"', self.client.get("/").data)
 
-    def test_existing_question_data_survives_explanation_column_migration(self):
+    def test_existing_question_data_survives_explanation_migration_and_preserves_fractions(self):
         with self.client.session_transaction() as user_session:
             user_uuid = user_session["user_uuid"]
         connection = sqlite3.connect(app.config["DATABASE"])

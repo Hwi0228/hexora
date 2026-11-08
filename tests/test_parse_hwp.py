@@ -1,5 +1,6 @@
 import tempfile
 import unittest
+from unittest.mock import patch
 from pathlib import Path
 from unittest.mock import patch
 
@@ -14,7 +15,8 @@ from parse_hwp import (
 class HwpParsingTests(unittest.TestCase):
     @patch("parse_hwp.convert_hancom_to_latex", return_value=r"\frac{1}{2}")
     def test_prefers_hmleq_for_equation_scripts(self, convert):
-        self.assertEqual(_equation_to_latex("1 over 2 `"), r"\frac{1}{2}")
+        with patch.dict("os.environ", {"HMLEQ_USE_LEGACY": ""}):
+            self.assertEqual(_equation_to_latex("1 over 2 `"), r"\frac{1}{2}")
         convert.assert_called_once_with("1 over 2")
 
     def test_extracts_question_choices_answer_explanation_and_math(self):
@@ -164,6 +166,10 @@ class HwpParsingTests(unittest.TestCase):
             aligned_formula,
             r"\begin{aligned} & \text{가입비 15000원} \\ & \text{- 가입 시 추가 요금 없이 무제한 편집 가능} \end{aligned}",
         )
+
+    def test_fraction_commands_are_preserved_for_katex(self):
+        expression = r"\frac{a}{b} + \tfrac{c}{d} + \cfrac{1}{2} + \dfrac{3}{4}"
+        self.assertEqual(normalize_katex_expression(expression), expression)
 
     def test_normalizes_legacy_formula_markup_for_existing_db_questions(self):
         expression = r"\frac{a}{b} + \tfrac{c}{d} + \cfrac{1}{2} + \dfrac{3}{4}"

@@ -8,7 +8,7 @@ import subprocess
 from pathlib import Path
 
 
-MAX_SCRIPT_LENGTH = 4096
+MAX_SCRIPT_LENGTH = 5000
 CONVERSION_TIMEOUT_SECONDS = 5
 
 
@@ -23,13 +23,19 @@ class HmleqConversionError(ValueError):
 def _executable() -> str | None:
     configured = os.environ.get("HMLEQ_BIN", "").strip()
     if configured:
-        return configured
+        configured_path = Path(configured)
+        if configured_path.is_file() and os.access(configured_path, os.X_OK):
+            return str(configured_path)
 
     executable = shutil.which("hmleq")
     if executable:
         return executable
 
     cargo_executable = "hmleq.exe" if os.name == "nt" else "hmleq"
+    project_path = Path(__file__).resolve().parent / ".render-tools" / "bin" / cargo_executable
+    if project_path.is_file():
+        return str(project_path)
+
     cargo_path = Path.home() / ".cargo" / "bin" / cargo_executable
     return str(cargo_path) if cargo_path.is_file() else None
 

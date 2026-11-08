@@ -12,11 +12,7 @@ from auth import admin_required, login_required
 from constants import NAV_ITEMS, SUBJECTS
 from database import begin_write_transaction, get_db
 from parse_hwp import normalize_katex_markup, strip_choice_label
-from hmleq_converter import (
-    HmleqConversionError,
-    HmleqUnavailable,
-    convert_hancom_to_latex as run_hmleq,
-)
+from hmleq_converter import HmleqConversionError, HmleqUnavailable, convert_hancom_to_latex as run_hmleq
 from curriculum_data import (
     DATASET_URL as CURRICULUM_DATASET_URL,
     DATASET_VERSION as CURRICULUM_DATASET_VERSION,
@@ -148,6 +144,7 @@ class _RichTextSanitizer(HTMLParser):
         self.parts = []
         self.stack = []
         self.math_skip_depth = None
+        self.math_close_tag = None
 
     def handle_starttag(self, tag, attrs):
         if self.math_skip_depth is not None:
@@ -173,11 +170,19 @@ class _RichTextSanitizer(HTMLParser):
 
         if tag in {"span", "div"} and math_type in {"inline-math", "block-math"}:
             latex = attr_map.get("data-latex", "") or ""
-            delimiter = "$$" if math_type == "block-math" else "$"
-            self.parts.append(html.escape(f"{delimiter}{latex}{delimiter}"))
-            # Quill embeds contain rendered KaTeX DOM. Store only the LaTeX text.
-            # Ignore the nested HTML so it cannot leak into the database field.
+            input_format = "hancom" if attr_map.get("data-input-format") == "hancom" else "latex"
+            input_source = attr_map.get("data-input-source") or latex
+            safe_class = "ql-math-block" if math_type == "block-math" else "ql-math-inline"
+            safe_tag = "div" if math_type == "block-math" else "span"
+            self.parts.append(
+                f'<{safe_tag} class="{safe_class}" '
+                f'data-latex="{html.escape(latex, quote=True)}" '
+                f'data-input-format="{input_format}" '
+                f'data-input-source="{html.escape(input_source, quote=True)}">'
+            )
+            # Keep only safe equation data. Drop any embedded KaTeX markup.
             self.math_skip_depth = 1
+            self.math_close_tag = safe_tag
             return
 
         self.parts.append(f"<{tag}>")
@@ -194,6 +199,9 @@ class _RichTextSanitizer(HTMLParser):
             self.math_skip_depth -= 1
             if self.math_skip_depth == 0:
                 self.math_skip_depth = None
+                if self.math_close_tag:
+                    self.parts.append(f"</{self.math_close_tag}>")
+                    self.math_close_tag = None
             return
         if self.stack and self.stack[-1].startswith("__literal__:"):
             literal_tag = self.stack[-1].split(":", 1)[1]
@@ -238,8 +246,8 @@ def _rich_text_has_content(value):
 
 
 def render_rich_html(value):
-    # Keep Tiptap math nodes intact for the client-side KaTeX renderer.
-    # The sanitizer preserves only the editor's safe data-type/data-latex attributes.
+    # Preserve sanitized equation source metadata so existing equations can be edited
+    # in the same input format while KaTeX renders only their LaTeX output.
     return sanitize_rich_html(normalize_katex_markup(value or ""))
 
 
@@ -1248,11 +1256,33 @@ def hancom_to_latex():
     return jsonify(latex=latex)
 
 
+def convert_hancom_math():
+    payload = request.get_json(silent=True) or {}
+    expression = str(payload.get("expression", "")).strip()
+    if not expression:
+        return jsonify(error="수식 코드를 입력해 주세요."), 400
+    if len(expression) > 5000:
+        return jsonify(error="수식 코드는 5,000자 이내로 입력해 주세요."), 400
+    try:
+        latex = run_hmleq(expression)
+    except HmleqConversionError as error:
+        return jsonify(error=f"한컴 수식을 변환하지 못했습니다: {error}"), 400
+    except HmleqUnavailable as error:
+        return jsonify(error=f"수식 변환기를 사용할 수 없습니다: {error}"), 503
+    return jsonify(latex=latex)
+
+
 def register_question_routes(app):
     app.add_url_rule(
         "/api/math/hancom-to-latex",
         endpoint="hancom_to_latex",
         view_func=login_required(hancom_to_latex),
+        methods=["POST"],
+    )
+    app.add_url_rule(
+        "/questions/math/convert-hancom",
+        endpoint="convert_hancom_math",
+        view_func=login_required(convert_hancom_math),
         methods=["POST"],
     )
     app.add_url_rule(

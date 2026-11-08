@@ -7,6 +7,7 @@ import uuid
 from pathlib import Path
 
 from app import app
+from hmleq_converter import _executable
 
 
 class QuestionRegistrationTests(unittest.TestCase):
@@ -353,7 +354,8 @@ class QuestionRegistrationTests(unittest.TestCase):
         self.assertIn("인라인 수식".encode("utf-8"), dashboard_response.data)
         self.assertIn("지문 수식".encode("utf-8"), dashboard_response.data)
         self.assertIn("보기 수식".encode("utf-8"), dashboard_response.data)
-        self.assertIn("선택지 수식 $x^2$".encode("utf-8"), dashboard_response.data)
+        self.assertIn("선택지 수식".encode("utf-8"), dashboard_response.data)
+        self.assertIn(b'data-latex="x^2"', dashboard_response.data)
         self.assertIn(b'class="question-choice math-content"', dashboard_response.data)
         self.assertNotIn(b"&lt;span class=\"ql-math-inline\"", dashboard_response.data)
 
@@ -502,7 +504,59 @@ class QuestionRegistrationTests(unittest.TestCase):
         self.assertIn("임시 저장".encode(), form_response.data)
         self.assertIn(b"quill@2.0.3", form_response.data)
         self.assertIn(b'id="math-input-dialog"', form_response.data)
+        self.assertIn("한컴 한/글 수식".encode(), form_response.data)
+        self.assertIn(b'id="math-input-format"', form_response.data)
         self.assertNotIn(b"window.prompt(", form_response.data)
+
+    @patch("question_routes.run_hmleq", return_value=r"\frac{ a+b } { c }")
+    def test_hancom_math_input_endpoint_converts_to_latex(self, convert):
+        self.client.get("/questions/new")
+        with self.client.session_transaction() as user_session:
+            csrf = user_session["csrf_token"]
+        response = self.client.post("/questions/math/convert-hancom", json={"expression": r"{a+b} over {c}"}, headers={"X-CSRF-Token": csrf})
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.get_json()["latex"], r"\frac{ a+b } { c }")
+        convert.assert_called_once_with("{a+b} over {c}")
+        empty = self.client.post("/questions/math/convert-hancom", json={"expression": "   "}, headers={"X-CSRF-Token": csrf})
+        self.assertEqual(empty.status_code, 400)
+        too_long = self.client.post("/questions/math/convert-hancom", json={"expression": "x" * 5001}, headers={"X-CSRF-Token": csrf})
+        self.assertEqual(too_long.status_code, 400)
+
+    @unittest.skipUnless(_executable(), "hmleq CLI is installed by build.sh")
+    def test_real_hmleq_math_input_can_be_saved_and_rendered(self):
+        self.client.get("/questions/new")
+        with self.client.session_transaction() as user_session:
+            csrf = user_session["csrf_token"]
+
+        converted = self.client.post(
+            "/questions/math/convert-hancom",
+            json={"expression": "1 over 2"},
+            headers={"X-CSRF-Token": csrf},
+        )
+        self.assertEqual(converted.status_code, 200)
+        latex = converted.get_json()["latex"]
+        self.assertEqual(latex, r"\frac{1}{2}")
+
+        self.csrf_post(
+            self.client,
+            "/questions/new",
+            data=self.valid_question(prompt=f"<p>변환 수식 ${latex}$</p>"),
+        )
+        connection = sqlite3.connect(self.database)
+        try:
+            stored_prompt = connection.execute(
+                "SELECT prompt FROM questions WHERE id = 1"
+            ).fetchone()[0]
+        finally:
+            connection.close()
+        self.assertEqual(stored_prompt, r"<p>변환 수식 $\frac{1}{2}$</p>")
+
+        rendered = self.client.get("/questions")
+        self.assertEqual(rendered.status_code, 200)
+        self.assertIn("변환 수식".encode(), rendered.data)
+        self.assertIn(r"\frac{1}{2}".encode(), rendered.data)
+        self.assertIn(b'class="math-content"', rendered.data)
+        self.assertIn(b"scripts/katex-render.js", rendered.data)
 
     def test_only_user_created_uuid_folders_and_nested_folders_appear(self):
         empty_response = self.client.get("/questions")
@@ -723,10 +777,10 @@ class QuestionRegistrationTests(unittest.TestCase):
         self.assertIn(r'{ left: "\\[", right: "\\]", display: true }', renderer)
 
 
-    def test_quill_math_embeds_are_stored_as_latex_text_and_rendered_in_question_bank(self):
+    def test_quill_math_embeds_preserve_source_format_and_render_in_question_bank(self):
         prompt_html = (
             '<p>인라인 수식 '
-            '<span class="ql-math-inline" data-latex="x^2 + 1">'
+            '<span class="ql-math-inline" data-latex="x^2 + 1" data-input-format="hancom" data-input-source="{x} over {y}">'
             '<span class="katex">rendered inline markup</span></span></p>'
             '<div class="ql-math-block" data-latex="y = x + 2">'
             '<span class="katex-display">rendered block markup</span></div>'
@@ -739,17 +793,17 @@ class QuestionRegistrationTests(unittest.TestCase):
         self.assertEqual(response.status_code, 302)
 
         stored_prompt = self.query_one("SELECT prompt FROM questions LIMIT 1")
-        self.assertIn("$x^2 + 1$", stored_prompt)
-        self.assertIn("$$y = x + 2$$", stored_prompt)
-        self.assertNotIn("ql-math", stored_prompt)
-        self.assertNotIn("data-latex", stored_prompt)
+        self.assertIn('data-latex="x^2 + 1"', stored_prompt)
+        self.assertIn('data-input-format="hancom"', stored_prompt)
+        self.assertIn('data-input-source="{x} over {y}"', stored_prompt)
+        self.assertIn('data-input-format="latex"', stored_prompt)
         self.assertNotIn("rendered inline markup", stored_prompt)
         self.assertNotIn("rendered block markup", stored_prompt)
 
         question_response = self.client.get("/questions")
         self.assertEqual(question_response.status_code, 200)
-        self.assertIn("$x^2 + 1$".encode(), question_response.data)
-        self.assertIn("$$y = x + 2$$".encode(), question_response.data)
+        self.assertIn('data-latex="x^2 + 1"'.encode(), question_response.data)
+        self.assertIn('data-input-source="{x} over {y}"'.encode(), question_response.data)
         self.assertIn(b"scripts/katex-render.js", question_response.data)
         self.assertIn(b'class="math-content"', question_response.data)
 
@@ -922,7 +976,7 @@ class QuestionRegistrationTests(unittest.TestCase):
         self.assertIn(r"$\tfrac{2}{3}$".encode(), history.data)
         self.assertNotIn("&lt;p&gt;관리자 원본".encode(), history.data)
         self.assertNotIn("&lt;p&gt;다른 회원이".encode(), history.data)
-        self.assertIn(b'class="value before math-content"', history.data)
+        self.assertIn(b"class=" + b'"value before math-content"', history.data)
         self.assertIn(b"scripts/katex-render.js", history.data)
 
         self.csrf_post(self.client, f"/questions/{question_id}/restore/1")
@@ -1041,8 +1095,7 @@ class EditorFrontendRegressionTests(unittest.TestCase):
         ).read_text(encoding="utf-8")
         self.assertIn('<option value="hancom">한컴 한/글 수식</option>', template)
         self.assertIn('id="math-hancom-input"', template)
-        self.assertIn("url_for('hancom_to_latex')", template)
-        self.assertIn('"X-CSRF-Token": token', template)
+        self.assertIn("window.EasyConvertEquation.hwpEquationToLaTeX(source)", template)
 
     def test_quill_math_remains_atomic_and_supports_clipboard_roundtrips(self):
         template = (Path(__file__).resolve().parents[1] / "static/templates/question_form.html").read_text(encoding="utf-8")
@@ -1050,7 +1103,8 @@ class EditorFrontendRegressionTests(unittest.TestCase):
         self.assertIn('static blotName = "blockMath"', template)
         self.assertIn('node.dataset.latex = latex', template)
         self.assertIn('node.setAttribute("contenteditable", "false")', template)
-        self.assertIn('quill.insertEmbed(index, format, latex, "user")', template)
+        self.assertIn('quill.insertEmbed(index, format, equation, "user")', template)
+        self.assertIn('data-input-source', template)
         self.assertIn('quill.clipboard.addMatcher("span.ql-math-inline"', template)
         self.assertIn('quill.clipboard.addMatcher("div.ql-math-block"', template)
         self.assertIn('quill.clipboard.addMatcher(\'span[data-type="inline-math"]\'', template)
@@ -1105,7 +1159,9 @@ class EditorFrontendRegressionTests(unittest.TestCase):
         root = Path(__file__).resolve().parents[1]
         template = (root / "static/templates/question_form.html").read_text(encoding="utf-8")
         stylesheet = (root / "static/styles/pages/legacy-question_form.css").read_text(encoding="utf-8")
-        self.assertIn("source.value = editor.root.innerHTML", template)
+        self.assertIn('if (editor) source.value = source.dataset.source === "choices"', template)
+        self.assertIn("serializeChoices(editor)", template)
+        self.assertIn("editor.root.innerHTML", template)
         self.assertIn('document.documentElement.classList.add("js-editor-ready")', template)
         self.assertIn('document.documentElement.classList.remove("js-editor-ready")', template)
         self.assertIn('element.hidden = true', template)

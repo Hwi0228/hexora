@@ -287,9 +287,9 @@
   <div class="math-dialog-backdrop" id="math-input-dialog" hidden>
     <section class="math-dialog" role="dialog" aria-modal="true" aria-labelledby="math-dialog-title">
       <form id="math-input-form">
-        <h2 id="math-dialog-title">LaTeX 수식 입력</h2>
-        <label for="math-input-mode">입력 방식</label>
-        <select id="math-input-mode">
+        <h2 id="math-dialog-title">수식 입력</h2>
+        <label for="math-input-format">입력 형식</label>
+        <select id="math-input-format">
           <option value="latex">LaTeX</option>
           <option value="hancom">한컴 한/글 수식</option>
         </select>
@@ -301,7 +301,7 @@
         </div>
         <div id="hancom-math-fields" hidden>
           <label for="math-hancom-input">한컴 수식 스크립트</label>
-          <textarea id="math-hancom-input" rows="3" maxlength="4096" spellcheck="false"
+          <textarea id="math-hancom-input" rows="3" maxlength="5000" spellcheck="false"
                     placeholder="예: {a+b} over {c}"></textarea>
           <p>브라우저에서 변환합니다. 예: <code>sqrt {x}</code>, <code>root 3 of {x}</code>, <code>{a+b} over {c}</code></p>
         </div>
@@ -330,8 +330,14 @@
       const Delta = Quill.import("delta");
       const InlineEmbed = Quill.import("blots/embed");
       const BlockEmbed = Quill.import("blots/block/embed");
-      function renderMath(node, latex, displayMode) {
+      function renderMath(node, value, displayMode) {
+        const equation = value && typeof value === "object"
+          ? value
+          : { latex: String(value || ""), inputFormat: "latex", inputSource: String(value || "") };
+        const latex = String(equation.latex || "");
         node.dataset.latex = latex;
+        node.dataset.inputFormat = equation.inputFormat === "hancom" ? "hancom" : "latex";
+        node.dataset.inputSource = String(equation.inputSource || latex);
         node.dataset.mathObject = displayMode ? "block" : "inline";
         node.setAttribute("contenteditable", "false");
         node.setAttribute("aria-label", displayMode ? "블록 수식" : "인라인 수식");
@@ -348,10 +354,16 @@
         static className = "ql-math-inline";
         static create(value) {
           const node = super.create();
-          renderMath(node, String(value || ""), false);
+          renderMath(node, value, false);
           return node;
         }
-        static value(node) { return node.dataset.latex || ""; }
+        static value(node) {
+          return {
+            latex: node.dataset.latex || "",
+            inputFormat: node.dataset.inputFormat || "latex",
+            inputSource: node.dataset.inputSource || node.dataset.latex || ""
+          };
+        }
       }
 
       class BlockMathBlot extends BlockEmbed {
@@ -360,10 +372,16 @@
         static className = "ql-math-block";
         static create(value) {
           const node = super.create();
-          renderMath(node, String(value || ""), true);
+          renderMath(node, value, true);
           return node;
         }
-        static value(node) { return node.dataset.latex || ""; }
+        static value(node) {
+          return {
+            latex: node.dataset.latex || "",
+            inputFormat: node.dataset.inputFormat || "latex",
+            inputSource: node.dataset.inputSource || node.dataset.latex || ""
+          };
+        }
       }
 
       Quill.register(InlineMathBlot, true);
@@ -374,7 +392,7 @@
       const mathDialogForm = document.getElementById("math-input-form");
       const mathInput = document.getElementById("math-latex-input");
       const hancomInput = document.getElementById("math-hancom-input");
-      const mathInputMode = document.getElementById("math-input-mode");
+      const mathInputMode = document.getElementById("math-input-format");
       const latexMathFields = document.getElementById("latex-math-fields");
       const hancomMathFields = document.getElementById("hancom-math-fields");
       const conversionError = document.getElementById("math-conversion-error");
@@ -387,11 +405,18 @@
       }
 
       function openMathDialog(initialValue, action) {
-        mathInputMode.value = "latex";
-        latexMathFields.hidden = false;
-        hancomMathFields.hidden = true;
+        const equation = initialValue && typeof initialValue === "object"
+          ? initialValue
+          : { latex: String(initialValue || ""), inputFormat: "latex", inputSource: String(initialValue || "") };
+        mathInputMode.value = equation.inputFormat === "hancom" ? "hancom" : "latex";
+        mathInput.value = equation.inputFormat === "hancom"
+          ? equation.latex || ""
+          : equation.inputSource || equation.latex || "";
+        hancomInput.value = equation.inputFormat === "hancom"
+          ? equation.inputSource || equation.latex || ""
+          : "";
+        updateMathInputFields();
         conversionError.hidden = true;
-        mathInput.value = initialValue || "";
         mathDialogAction = action;
         mathDialog.hidden = false;
         requestAnimationFrame(() => {
@@ -400,29 +425,38 @@
         });
       }
 
-      mathInputMode.addEventListener("change", () => {
+      function updateMathInputFields() {
         const hancomMode = mathInputMode.value === "hancom";
         latexMathFields.hidden = hancomMode;
         hancomMathFields.hidden = !hancomMode;
+      }
+
+      mathInputMode.addEventListener("change", () => {
+        updateMathInputFields();
         conversionError.hidden = true;
-        (hancomMode ? hancomInput : mathInput).focus();
+        (mathInputMode.value === "hancom" ? hancomInput : mathInput).focus();
       });
 
       mathDialogForm.addEventListener("submit", (event) => {
         event.preventDefault();
-        let latex = mathInput.value.trim();
-        if (mathInputMode.value === "hancom") {
-          const script = hancomInput.value.trim();
-          if (!script) {
-            hancomInput.setCustomValidity("한컴 수식 스크립트를 입력해 주세요.");
-            hancomInput.reportValidity();
-            return;
-          }
+        const inputFormat = mathInputMode.value;
+        const source = (inputFormat === "hancom" ? hancomInput : mathInput).value.trim();
+        const activeInput = inputFormat === "hancom" ? hancomInput : mathInput;
+        activeInput.setCustomValidity("");
+        if (!source) {
+          activeInput.setCustomValidity(inputFormat === "hancom"
+            ? "한컴 수식 스크립트를 입력해 주세요."
+            : "LaTeX 수식을 입력해 주세요.");
+          activeInput.reportValidity();
+          return;
+        }
+        let latex = source;
+        if (inputFormat === "hancom") {
           conversionError.hidden = true;
           try {
-            latex = window.EasyConvertEquation.hwpEquationToLaTeX(script);
+            latex = window.EasyConvertEquation.hwpEquationToLaTeX(source);
           } catch (error) {
-            const invalidRootOrder = /^sqrt\s*\{[^}]+\}\s+of\b/i.test(script);
+            const invalidRootOrder = /^sqrt\s*\{[^}]+\}\s+of\b/i.test(source);
             conversionError.textContent = invalidRootOrder
               ? "'sqrt {3} of {5}' 형식은 사용할 수 없습니다. 다섯제곱근을 뜻한다면 'root 5 of {3}'처럼 입력해 주세요."
               : (error.message || "수식 문법을 확인해 주세요.");
@@ -436,10 +470,9 @@
           mathInput.reportValidity();
           return;
         }
-        mathInput.setCustomValidity("");
         const action = mathDialogAction;
         closeMathDialog();
-        if (action) action(latex);
+        if (action) action({ latex, inputFormat, inputSource: source });
       });
       mathInput.addEventListener("input", () => mathInput.setCustomValidity(""));
       hancomInput.addEventListener("input", () => hancomInput.setCustomValidity(""));
@@ -456,11 +489,11 @@
         const range = quill.getSelection(true) || {
           index: Math.max(0, quill.getLength() - 1), length: 0
         };
-        openMathDialog("", (latex) => {
+        openMathDialog("", (equation) => {
           quill.focus();
           if (range.length) quill.deleteText(range.index, range.length, "user");
           const index = range.index;
-          quill.insertEmbed(index, format, latex, "user");
+          quill.insertEmbed(index, format, equation, "user");
           quill.setSelection(index + 1, 0, "silent");
         });
       }
@@ -495,9 +528,14 @@
         function legacyMathEmbed(node, displayMode) {
           const latex = node.getAttribute("data-latex") ||
             node.getAttribute("data-tex") || node.textContent || "";
+          const equation = {
+            latex: latex.trim(),
+            inputFormat: node.getAttribute("data-input-format") === "hancom" ? "hancom" : "latex",
+            inputSource: node.getAttribute("data-input-source") || latex.trim()
+          };
           return new Delta().insert(displayMode
-            ? { blockMath: latex.trim() }
-            : { inlineMath: latex.trim() }).concat(
+            ? { blockMath: equation }
+            : { inlineMath: equation }).concat(
               displayMode ? new Delta().insert("\\n") : new Delta()
             );
         }
@@ -528,10 +566,14 @@
           if (!blot) return;
           const index = quill.getIndex(blot);
           const format = mathNode.classList.contains("ql-math-block") ? "blockMath" : "inlineMath";
-          openMathDialog(mathNode.dataset.latex || "", (nextLatex) => {
+          openMathDialog({
+            latex: mathNode.dataset.latex || "",
+            inputFormat: mathNode.dataset.inputFormat || "latex",
+            inputSource: mathNode.dataset.inputSource || mathNode.dataset.latex || ""
+          }, (nextEquation) => {
             quill.focus();
             quill.deleteText(index, 1, "user");
-            quill.insertEmbed(index, format, nextLatex, "user");
+            quill.insertEmbed(index, format, nextEquation, "user");
             quill.setSelection(index + 1, 0, "silent");
           });
         });
