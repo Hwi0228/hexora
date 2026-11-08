@@ -34,10 +34,10 @@ jobs:
           fn main() {
               let cases = [
                   ("a over b", r"\\frac{a}{b}"),
-                  ("{a+b} over {c+d}", r"\\frac"),
-                  ("sqrt {a over b}", r"\\sqrt"),
+                  ("{a+b} over {c+d}", r"\frac"),
+                  ("sqrt {a over b}", r"\sqrt"),
                   ("x^2 + y_1", "^"),
-                  ("matrix {a & b # c & d}", r"\\begin{matrix}"),
+                  ("matrix {a & b # c & d}", r"\begin{matrix}"),
               ];
               for (input, expected) in cases {
                   let output = hmleq::eq_to_latex(input).unwrap_or_else(|e| panic!("{input}: {e}"));
