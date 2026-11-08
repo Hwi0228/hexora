@@ -3,8 +3,8 @@ set -euo pipefail
 
 python -m pip install -r requirements.txt
 
-# Render may set CARGO_HOME to a read-only shared path. Keep Cargo's cache
-# and installed CLI in the build user's writable home directory.
+# Render's build and runtime containers do not share the build user's home.
+# Install the CLI inside the deploy artifact so the app can execute it at runtime.
 export CARGO_HOME="$HOME/.cargo"
 export PATH="$CARGO_HOME/bin:$PATH"
 
@@ -20,10 +20,10 @@ cargo install \
   --branch main \
   hmleq-cli \
   --bin hmleq \
-  --root "$HOME/.cargo" \
+  --root "$PWD/.render-tools" \
   --force
 
-hmleq_version=$("$HOME/.cargo/bin/hmleq" --version)
+hmleq_version=$("$PWD/.render-tools/bin/hmleq" --version)
 [[ "$hmleq_version" == "hmleq-cli 0.2.0" ]] || {
   echo "Expected hmleq-cli 0.2.0; found: $hmleq_version" >&2
   exit 1
