@@ -1,0 +1,10 @@
+EasyConvert HWP equation parser
+
+Source: https://github.com/AquilaXk/easyconvert/blob/fd0ef7276a289ca366170ad79f51acf183540fe7/src/lib/conversions/hwp-equation.ts
+Pinned commit: fd0ef7276a289ca366170ad79f51acf183540fe7
+Bundled from: hwp-equation.vendor.ts
+Copyright (c) 2026 EasyConvert Contributors
+License: MIT (see EASYCONVERT-MIT-LICENSE.txt)
+
+The app-specific CorruptStreamError import was replaced with a local Error
+subclass. The source is compiled to hancom-equation.js for browser use.

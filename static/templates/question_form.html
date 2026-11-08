@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="theme-color" content="#F4F7FA">
   <title>{{ '문항 수정' if mode == 'edit' else '문항 작성' }} | HEXORA</title>
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.css">
+  <link rel="stylesheet" href="{{ url_for('static', filename='styles/math-rendering.css') }}">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/quill@2.0.3/dist/quill.snow.css">
   <link rel="stylesheet" href="{{ url_for('static', filename='styles/pages/legacy-question_form.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='styles/shared.css') }}">
@@ -60,6 +60,7 @@
         <form class="editor-form" id="question-form" method="post"
               action="{{ url_for('edit_question', question_id=question.id) if mode == 'edit' else url_for('new_question') }}">
           <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
+          <input type="hidden" name="unit" value="{{ form_data.get('unit', '') }}">
           {% if mode == 'edit' %}<input type="hidden" name="base_revision" value="{{ base_revision }}">{% endif %}
 
           <section class="form-section">
@@ -68,10 +69,9 @@
               <span class="section-hint"><span class="required">*</span> 필수</span>
             </div>
             <div class="fields">
-              <label class="field">문항 제목 <span class="required">*</span>
-                <input name="title" maxlength="200" value="{{ form_data.get('title', '') }}" placeholder="예: 함수의 극한과 연속성">
-                <small>목록에서 문항을 구분할 수 있는 제목</small>
-              </label>
+              <input type="hidden" name="title" value="{{ form_data.get('title', '') }}">
+              <input type="hidden" name="difficulty" value="{{ form_data.get('difficulty', '중') }}">
+              <input type="hidden" name="points" value="{{ form_data.get('points', 4)|default(4, true) }}">
               <label class="field">과목 <span class="required">*</span>
                 <select name="subject" required>
                   <option value="">과목 선택</option>
@@ -99,20 +99,19 @@
                 <select name="course" id="course-select">
                   <option value="">교과 선택</option>
                   {% for course in subject_course_options.get(form_data.get('subject', '수학'), []) %}
-                    <option value="{{ course }}"{% if form_data.get('course', '수학Ⅱ') == course %} selected{% endif %}>{{ course }}</option>
+                    <option value="{{ course }}"{% if form_data.get('course', '') == course %} selected{% endif %}>{{ course }}</option>
                   {% endfor %}
                 </select>
               </label>
-              <label class="field">단원 <span class="required">*</span>
-                <input name="unit" id="unit-input" list="unit-options" value="{{ form_data.get('unit', '') }}" placeholder="단원 선택 또는 입력" required>
-                <datalist id="unit-options"></datalist>
-              </label>
-              <label class="field">난이도 <span class="required">*</span>
-                <select name="difficulty" required>
-                  {% for value in difficulties %}
-                    <option value="{{ value }}"{% if form_data.get('difficulty', '중') == value %} selected{% endif %}>{{ value }}</option>
-                  {% endfor %}
+              <label class="field full standard-area-field" id="standard-area-field" hidden>
+                교육과정 영역
+                <select id="standard-area-select">
+                  <option value="">영역 선택</option>
                 </select>
+                <small>
+                  2022 개정 교육과정의 공식 영역입니다. 영역을 선택하면 해당 기준만 표시됩니다.
+                  <a href="https://github.com/greatsong/k-curriculum-2022/tree/v3.0.1" target="_blank" rel="noopener noreferrer">데이터 출처</a>
+                </small>
               </label>
               <label class="field">문항 유형 <span class="required">*</span>
                 <select name="question_type" id="question-type" required>
@@ -121,12 +120,12 @@
                   {% endfor %}
                 </select>
               </label>
-              <label class="field">배점
-                <input name="points" type="number" min="1" max="100" value="{{ form_data.get('points', 4)|default(4, true) }}">
-              </label>
               <div class="field full standard-box">
-                <label for="achievement-standard">성취기준 <span class="standard-status" id="standard-status">단원을 선택하면 자동으로 입력됩니다.</span></label>
-                <textarea name="achievement_standard" id="achievement-standard" maxlength="4000" placeholder="선택한 교육과정과 단원에 연결된 성취기준이 표시됩니다.">{{ form_data.get('achievement_standard', '') }}</textarea>
+                <label>성취기준 <span class="standard-status" id="standard-status">목록에서 적용할 기준을 선택하세요.</span></label>
+                <div class="standard-options" id="achievement-standard-options" role="radiogroup" aria-label="성취기준 목록">
+                  <p class="standard-empty">과목과 학년을 선택하면 성취기준 목록이 표시됩니다.</p>
+                </div>
+                <textarea name="achievement_standard" id="achievement-standard" maxlength="4000" hidden>{{ form_data.get('achievement_standard', '') }}</textarea>
               </div>
             </div>
           </section>
@@ -156,8 +155,20 @@
                   <div class="math-help">지문, 보기, 문제 본문을 이곳에 함께 작성할 수 있습니다. 수식은 LaTeX 문자열로 저장되고 문제 DB에서 렌더링됩니다.</div>
                 </div>
               </label>
-              <label class="field full">선택지 <span class="choice-help">객관식 문항은 한 줄에 하나씩 입력 · 수식 LaTeX 지원</span>
-                <textarea name="choices" placeholder="① 첫 번째 선택지&#10;② 두 번째 선택지&#10;③ 세 번째 선택지">{{ form_data.get('choices', '') }}</textarea>
+              <label class="field full">선택지 <span class="choice-help">한 문단에 하나씩 작성 · LaTeX 및 한컴 한/글 수식 삽입 지원</span>
+                <div class="rich-field">
+                  <div class="rich-toolbar" data-toolbar="choices">
+                    <button class="tool-button ql-bold" type="button" aria-label="굵게">B</button>
+                    <button class="tool-button ql-italic" type="button" aria-label="기울임"><i>I</i></button>
+                    <button class="tool-button ql-underline" type="button" aria-label="밑줄"><u>U</u></button>
+                    <span class="tool-divider"></span>
+                    <button class="tool-button ql-inlineMath" type="button">∑ 수식</button>
+                    <button class="tool-button ql-blockMath" type="button">∑ 블록</button>
+                  </div>
+                  <div class="rich-editor choices-editor" data-editor="choices"></div>
+                  <textarea class="rich-source choices-source" name="choices" data-source="choices" placeholder="① 첫 번째 선택지&#10;② 두 번째 선택지&#10;③ 세 번째 선택지">{{ form_data.get('choices', '') }}</textarea>
+                  <div class="math-help">각 문단을 선택지 하나로 저장합니다. 수식 버튼에서 LaTeX 또는 한컴 수식을 입력할 수 있습니다.</div>
+                </div>
               </label>
             </div>
           </section>
@@ -248,6 +259,10 @@
                   {% endfor %}
                 </select>
               </label>
+              <label class="field full">변형문제 기준 문항 번호
+                <input name="base_question_number" maxlength="6" minlength="6" pattern="[0-9A-Za-z]{6}" autocapitalize="characters" value="{{ form_data.get('base_question_number', '') }}" placeholder="예: 00000A">
+                <small>기준이 되는 HEXORA 문항의 6자리 Base36 번호를 입력하면 변형문제로 연결됩니다.</small>
+              </label>
             </div>
             {% if mode == 'edit' %}
               <label class="field revision-summary-field">수정 요약 <small>최종 저장 시 수정 이력에 표시됩니다.</small>
@@ -272,11 +287,25 @@
   <div class="math-dialog-backdrop" id="math-input-dialog" hidden>
     <section class="math-dialog" role="dialog" aria-modal="true" aria-labelledby="math-dialog-title">
       <form id="math-input-form">
-        <h2 id="math-dialog-title">LaTeX 수식 입력</h2>
+        <h2 id="math-dialog-title">수식 입력</h2>
+        <label for="math-input-format">입력 형식</label>
+        <select id="math-input-format">
+          <option value="latex">LaTeX</option>
+          <option value="hancom">한컴 한/글 수식</option>
+        </select>
+        <div id="latex-math-fields">
         <label for="math-latex-input">수식 코드</label>
         <input id="math-latex-input" type="text" autocomplete="off" spellcheck="false"
                placeholder="예: \\frac{1}{2} 또는 x^2 + 1">
         <p>LaTeX 문법으로 입력하세요. 예: \\sqrt{x}, \\frac{a}{b}</p>
+        </div>
+        <div id="hancom-math-fields" hidden>
+          <label for="math-hancom-input">한컴 수식 스크립트</label>
+          <textarea id="math-hancom-input" rows="3" maxlength="5000" spellcheck="false"
+                    placeholder="예: {a+b} over {c}"></textarea>
+          <p>브라우저에서 변환합니다. 예: <code>sqrt {x}</code>, <code>root 3 of {x}</code>, <code>{a+b} over {c}</code></p>
+        </div>
+        <p id="math-conversion-error" class="errors" role="alert" hidden></p>
         <div class="math-dialog-actions">
           <button class="button" id="math-input-cancel" type="button">취소</button>
           <button class="button primary" type="submit">삽입</button>
@@ -285,7 +314,8 @@
     </section>
   </div>
 
-  <script src="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.js"></script>
+  <script defer src="{{ url_for('static', filename='scripts/katex-render.js') }}"></script>
+  <script src="{{ url_for('static', filename='scripts/hancom-equation.js') }}"></script>
   <script src="https://cdn.jsdelivr.net/npm/quill@2.0.3/dist/quill.js"></script>
   <script>
     const form = document.getElementById("question-form");
@@ -300,8 +330,14 @@
       const Delta = Quill.import("delta");
       const InlineEmbed = Quill.import("blots/embed");
       const BlockEmbed = Quill.import("blots/block/embed");
-      function renderMath(node, latex, displayMode) {
+      function renderMath(node, value, displayMode) {
+        const equation = value && typeof value === "object"
+          ? value
+          : { latex: String(value || ""), inputFormat: "latex", inputSource: String(value || "") };
+        const latex = String(equation.latex || "");
         node.dataset.latex = latex;
+        node.dataset.inputFormat = equation.inputFormat === "hancom" ? "hancom" : "latex";
+        node.dataset.inputSource = String(equation.inputSource || latex);
         node.dataset.mathObject = displayMode ? "block" : "inline";
         node.setAttribute("contenteditable", "false");
         node.setAttribute("aria-label", displayMode ? "블록 수식" : "인라인 수식");
@@ -318,10 +354,16 @@
         static className = "ql-math-inline";
         static create(value) {
           const node = super.create();
-          renderMath(node, String(value || ""), false);
+          renderMath(node, value, false);
           return node;
         }
-        static value(node) { return node.dataset.latex || ""; }
+        static value(node) {
+          return {
+            latex: node.dataset.latex || "",
+            inputFormat: node.dataset.inputFormat || "latex",
+            inputSource: node.dataset.inputSource || node.dataset.latex || ""
+          };
+        }
       }
 
       class BlockMathBlot extends BlockEmbed {
@@ -330,10 +372,16 @@
         static className = "ql-math-block";
         static create(value) {
           const node = super.create();
-          renderMath(node, String(value || ""), true);
+          renderMath(node, value, true);
           return node;
         }
-        static value(node) { return node.dataset.latex || ""; }
+        static value(node) {
+          return {
+            latex: node.dataset.latex || "",
+            inputFormat: node.dataset.inputFormat || "latex",
+            inputSource: node.dataset.inputSource || node.dataset.latex || ""
+          };
+        }
       }
 
       Quill.register(InlineMathBlot, true);
@@ -343,6 +391,11 @@
       const mathDialog = document.getElementById("math-input-dialog");
       const mathDialogForm = document.getElementById("math-input-form");
       const mathInput = document.getElementById("math-latex-input");
+      const hancomInput = document.getElementById("math-hancom-input");
+      const mathInputMode = document.getElementById("math-input-format");
+      const latexMathFields = document.getElementById("latex-math-fields");
+      const hancomMathFields = document.getElementById("hancom-math-fields");
+      const conversionError = document.getElementById("math-conversion-error");
       const mathCancel = document.getElementById("math-input-cancel");
       let mathDialogAction = null;
 
@@ -352,7 +405,18 @@
       }
 
       function openMathDialog(initialValue, action) {
-        mathInput.value = initialValue || "";
+        const equation = initialValue && typeof initialValue === "object"
+          ? initialValue
+          : { latex: String(initialValue || ""), inputFormat: "latex", inputSource: String(initialValue || "") };
+        mathInputMode.value = equation.inputFormat === "hancom" ? "hancom" : "latex";
+        mathInput.value = equation.inputFormat === "hancom"
+          ? equation.latex || ""
+          : equation.inputSource || equation.latex || "";
+        hancomInput.value = equation.inputFormat === "hancom"
+          ? equation.inputSource || equation.latex || ""
+          : "";
+        updateMathInputFields();
+        conversionError.hidden = true;
         mathDialogAction = action;
         mathDialog.hidden = false;
         requestAnimationFrame(() => {
@@ -361,20 +425,57 @@
         });
       }
 
+      function updateMathInputFields() {
+        const hancomMode = mathInputMode.value === "hancom";
+        latexMathFields.hidden = hancomMode;
+        hancomMathFields.hidden = !hancomMode;
+      }
+
+      mathInputMode.addEventListener("change", () => {
+        updateMathInputFields();
+        conversionError.hidden = true;
+        (mathInputMode.value === "hancom" ? hancomInput : mathInput).focus();
+      });
+
       mathDialogForm.addEventListener("submit", (event) => {
         event.preventDefault();
-        const latex = mathInput.value.trim();
+        const inputFormat = mathInputMode.value;
+        const source = (inputFormat === "hancom" ? hancomInput : mathInput).value.trim();
+        const activeInput = inputFormat === "hancom" ? hancomInput : mathInput;
+        activeInput.setCustomValidity("");
+        if (!source) {
+          activeInput.setCustomValidity(inputFormat === "hancom"
+            ? "한컴 수식 스크립트를 입력해 주세요."
+            : "LaTeX 수식을 입력해 주세요.");
+          activeInput.reportValidity();
+          return;
+        }
+        let latex = source;
+        if (inputFormat === "hancom") {
+          conversionError.hidden = true;
+          try {
+            latex = window.EasyConvertEquation.hwpEquationToLaTeX(source);
+          } catch (error) {
+            const invalidRootOrder = /^sqrt\s*\{[^}]+\}\s+of\b/i.test(source);
+            conversionError.textContent = invalidRootOrder
+              ? "'sqrt {3} of {5}' 형식은 사용할 수 없습니다. 다섯제곱근을 뜻한다면 'root 5 of {3}'처럼 입력해 주세요."
+              : (error.message || "수식 문법을 확인해 주세요.");
+            conversionError.hidden = false;
+            hancomInput.focus();
+            return;
+          }
+        }
         if (!latex) {
           mathInput.setCustomValidity("LaTeX 수식을 입력해 주세요.");
           mathInput.reportValidity();
           return;
         }
-        mathInput.setCustomValidity("");
         const action = mathDialogAction;
         closeMathDialog();
-        if (action) action(latex);
+        if (action) action({ latex, inputFormat, inputSource: source });
       });
       mathInput.addEventListener("input", () => mathInput.setCustomValidity(""));
+      hancomInput.addEventListener("input", () => hancomInput.setCustomValidity(""));
       mathCancel.addEventListener("click", closeMathDialog);
       mathDialog.addEventListener("click", (event) => {
         if (event.target === mathDialog) closeMathDialog();
@@ -388,13 +489,20 @@
         const range = quill.getSelection(true) || {
           index: Math.max(0, quill.getLength() - 1), length: 0
         };
-        openMathDialog("", (latex) => {
+        openMathDialog("", (equation) => {
           quill.focus();
           if (range.length) quill.deleteText(range.index, range.length, "user");
           const index = range.index;
-          quill.insertEmbed(index, format, latex, "user");
+          quill.insertEmbed(index, format, equation, "user");
           quill.setSelection(index + 1, 0, "silent");
         });
+      }
+
+      function serializeChoices(quill) {
+        return Array.from(quill.root.children)
+          .filter((node) => node.textContent.trim() ||
+            node.querySelector(".ql-math-inline, .ql-math-block"))
+          .map((node) => node.outerHTML).join("\n");
       }
 
       sources.forEach((source) => {
@@ -420,9 +528,14 @@
         function legacyMathEmbed(node, displayMode) {
           const latex = node.getAttribute("data-latex") ||
             node.getAttribute("data-tex") || node.textContent || "";
+          const equation = {
+            latex: latex.trim(),
+            inputFormat: node.getAttribute("data-input-format") === "hancom" ? "hancom" : "latex",
+            inputSource: node.getAttribute("data-input-source") || latex.trim()
+          };
           return new Delta().insert(displayMode
-            ? { blockMath: latex.trim() }
-            : { inlineMath: latex.trim() }).concat(
+            ? { blockMath: equation }
+            : { inlineMath: equation }).concat(
               displayMode ? new Delta().insert("\\n") : new Delta()
             );
         }
@@ -440,7 +553,11 @@
           legacyMathEmbed(node, true));
         const initialHtml = source.value.trim();
         if (initialHtml) quill.setContents(quill.clipboard.convert({ html: initialHtml }), "silent");
-        quill.on("text-change", () => { source.value = quill.root.innerHTML; });
+        quill.on("text-change", () => {
+          source.value = key === "choices"
+            ? serializeChoices(quill)
+            : quill.root.innerHTML;
+        });
 
         mount.addEventListener("dblclick", (event) => {
           const mathNode = event.target.closest(".ql-math-inline, .ql-math-block");
@@ -449,10 +566,14 @@
           if (!blot) return;
           const index = quill.getIndex(blot);
           const format = mathNode.classList.contains("ql-math-block") ? "blockMath" : "inlineMath";
-          openMathDialog(mathNode.dataset.latex || "", (nextLatex) => {
+          openMathDialog({
+            latex: mathNode.dataset.latex || "",
+            inputFormat: mathNode.dataset.inputFormat || "latex",
+            inputSource: mathNode.dataset.inputSource || mathNode.dataset.latex || ""
+          }, (nextEquation) => {
             quill.focus();
             quill.deleteText(index, 1, "user");
-            quill.insertEmbed(index, format, nextLatex, "user");
+            quill.insertEmbed(index, format, nextEquation, "user");
             quill.setSelection(index + 1, 0, "silent");
           });
         });
@@ -465,7 +586,9 @@
       form.addEventListener("submit", (event) => {
         sources.forEach((source) => {
           const editor = editors.get(source.dataset.source);
-          if (editor) source.value = editor.root.innerHTML;
+          if (editor) source.value = source.dataset.source === "choices"
+            ? serializeChoices(editor)
+            : editor.root.innerHTML;
         });
         if (event.submitter && event.submitter.value === "draft") return;
         const missing = ["prompt", "answer"].find((key) => {
@@ -492,86 +615,208 @@
 
         const curriculum = document.getElementById("curriculum-select");
     const course = document.getElementById("course-select");
-    const unit = document.getElementById("unit-input");
     const standards = document.getElementById("achievement-standard");
+    const standardOptions = document.getElementById("achievement-standard-options");
     const standardStatus = document.getElementById("standard-status");
-    const courseOptions = {{ course_options|tojson }};
+    const standardAreaField = document.getElementById("standard-area-field");
+    const standardArea = document.getElementById("standard-area-select");
+    const gradeSelect = form.querySelector('[name="grade"]');
     const selectedCourse = {{ form_data.get('course', '')|tojson }};
+    let preferredCourse = selectedCourse;
+    let standardsRequestId = 0;
     const subjectSelect = form.querySelector('[name="subject"]');
     const subjectCourseOptions = {{ subject_course_options|tojson }};
-    const selectedUnit = {{ form_data.get('unit', '')|tojson }};
     const storedStandard = {{ form_data.get('achievement_standard', '')|tojson }};
+    // Older drafts may contain multiple lines; keep the first value when opening them.
+    const selectedStandard = {
+      value: String(storedStandard || "")
+        .split(/\r?\n/)
+        .map((value) => value.trim())
+        .find(Boolean) || ""
+    };
+    const is2022Curriculum = () => curriculum.value === "2022 개정 교육과정";
+
+    function setSelectOptions(select, values, placeholder, preferredValue) {
+      const previous = preferredValue || select.value;
+      select.innerHTML = "";
+      const first = document.createElement("option");
+      first.value = "";
+      first.textContent = placeholder;
+      select.appendChild(first);
+      (values || []).forEach((value) => {
+        const option = document.createElement("option");
+        option.value = value;
+        option.textContent = value;
+        select.appendChild(option);
+      });
+      if ((values || []).includes(previous)) select.value = previous;
+    }
+
+    function syncSelectedStandards() {
+      standards.value = selectedStandard.value;
+      standardStatus.textContent = selectedStandard.value
+        ? "성취기준 1개 선택됨"
+        : "적용할 성취기준을 선택하세요.";
+    }
+
+    function clearSelectedStandards() {
+      selectedStandard.value = "";
+      standards.value = "";
+      renderStandards([]);
+    }
+
+    function renderStandards(items) {
+      standardOptions.replaceChildren();
+      if (!items || !items.length) {
+        const empty = document.createElement("p");
+        empty.className = "standard-empty";
+        empty.textContent = course.value
+          ? "선택한 조건에 해당하는 성취기준이 없습니다."
+          : "과목과 학년을 선택하면 성취기준 목록이 표시됩니다.";
+        standardOptions.appendChild(empty);
+        syncSelectedStandards();
+        return;
+      }
+
+      items.forEach((standard) => {
+        const label = document.createElement("label");
+        label.className = "standard-option";
+
+        const radio = document.createElement("input");
+        radio.type = "radio";
+        radio.name = "achievement-standard-choice";
+        radio.value = standard;
+        radio.checked = selectedStandard.value === standard;
+        radio.addEventListener("change", () => {
+          if (radio.checked) {
+            selectedStandard.value = standard;
+            syncSelectedStandards();
+          }
+        });
+
+        const content = document.createElement("span");
+        content.className = "standard-option-content";
+        const match = standard.match(/^(\[[^\]]+\])\s*(.*)$/s);
+        if (match) {
+          const code = document.createElement("span");
+          code.className = "standard-code";
+          code.textContent = match[1];
+          content.appendChild(code);
+          if (match[2]) {
+            content.appendChild(document.createTextNode(" " + match[2]));
+          }
+        } else {
+          content.textContent = standard;
+        }
+
+        label.append(radio, content);
+        standardOptions.appendChild(label);
+      });
+      syncSelectedStandards();
+    }
 
     function rebuildCourses() {
       const options = subjectCourseOptions[subjectSelect.value] || [];
-      const previous = course.value || selectedCourse;
-      course.innerHTML = '<option value="">교과 선택</option>';
-      options.forEach((name) => {
-        const option = document.createElement("option");
-        option.value = name;
-        option.textContent = name;
-        course.appendChild(option);
-      });
-      if (options.includes(previous)) course.value = previous;
+      const previous = course.value || preferredCourse;
+      setSelectOptions(course, options, "교과 선택", previous);
     }
 
-    async function loadStandards(autofill) {
+    async function loadStandards() {
+      const use2022 = is2022Curriculum();
+      const requestId = ++standardsRequestId;
+      standardAreaField.hidden = !use2022;
+
+      if (!course.value && !use2022) {
+        renderStandards([]);
+        standardStatus.textContent = "교과를 선택하면 성취기준 목록이 표시됩니다.";
+        return;
+      }
+      standardStatus.textContent = "성취기준 목록을 불러오는 중입니다.";
+
       const params = new URLSearchParams({
         curriculum: curriculum.value,
         course: course.value,
-        unit: unit.value
+        subject: subjectSelect.value,
+        grade: gradeSelect.value,
+        area: use2022 ? standardArea.value : ""
       });
       try {
         const response = await fetch("{{ url_for('curriculum_standards') }}?" + params.toString(), {
           headers: { "Accept": "application/json" }
         });
-        if (!response.ok) throw new Error("성취기준을 불러오지 못했습니다.");
         const data = await response.json();
-        const datalist = document.getElementById("unit-options");
-        datalist.innerHTML = "";
-        (data.units || []).forEach((name) => {
-          const option = document.createElement("option");
-          option.value = name;
-          datalist.appendChild(option);
-        });
-        if (autofill) {
-          if (data.standards && data.standards.length) {
-            standards.value = data.standards.join("\n");
-            standardStatus.textContent = "선택한 단원에 연결된 성취기준을 자동 입력했습니다.";
-          } else {
-            standards.value = "";
-            standardStatus.textContent = "등록된 자동 매핑이 없습니다. 필요한 경우 직접 입력하세요.";
+        if (!response.ok) {
+          throw new Error(data.error || "성취기준을 불러오지 못했습니다.");
+        }
+        if (requestId !== standardsRequestId) return;
+
+        if (use2022) {
+          const previousCourse = course.value || preferredCourse;
+          const availableCourses = data.courses || [];
+          setSelectOptions(course, availableCourses, "교과 선택", previousCourse);
+          preferredCourse = "";
+
+          if (previousCourse && !availableCourses.includes(previousCourse)) {
+            standardArea.value = "";
+            clearSelectedStandards();
+            standardStatus.textContent = "선택한 학년과 과목에 해당하는 데이터가 없습니다. 과목을 다시 선택해 주세요.";
+            return;
           }
+
+          const previousArea = standardArea.value;
+          setSelectOptions(standardArea, data.areas || [], "전체 영역", previousArea);
+        }
+
+        renderStandards(data.standards || []);
+        if (!course.value && use2022) {
+          standardStatus.textContent = "교과를 선택하면 해당 과목의 성취기준이 표시됩니다.";
         }
       } catch (error) {
-        standardStatus.textContent = "자동 입력을 불러오지 못했습니다. 성취기준을 직접 입력할 수 있습니다.";
+        if (requestId !== standardsRequestId) return;
+        standardOptions.replaceChildren();
+        const message = document.createElement("p");
+        message.className = "standard-empty";
+        message.textContent = error.message || "성취기준 목록을 불러오지 못했습니다.";
+        standardOptions.appendChild(message);
+        standardStatus.textContent = "성취기준 조회에 실패했습니다.";
       }
     }
 
     rebuildCourses();
-    if (selectedUnit) {
-      unit.value = selectedUnit;
-      if (storedStandard) standards.value = storedStandard;
-    }
-    loadStandards(false);
+    loadStandards();
+
     subjectSelect.addEventListener("change", () => {
-      rebuildCourses();
+      preferredCourse = "";
       course.value = "";
-      standards.value = "";
-      unit.value = "";
-      loadStandards(false);
+      standardArea.value = "";
+      clearSelectedStandards();
+      rebuildCourses();
+      loadStandards();
+    });
+    gradeSelect.addEventListener("change", () => {
+      preferredCourse = "";
+      course.value = "";
+      standardArea.value = "";
+      clearSelectedStandards();
+      rebuildCourses();
+      loadStandards();
     });
     curriculum.addEventListener("change", () => {
-      standards.value = "";
-      unit.value = "";
-      loadStandards(false);
+      preferredCourse = "";
+      course.value = "";
+      standardArea.value = "";
+      clearSelectedStandards();
+      rebuildCourses();
+      loadStandards();
     });
     course.addEventListener("change", () => {
-      unit.value = "";
-      standards.value = "";
-      loadStandards(false);
+      preferredCourse = "";
+      standardArea.value = "";
+      clearSelectedStandards();
+      loadStandards();
     });
-    unit.addEventListener("change", () => loadStandards(true));
+    standardArea.addEventListener("change", () => loadStandards());
+
   </script>
 </body>
 </html>

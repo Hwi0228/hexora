@@ -1,6 +1,8 @@
 import tempfile
 import unittest
+from unittest.mock import patch
 from pathlib import Path
+from unittest.mock import patch
 
 from parse_hwp import (
     _equation_to_latex,
@@ -11,6 +13,12 @@ from parse_hwp import (
 
 
 class HwpParsingTests(unittest.TestCase):
+    @patch("parse_hwp.convert_hancom_to_latex", return_value=r"\frac{1}{2}")
+    def test_prefers_hmleq_for_equation_scripts(self, convert):
+        with patch.dict("os.environ", {"HMLEQ_USE_LEGACY": ""}):
+            self.assertEqual(_equation_to_latex("1 over 2 `"), r"\frac{1}{2}")
+        convert.assert_called_once_with("1 over 2")
+
     def test_extracts_question_choices_answer_explanation_and_math(self):
         xml = """\
 <hs:sec xmlns:hs="http://www.hancom.co.kr/hwpml/2011/section"
@@ -118,7 +126,7 @@ class HwpParsingTests(unittest.TestCase):
             r"풀이 $\angle \mathrm{C} = 90 ^\circ$",
         )
 
-    def test_converts_every_fraction_to_display_fraction(self):
+    def test_preserves_fraction_commands_when_converting_hancom(self):
         xml = """\
 <hs:sec xmlns:hs="http://www.hancom.co.kr/hwpml/2011/section"
          xmlns:hp="http://www.hancom.co.kr/hwpml/2011/paragraph">
@@ -137,10 +145,10 @@ class HwpParsingTests(unittest.TestCase):
 
         question = parse_questions_from_xml(xml.encode("utf-8"))[0]
 
-        self.assertIn(r"\dfrac{ 3 } { 4 }", question["question"])
-        self.assertIn(r"\dfrac{ 5 } { 6 }", question["explanation"])
-        self.assertEqual(question["choices"], [r"$\dfrac{ 7 } { 8 }$"])
-        self.assertNotIn(r"\frac", question["question"])
+        self.assertIn(r"\frac{ 3 } { 4 }", question["question"])
+        self.assertIn(r"\frac{ 5 } { 6 }", question["explanation"])
+        self.assertEqual(question["choices"], [r"$\frac{ 7 } { 8 }$"])
+        self.assertNotIn(r"\dfrac", question["question"])
 
     def test_normalizes_hancom_braces_division_and_alignment_for_katex(self):
         brace_formula = _equation_to_latex(
@@ -148,7 +156,7 @@ class HwpParsingTests(unittest.TestCase):
         )
         self.assertEqual(
             brace_formula,
-            r"\left \{ \dfrac{ 4 } { 3 } - \left ( - \dfrac{ 1 } { 3 } \right ) \right \} \div \left ( - \dfrac{ 1 } { 9 } \right )",
+            r"\left \{ \frac{ 4 } { 3 } - \left ( - \frac{ 1 } { 3 } \right ) \right \} \div \left ( - \frac{ 1 } { 9 } \right )",
         )
 
         aligned_formula = _equation_to_latex(
@@ -159,7 +167,13 @@ class HwpParsingTests(unittest.TestCase):
             r"\begin{aligned} & \text{가입비 15000원} \\ & \text{- 가입 시 추가 요금 없이 무제한 편집 가능} \end{aligned}",
         )
 
+    def test_fraction_commands_are_preserved_for_katex(self):
+        expression = r"\frac{a}{b} + \tfrac{c}{d} + \cfrac{1}{2} + \dfrac{3}{4}"
+        self.assertEqual(normalize_katex_expression(expression), expression)
+
     def test_normalizes_legacy_formula_markup_for_existing_db_questions(self):
+        expression = r"\frac{a}{b} + \tfrac{c}{d} + \cfrac{1}{2} + \dfrac{3}{4}"
+        self.assertEqual(normalize_katex_expression(expression), expression)
         self.assertEqual(
             normalize_katex_expression(
                 r"\eqalign{ & \mathrm{가입비 15000원} \\ & \mathrm{- 가입 시 추가 요금 없이 가능} }"

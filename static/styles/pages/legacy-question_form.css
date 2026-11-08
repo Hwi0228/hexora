@@ -51,6 +51,7 @@
     .rich-editor { min-height:130px; padding:14px 15px; color:#24364B; font-size:13px; line-height:1.8; outline:none; }
     .rich-editor.answer-editor { min-height:88px; }
     .rich-editor.explanation-editor { min-height:150px; }
+    .rich-editor.choices-editor { min-height:125px; }
     .rich-editor p { margin:0 0 8px; }
     .rich-editor ul, .rich-editor ol { padding-left:24px; }
     .rich-editor [data-type="block-math"] { margin:12px 0; padding:9px; overflow-x:auto; border-radius:7px; background:#F8FAFC; text-align:center; }
@@ -58,6 +59,7 @@
     .rich-source { width:100%; min-height:125px; border:0; border-radius:0; resize:vertical; }
     .rich-source.answer-source { min-height:80px; }
     .rich-source.explanation-source { min-height:145px; }
+    .rich-source.choices-source { min-height:125px; }
     .js-editor-ready .rich-source { display:none; }
     .js-editor-ready .rich-editor { display:block; }
     .rich-editor { display:none; }
@@ -67,6 +69,7 @@
     .standard-box label { color:#526E89; font-size:11px; font-weight:700; }
     .standard-box textarea { min-height:70px; border-color:#D8E6F2; background:#fff; }
     .standard-status { color:#718096; font-size:10px; font-weight:400; }
+.standard-area-field[hidden] { display:none !important; }
     .source-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:13px 15px; }
     .actions { display:flex; align-items:center; justify-content:flex-end; gap:9px; padding:4px 0 0; }
     .button { display:inline-flex; min-height:39px; align-items:center; justify-content:center; gap:7px; padding:0 16px; border:1px solid #DCE4EC; border-radius:9px; background:#fff; color:#526477; font-size:12px; font-weight:700; text-decoration:none; cursor:pointer; }
@@ -229,3 +232,80 @@
   color: #43566B;
 }
 .rich-editor .ql-editor blockquote p:last-child { margin-bottom: 0; }
+
+
+/* The 2022 curriculum area is distinct from a textbook's unit name. */
+.standard-area-field[hidden] {
+  display: none !important;
+}
+.standard-area-field small {
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 400;
+  line-height: 1.6;
+}
+.standard-area-field small a {
+  color: var(--primary);
+  font-weight: 650;
+  text-decoration: none;
+}
+.standard-area-field small a:hover {
+  text-decoration: underline;
+}
+
+
+/* Achievement standards are selected individually; bracketed codes stand out. */
+.standard-options {
+  display: grid;
+  gap: 2px;
+  max-height: 320px;
+  overflow: auto;
+  padding: 4px;
+  border: 1px solid #D8E6F2;
+  border-radius: 8px;
+  background: #fff;
+}
+.standard-option {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  padding: 8px 9px;
+  border-radius: 6px;
+  color: #43566B;
+  font-size: 11px;
+  font-weight: 400;
+  line-height: 1.65;
+  cursor: pointer;
+}
+.standard-option:hover { background: #F5F8FB; }
+.standard-option input[type="radio"] {
+  width: 15px;
+  min-width: 15px;
+  min-height: 15px;
+  height: 15px;
+  margin: 2px 0 0;
+  padding: 0;
+  accent-color: #356A9A;
+}
+.standard-option-content { min-width: 0; }
+.standard-code {
+  display: inline-block;
+  margin: 0 4px 2px 0;
+  padding: 1px 6px;
+  border: 1px solid #CFE0EF;
+  border-radius: 5px;
+  background: #EAF2F9;
+  color: #285477;
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: 10px;
+  font-weight: 750;
+  white-space: nowrap;
+}
+.standard-empty {
+  margin: 0;
+  padding: 10px;
+  color: #8794A1;
+  font-size: 11px;
+  font-weight: 400;
+  line-height: 1.6;
+}

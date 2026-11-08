@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>문제집 | HEXORA</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='styles/shared.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='styles/tokens.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='styles/base.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='styles/layout.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='styles/components.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='styles/pages/workbooks.css') }}">
+</head>
+<body class="workbooks-page"><div class="app app-standard">
+  {% include "partials/sidebar.html" %}
+  <main>
+    {% set header_section = "WORKBOOKS / CATALOG" %}
+    {% set header_title = "문제집" %}
+    {% set header_description = "시중 교재의 서지정보와 커뮤니티 문제 모음을 관리합니다." %}
+    {% include "partials/header.html" %}
+    <section class="content-card">
+      <h2>문제집 찾기</h2>
+      <form method="get" class="inline-form">
+        <input name="q" value="{{ search }}" maxlength="100" placeholder="제목, 출판사, 저자, ISBN 검색">
+        <select name="kind" aria-label="문제집 종류">
+          <option value="all"{% if selected_kind == 'all' %} selected{% endif %}>전체</option>
+          <option value="commercial"{% if selected_kind == 'commercial' %} selected{% endif %}>시중 교재 출처</option>
+          <option value="community"{% if selected_kind == 'community' %} selected{% endif %}>커뮤니티 문제집</option>
+        </select>
+        <button class="workbook-button secondary" type="submit">검색</button>
+      </form>
+      <div class="workbook-list">
+        {% for book in workbooks %}
+        <article class="workbook-card">
+          <span class="tag">{{ '시중 교재 · 메타데이터만' if book.kind == 'commercial' else '커뮤니티 문제집' }}</span>
+          <h3><a href="{{ url_for('workbook_detail', workbook_id=book.id) }}">{{ book.title }}</a></h3>
+          <p>{{ book.publisher or '출판사 미상' }}{% if book.authors %} · {{ book.authors }}{% endif %}{% if book.edition %} · {{ book.edition }}{% endif %}</p>
+          <p>{% if book.subject %}{{ book.subject }}{% endif %}{% if book.grade %} · {{ book.grade }}{% endif %}{% if book.publication_year %} · {{ book.publication_year }}년{% endif %}{% if book.isbn %} · ISBN {{ book.isbn }}{% endif %}</p>
+          <small>{{ book.entry_count }}개 연결 항목 · 등록 {{ book.creator_name or '탈퇴한 사용자' }}</small>
+        </article>
+        {% else %}<p class="empty-state">등록된 문제집이 없습니다. 아래에서 먼저 추가해 보세요.</p>{% endfor %}
+      </div>
+    </section>
+    <section class="content-card">
+      <h2>문제집 등록</h2>
+      <p>시중 교재는 책 정보와 문항 위치만 기록합니다. 교재 본문을 입력하거나 업로드하지 않습니다.</p>
+      <form method="post" class="workbook-form">
+        <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
+        <label>종류<select name="kind"><option value="commercial">시중 교재 출처 (본문 없음)</option><option value="community">커뮤니티 문제집</option></select></label>
+        <label>제목<input name="title" maxlength="200" required></label>
+        <label>출판사<input name="publisher" maxlength="200"></label>
+        <label>저자<input name="authors" maxlength="300"></label>
+        <label>ISBN<input name="isbn" maxlength="20" inputmode="numeric"></label>
+        <label>판·쇄<input name="edition" maxlength="100" placeholder="예: 2026 개정판"></label>
+        <label>발행 연도<input name="publication_year" type="number" min="1" max="2200"></label>
+        <label>과목<select name="subject"><option value="">과목 선택</option>{% for group, courses in subject_course_options.items() %}<optgroup label="{{ group }}">{% for course in courses %}<option value="{{ course }}">{{ course }}</option>{% endfor %}</optgroup>{% endfor %}</select></label>
+        <label>대상 학년<select name="grade"><option value="">선택 안 함</option>{% for grade in grade_options %}<option value="{{ grade }}">{{ grade }}</option>{% endfor %}</select></label>
+        <label>교육과정<select name="curriculum"><option value="">선택 안 함</option>{% for curriculum in curriculum_options %}<option value="{{ curriculum }}">{{ curriculum }}</option>{% endfor %}</select></label>
+        <label class="full-field">설명<textarea name="description" maxlength="2000" rows="3"></textarea></label>
+        <button class="workbook-button primary" type="submit">문제집 등록</button>
+      </form>
+    </section>
+  </main>
+</div>
+</body></html>
