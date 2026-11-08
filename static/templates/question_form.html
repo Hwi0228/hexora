@@ -147,7 +147,8 @@
               <span class="section-hint">서식 · 수식 · 이미지가 포함된 콘텐츠</span>
             </div>
             <div class="fields">
-              <label class="field full">문제 내용 <span class="required">*</span>
+              <div class="field full">
+                <div class="field-label">문제 내용 <span class="required">*</span></div>
                 <div class="rich-field">
                   <div class="rich-toolbar" data-toolbar="prompt">
                     <button class="tool-button ql-bold" type="button" aria-label="굵게">B</button>
@@ -165,8 +166,9 @@
                   <textarea class="rich-source" name="prompt" data-source="prompt" required>{{ form_data.get('prompt', '') }}</textarea>
                   <div class="math-help">지문, 보기, 문제 본문을 이곳에 함께 작성할 수 있습니다. 수식은 LaTeX 문자열로 저장되고 문제 DB에서 렌더링됩니다.</div>
                 </div>
-              </label>
-              <label class="field full">선택지 <span class="choice-help">한 문단에 하나씩 작성 · LaTeX 및 한컴 한/글 수식 삽입 지원</span>
+              </div>
+              <div class="field full">
+                <div class="field-label">선택지 <span class="choice-help">한 문단에 하나씩 작성 · LaTeX 및 한컴 한/글 수식 삽입 지원</span></div>
                 <div class="rich-field">
                   <div class="rich-toolbar" data-toolbar="choices">
                     <button class="tool-button ql-bold" type="button" aria-label="굵게">B</button>
@@ -180,7 +182,7 @@
                   <textarea class="rich-source choices-source" name="choices" data-source="choices" placeholder="① 첫 번째 선택지&#10;② 두 번째 선택지&#10;③ 세 번째 선택지">{{ form_data.get('choices', '') }}</textarea>
                   <div class="math-help">각 문단을 선택지 하나로 저장합니다. 수식 버튼에서 LaTeX 또는 한컴 수식을 입력할 수 있습니다.</div>
                 </div>
-              </label>
+              </div>
             </div>
           </section>
 
@@ -190,7 +192,8 @@
               <span class="section-hint">수식 및 서식을 지원합니다.</span>
             </div>
             <div class="fields">
-              <label class="field full">정답 <span class="required">*</span>
+              <div class="field full">
+                <div class="field-label">정답 <span class="required">*</span></div>
                 <div class="rich-field">
                   <div class="rich-toolbar" data-toolbar="answer">
                     <button class="tool-button ql-bold" type="button">B</button>
@@ -204,7 +207,7 @@
                   <textarea class="rich-source answer-source" name="answer" data-source="answer" required>{{ form_data.get('answer', '') }}</textarea>
                   <div class="math-help">예: \(x=2\), 분수, 근호, 행렬 등 수식을 삽입할 수 있습니다.</div>
                 </div>
-              </label>
+              </div>
             </div>
           </section>
 
