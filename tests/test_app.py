@@ -338,7 +338,8 @@ class QuestionRegistrationTests(unittest.TestCase):
         self.assertIn("인라인 수식".encode("utf-8"), dashboard_response.data)
         self.assertIn("지문 수식".encode("utf-8"), dashboard_response.data)
         self.assertIn("보기 수식".encode("utf-8"), dashboard_response.data)
-        self.assertIn("선택지 수식 $x^2$".encode("utf-8"), dashboard_response.data)
+        self.assertIn("선택지 수식".encode("utf-8"), dashboard_response.data)
+        self.assertIn(b'data-latex="x^2"', dashboard_response.data)
         self.assertIn(b'class="question-choice math-content"', dashboard_response.data)
         self.assertNotIn(b"&lt;span class=\"ql-math-inline\"", dashboard_response.data)
 
