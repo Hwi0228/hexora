@@ -13,7 +13,7 @@ fi
 cargo install \
   --git https://github.com/alphaiv-project/hmleq \
   --branch main \
-  --package hmleq-cli \
+  hmleq-cli \
   --bin hmleq \
   --root "$HOME/.cargo" \
   --force
