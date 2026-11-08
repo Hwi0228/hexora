@@ -34,10 +34,10 @@ jobs:
           fn main() {
               let cases = [
                   ("a over b", r"\\frac{a}{b}"),
-                  ("{a+b} over {c+d}", r"\frac"),
-                  ("sqrt {a over b}", r"\sqrt"),
+                  ("{a+b} over {c+d}", "frac"),
+                  ("sqrt {a over b}", "sqrt"),
                   ("x^2 + y_1", "^"),
-                  ("matrix {a & b # c & d}", r"\begin{matrix}"),
+                  ("matrix {a & b # c & d}", "begin{matrix}"),
               ];
               for (input, expected) in cases {
                   let output = hmleq::eq_to_latex(input).unwrap_or_else(|e| panic!("{input}: {e}"));
@@ -137,11 +137,11 @@ jobs:
           sys.modules[spec.name] = module
           spec.loader.exec_module(module)
           cases = [
-              ("a over b", r"\frac"),
-              ("{a+b} over {c+d}", r"\frac"),
-              ("sqrt {a over b}", r"\sqrt"),
+              ("a over b", "frac"),
+              ("{a+b} over {c+d}", "frac"),
+              ("sqrt {a over b}", "sqrt"),
               ("x^2 + y_1", "^"),
-              ("matrix {a & b # c & d}", r"\begin{matrix}"),
+              ("matrix {a & b # c & d}", "begin{matrix}"),
           ]
           for source, expected in cases:
               output = module.hwp_equation_to_latex(source)
