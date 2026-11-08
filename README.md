@@ -14,7 +14,7 @@ Flask 앱을 실행한 다음 **문제 DB 등록**을 눌러 과목, 학년, 단
 
 로그인 후 대시보드에서 전체 공개 문항 수와 과목·단원별 현황, 최근 등록 문제를 확인할 수 있습니다. 개인 폴더 수는 본인 계정 기준으로 표시합니다.
 
-등록된 문제는 SQLite의 `instance/probocr.sqlite3`에 저장됩니다. 기존 DB를 새 문제 서식으로 자동 마이그레이션하며, 이전에 입력한 문제도 보존합니다. 문제 목록과 문항 수에는 실제 저장된 데이터만 표시합니다. SQLite 파일은 Git에 포함되지 않습니다.
+등록된 문제는 설정한 데이터베이스에 저장됩니다. 기본값은 SQLite의 `instance/probocr.sqlite3`이며 기존 SQLite 마이그레이션 동작을 그대로 사용합니다. PostgreSQL을 선택하면 동일한 문제 은행·회원·폴더·수정 이력·임시 저장·개인 메모 스키마를 자동으로 준비합니다. DB 종류는 실행 환경 변수 DATABASE_TYPE으로 선택하며, SQLite와 PostgreSQL은 서로 별도의 데이터 저장소입니다. DB 종류를 바꿔도 기존 데이터가 자동 복사되지는 않으므로 실제 데이터를 옮기려면 별도 백업·이관 절차가 필요합니다.
 
 문제 DB 왼쪽의 **＋ 새 폴더**에서 폴더와 하위 폴더를 만들 수 있습니다. 폴더는 UUID로 식별되고 사용자별로 분리됩니다. 문항을 공개한 뒤 문제 카드의 **문제 더보기**에서 본인 소유 폴더로 이동할 수 있습니다. 개인 메모도 같은 메뉴에서 관리하며, 해당 메모는 작성한 사용자에게만 표시됩니다. 폴더를 선택하면 그 아래 하위 폴더의 문제도 함께 조회됩니다.
 
@@ -42,7 +42,74 @@ Flask 앱을 실행한 다음 **문제 DB 등록**을 눌러 과목, 학년, 단
 
 ## 테스트
 
-`python -m unittest discover -s tests -v` 명령으로 테스트를 실행합니다. GitHub Actions에서도 PR 및 기본 브랜치 푸시 시 동일한 테스트를 수행합니다.
+전체 자동 테스트는 다음 명령으로 실행합니다.
+
+```powershell
+python -m unittest discover -s tests -v
+```
+
+현재 테스트는 SQLite 기반 회귀 테스트와 PostgreSQL 연결 어댑터·설정·스키마 단위 테스트를 포함합니다. PostgreSQL 테스트 단위 테스트는 외부 DB 접속 없이 실행됩니다. GitHub Actions에서도 PR 및 기본 브랜치 푸시 시 동일한 테스트를 수행합니다.
+
+### Windows 로컬 실행
+
+PR 브랜치를 내려받은 뒤 Python 3.11 가상환경에서 의존성을 설치합니다.
+
+```powershell
+# GitHub CLI가 설치되어 있고 인증된 경우
+gh pr checkout 13
+
+# 또는 GitHub CLI 없이 PR 브랜치를 가져오는 경우
+git fetch origin pull/13/head:pr-13
+git switch pr-13
+
+py -3.11 -m venv .venv
+.\.venv\Scripts\Activate.ps1
+python -m pip install --upgrade pip
+python -m pip install -r requirements.txt
+```
+
+PowerShell에서 가상환경 활성화가 차단되면 현재 터미널에 한해 다음을 실행한 뒤 다시 활성화합니다.
+
+```powershell
+Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
+.\.venv\Scripts\Activate.ps1
+```
+
+기본 SQLite 설정으로 테스트와 웹 앱을 실행합니다.
+
+```powershell
+$env:DATABASE_TYPE = "sqlite"
+$env:DATABASE_PATH = "instance/probocr.sqlite3"
+$env:FLASK_SECRET_KEY = "local-development-only-change-me"
+
+python -m unittest discover -s tests -v
+python app.py
+```
+
+브라우저에서 `http://127.0.0.1:5000`을 열고 회원가입 후 문제 등록, 편집, 폴더, 임시 저장, HWP 가져오기를 확인합니다. SQLite DB 파일은 `instance/probocr.sqlite3`에 생성됩니다.
+
+### Neon PostgreSQL로 로컬 실행
+
+운영 데이터와 분리해서 확인하려면 Neon 콘솔에서 `production` 브랜치의 자식 브랜치(예: `local-test`)를 만든 뒤 그 브랜치의 **pooled connection string**을 복사합니다. 아래 환경 변수는 현재 PowerShell 창에만 적용됩니다.
+
+```powershell
+$env:DATABASE_TYPE = "postgresql"
+$env:DATABASE_URL = "postgresql://USER:PASSWORD@HOST/DBNAME?sslmode=require"
+$env:FLASK_SECRET_KEY = "local-development-only-change-me"
+
+python -m unittest discover -s tests -v
+python app.py
+```
+
+PostgreSQL 백엔드를 선택하면 첫 요청 때 HEXORA 테이블과 인덱스가 생성됩니다. 별도 테스트 브랜치를 사용하면 실제 `production` 데이터에 영향을 주지 않고 회원가입·문제 등록·수정 이력을 확인할 수 있습니다. 테스트가 끝나고 SQLite로 돌아갈 때는 새 PowerShell 창을 열거나 다음처럼 환경 변수를 바꿉니다.
+
+```powershell
+$env:DATABASE_TYPE = "sqlite"
+Remove-Item Env:DATABASE_URL -ErrorAction SilentlyContinue
+python app.py
+```
+
+`.env.example`은 설정 예시 파일이며 앱이 자동으로 읽지는 않습니다. 접속 문자열을 코드나 Git에 저장하지 말고, 로컬 환경 변수 또는 배포 플랫폼의 비밀 환경 변수로 설정하세요.
 
 ## 의존성 및 실행
 
@@ -55,6 +122,32 @@ Flask 진입점은 `app.py`이며, DB, 인증, 문제/폴더, HWP 파싱은 각�
 
 > 본 제품은 한글과컴퓨터의글 문서 파일(.hwp) 공개 문서를 참고하여 개발하였습니다.
 
+
+## 데이터베이스 설정
+
+데이터베이스 종류는 앱 화면이 아니라 배포 환경 변수로 설정합니다. 별도 설정이 없으면 기존 SQLite가 기본값입니다.
+
+### SQLite (기본값)
+
+```env
+DATABASE_TYPE=sqlite
+DATABASE_PATH=instance/probocr.sqlite3
+```
+
+DATABASE_PATH는 선택 항목이며 생략하면 instance/probocr.sqlite3를 사용합니다. 기존 SQLite 파일과 자동 마이그레이션 코드는 그대로 유지됩니다.
+
+### PostgreSQL / Neon
+
+```env
+DATABASE_TYPE=postgresql
+DATABASE_URL=postgresql://USER:PASSWORD@HOST/DATABASE?sslmode=require
+```
+
+Neon에서는 웹 앱의 일반 쿼리용 pooled connection string을 DATABASE_URL에 설정합니다. 연결 정보는 Git에 올리지 말고 Render의 Environment Variables에 비밀값으로 등록하세요. PostgreSQL 선택 시 최초 요청에서 HEXORA 테이블과 인덱스를 자동 생성합니다.
+
+Render 배포 명령은 Build Command: pip install -r requirements.txt, Start Command: gunicorn app:app을 사용합니다. FLASK_SECRET_KEY도 Render 환경 변수에 고정해 두어야 합니다.
+
+**주의:** SQLite와 PostgreSQL은 같은 데이터를 공유하지 않습니다. DATABASE_TYPE을 바꾸면 앱이 다른 저장소를 사용하며 기존 DB 데이터는 자동 이관되지 않습니다.
 
 ## 버전 관리
 
