@@ -84,6 +84,22 @@ class QuestionRegistrationTests(unittest.TestCase):
         form.update(overrides)
         return form
 
+    @patch("question_routes.run_hmleq", return_value=r"\frac{a}{b}")
+    def test_hancom_math_endpoint_returns_hmleq_latex(self, convert):
+        self.client.get("/questions/new")
+        with self.client.session_transaction() as user_session:
+            token = user_session["csrf_token"]
+
+        response = self.client.post(
+            "/api/math/hancom-to-latex",
+            json={"script": "{a} over {b}"},
+            headers={"X-CSRF-Token": token},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json, {"latex": r"\frac{a}{b}"})
+        convert.assert_called_once_with("{a} over {b}")
+
     def create_folder(self, client, name, parent_uuid=""):
         response = self.csrf_post(
             client,
@@ -486,21 +502,7 @@ class QuestionRegistrationTests(unittest.TestCase):
         self.assertIn("임시 저장".encode(), form_response.data)
         self.assertIn(b"quill@2.0.3", form_response.data)
         self.assertIn(b'id="math-input-dialog"', form_response.data)
-        self.assertIn("한컴 한/글 수식".encode(), form_response.data)
-        self.assertIn(b'id="math-input-format"', form_response.data)
         self.assertNotIn(b"window.prompt(", form_response.data)
-
-    def test_hancom_math_input_endpoint_converts_to_latex(self):
-        self.client.get("/questions/new")
-        with self.client.session_transaction() as user_session:
-            csrf = user_session["csrf_token"]
-        response = self.client.post("/questions/math/convert-hancom", json={"expression": r"{a+b} over {c}"}, headers={"X-CSRF-Token": csrf})
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.get_json()["latex"], r"\frac{ a+b } { c }")
-        empty = self.client.post("/questions/math/convert-hancom", json={"expression": "   "}, headers={"X-CSRF-Token": csrf})
-        self.assertEqual(empty.status_code, 400)
-        too_long = self.client.post("/questions/math/convert-hancom", json={"expression": "x" * 5001}, headers={"X-CSRF-Token": csrf})
-        self.assertEqual(too_long.status_code, 400)
 
     def test_only_user_created_uuid_folders_and_nested_folders_appear(self):
         empty_response = self.client.get("/questions")
@@ -920,7 +922,7 @@ class QuestionRegistrationTests(unittest.TestCase):
         self.assertIn(r"$\tfrac{2}{3}$".encode(), history.data)
         self.assertNotIn("&lt;p&gt;관리자 원본".encode(), history.data)
         self.assertNotIn("&lt;p&gt;다른 회원이".encode(), history.data)
-        self.assertIn(b"class=" + b'"value before math-content"', history.data)
+        self.assertIn(b'class="value before math-content"', history.data)
         self.assertIn(b"scripts/katex-render.js", history.data)
 
         self.csrf_post(self.client, f"/questions/{question_id}/restore/1")
@@ -1031,6 +1033,16 @@ class EditorFrontendRegressionTests(unittest.TestCase):
         self.assertNotIn("@tiptap/", template)
         self.assertIn("if (!window.Quill)", template)
         self.assertIn("new Quill(mount", template)
+
+    def test_question_editor_supports_converting_hancom_math_scripts(self):
+        template = (
+            Path(__file__).resolve().parents[1]
+            / "static/templates/question_form.html"
+        ).read_text(encoding="utf-8")
+        self.assertIn('<option value="hancom">한컴 한/글 수식</option>', template)
+        self.assertIn('id="math-hancom-input"', template)
+        self.assertIn("url_for('hancom_to_latex')", template)
+        self.assertIn('"X-CSRF-Token": token', template)
 
     def test_quill_math_remains_atomic_and_supports_clipboard_roundtrips(self):
         template = (Path(__file__).resolve().parents[1] / "static/templates/question_form.html").read_text(encoding="utf-8")
@@ -1206,3 +1218,4 @@ class ChangelogPageTests(unittest.TestCase):
             "/static/styles/shared.css",
             response.get_data(as_text=True),
         )
+
