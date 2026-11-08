@@ -11,7 +11,12 @@ from flask import abort, current_app, g, jsonify, redirect, render_template, req
 from auth import admin_required, login_required
 from constants import NAV_ITEMS, SUBJECTS
 from database import begin_write_transaction, get_db
-from parse_hwp import _equation_to_latex, normalize_katex_markup, strip_choice_label
+from parse_hwp import normalize_katex_markup, strip_choice_label
+from hmleq_converter import (
+    HmleqConversionError,
+    HmleqUnavailable,
+    convert_hancom_to_latex as run_hmleq,
+)
 from curriculum_data import (
     DATASET_URL as CURRICULUM_DATASET_URL,
     DATASET_VERSION as CURRICULUM_DATASET_VERSION,
@@ -1183,25 +1188,23 @@ def move_question(question_id):
         )
     )
 
-def convert_hancom_math():
-    payload = request.get_json(silent=True) or {}
-    expression = str(payload.get("expression", "")).strip()
-    if not expression:
-        return jsonify(error="수식 코드를 입력해 주세요."), 400
-    if len(expression) > 5000:
-        return jsonify(error="수식 코드는 5,000자 이내로 입력해 주세요."), 400
+def hancom_to_latex():
+    payload = request.get_json(silent=True)
+    script = payload.get("script") if isinstance(payload, dict) else None
     try:
-        latex = _equation_to_latex(expression)
-    except (ValueError, TypeError) as error:
-        return jsonify(error=f"한컴 수식을 변환하지 못했습니다: {error}"), 400
+        latex = run_hmleq(script)
+    except HmleqConversionError as exc:
+        return jsonify(error=str(exc)), 422
+    except HmleqUnavailable as exc:
+        return jsonify(error=str(exc)), 503
     return jsonify(latex=latex)
 
 
 def register_question_routes(app):
     app.add_url_rule(
-        "/questions/math/convert-hancom",
-        endpoint="convert_hancom_math",
-        view_func=login_required(convert_hancom_math),
+        "/api/math/hancom-to-latex",
+        endpoint="hancom_to_latex",
+        view_func=login_required(hancom_to_latex),
         methods=["POST"],
     )
     app.add_url_rule(
@@ -1261,3 +1264,4 @@ def register_question_routes(app):
         view_func=login_required(restore_question),
         methods=["POST"],
     )
+
