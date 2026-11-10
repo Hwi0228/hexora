@@ -2,8 +2,9 @@ import json
 
 from flask import abort
 
+from constants import SOURCE_TYPES
 from database import get_db
-from question_constants import COURSE_OPTIONS, DIFFICULTIES, QUESTION_TYPES, SOURCE_TYPES
+from question_constants import COURSE_OPTIONS, DIFFICULTIES, QUESTION_TYPES
 from question_ids import format_question_number
 
 
