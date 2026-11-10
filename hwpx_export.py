@@ -102,13 +102,16 @@ def _question_paragraphs(questions, title, include_answers):
             "page_break": False,
         })
 
-    # Match the supplied HWP: centered heading and right-aligned class fields.
+    # Branded exam-sheet masthead and student information fields.
+    add("HEXORA", char_style="21", para_style="39")
+    add("MATHEMATICS  ·  ASSESSMENT", char_style="24", para_style="58")
     add(title, char_style="15", para_style="39")
     add("(_____________)반 (______) ", char_style="24", para_style="58")
     add("이름: ____________________", char_style="24", para_style="58")
     add("")
 
     for number, question in enumerate(questions, start=1):
+        add(f"QUESTION {number:02d}", char_style="45")
         if question.get("title"):
             add(str(question["title"]).strip(), char_style="23")
 
@@ -127,10 +130,7 @@ def _question_paragraphs(questions, title, include_answers):
             pass
 
         first_line = prompt_lines.pop(0) if prompt_lines else ""
-        add_runs([
-            {"text": f"{number:02d}", "char_style": "60"},
-            {"text": f"  {first_line}{point_label}", "char_style": "17"},
-        ])
+        add(f"{first_line}{point_label}", char_style="17")
         for line in prompt_lines:
             add(line)
 
@@ -159,7 +159,13 @@ def _question_paragraphs(questions, title, include_answers):
         add("")
 
     if include_answers:
-        add("정답 및 해설", char_style="15", para_style="39", page_break=True)
+        add(
+            "ANSWER KEY  ·  TEACHER COPY",
+            char_style="46",
+            para_style="39",
+            page_break=True,
+        )
+        add("정답 및 해설", char_style="15", para_style="39")
         for number, question in enumerate(questions, start=1):
             answer_lines = rich_text_to_lines(question.get("answer"))
             explanation_lines = rich_text_to_lines(question.get("explanation"))
