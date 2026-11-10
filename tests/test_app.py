@@ -1211,6 +1211,31 @@ class HexoraBrandingTests(unittest.TestCase):
 
 
 
+    def test_soft_deleted_question_is_hidden_but_retrievable_and_restorable_by_code(self):
+        self.csrf_post(self.client, "/questions/new", data=self.valid_question())
+        code = "000001"
+
+        deleted = self.csrf_post(self.client, "/questions/1/delete")
+        self.assertEqual(deleted.status_code, 302)
+        self.assertIsNotNone(self.query_one(
+            "SELECT deleted_at FROM questions WHERE id = 1"
+        ))
+        self.assertNotIn("테스트 문항".encode(), self.client.get("/questions").data)
+
+        archived = self.client.get("/questions/code?code=" + code)
+        self.assertEqual(archived.status_code, 200)
+        self.assertIn("테스트 문항".encode(), archived.data)
+        self.assertIn("삭제된 문제".encode(), archived.data)
+        self.assertIn("문제 내용".encode(), self.query_one(
+            "SELECT prompt FROM questions WHERE id = 1"
+        ).encode())
+
+        restored = self.csrf_post(self.client, "/questions/1/undelete")
+        self.assertEqual(restored.status_code, 302)
+        self.assertIsNone(self.query_one("SELECT deleted_at FROM questions WHERE id = 1"))
+        self.assertIn("테스트 문항".encode(), self.client.get("/questions").data)
+
+
 class ChangelogPageTests(unittest.TestCase):
     def setUp(self):
         import tempfile

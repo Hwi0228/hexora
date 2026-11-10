@@ -323,7 +323,7 @@ def export_exam_hwpx():
         SELECT id, subject, grade, title, passage, prompt, examples, choices,
                answer, explanation, points
         FROM questions
-        WHERE id IN ({placeholders})
+        WHERE id IN ({placeholders}) AND deleted_at IS NULL
         """,
         selected_ids,
     ).fetchall()

@@ -153,6 +153,7 @@ QUESTION_ADDITIONAL_COLUMNS = {
     "source_url": "TEXT NOT NULL DEFAULT ''",
     "license": "TEXT NOT NULL DEFAULT ''",
     "title": "TEXT NOT NULL DEFAULT ''",
+    "deleted_at": "TEXT",
 }
 
 
@@ -537,6 +538,7 @@ POSTGRES_SCHEMA_STATEMENTS = (
     CREATE UNIQUE INDEX IF NOT EXISTS idx_folders_child_name
     ON folders(user_uuid, parent_uuid, name) WHERE parent_uuid IS NOT NULL
     """,
+    "ALTER TABLE questions ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMP",
     "CREATE INDEX IF NOT EXISTS idx_questions_user_subject ON questions(user_uuid, subject)",
     "CREATE INDEX IF NOT EXISTS idx_workbooks_kind_title ON workbooks(kind, title)",
     "CREATE INDEX IF NOT EXISTS idx_workbook_entries_workbook ON workbook_entries(workbook_id, id)",

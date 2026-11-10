@@ -600,7 +600,7 @@ def get_question_page_data():
             FROM question_revisions
             GROUP BY question_id
         ) AS revisions ON revisions.question_id = questions.id
-        WHERE questions.subject = ?
+        WHERE questions.subject = ? AND questions.deleted_at IS NULL
     """
     parameters = [g.user["uuid"], selected_subject]
     if request.args.get("user_uuid"):
@@ -645,6 +645,9 @@ def get_question_page_data():
         question["folder_name"] = folder_names.get(question["folder_uuid"])
     for question in questions:
         question["can_manage_folder"] = question["user_uuid"] == g.user["uuid"]
+        question["can_delete_question"] = (
+            question["user_uuid"] == g.user["uuid"] or g.user["role"] == "admin"
+        )
     return {
         "nav_items": NAV_ITEMS,
         "subjects": SUBJECTS,
@@ -940,6 +943,8 @@ def new_question():
 
 def edit_question(question_id):
     question = _question_row(question_id)
+    if question["deleted_at"] is not None:
+        abort(404)
     connection = get_db()
     if request.method == "GET":
         begin_write_transaction(connection)
@@ -1272,6 +1277,60 @@ def convert_hancom_math():
     return jsonify(latex=latex)
 
 
+def question_by_code():
+    code = request.args.get("code", "").strip().upper()
+    question_id = parse_question_number(code)
+    if question_id is None:
+        abort(404)
+
+    question = dict(_question_row(question_id))
+    try:
+        question["choices"] = json.loads(question.get("choices") or "[]")
+    except (TypeError, json.JSONDecodeError):
+        question["choices"] = []
+    question["choices"] = [
+        render_rich_html(strip_choice_label(str(choice or "")))
+        for choice in question["choices"]
+    ]
+    for field in ("passage", "prompt", "examples", "answer", "explanation"):
+        question[field] = render_rich_html(question.get(field, ""))
+    question["display_id"] = format_question_number(question_id)
+    question["can_manage_question"] = (
+        question["user_uuid"] == g.user["uuid"] or g.user["role"] == "admin"
+    )
+    return render_template(
+        "question_code.html", nav_items=NAV_ITEMS,
+        question=question, active_page="main",
+    )
+
+
+def delete_question(question_id):
+    question = _question_row(question_id)
+    if question["user_uuid"] != g.user["uuid"] and g.user["role"] != "admin":
+        abort(403)
+    connection = get_db()
+    connection.execute(
+        "UPDATE questions SET deleted_at = CURRENT_TIMESTAMP "
+        "WHERE id = ? AND deleted_at IS NULL",
+        (question_id,),
+    )
+    connection.commit()
+    return redirect(url_for("main", subject=question["subject"]))
+
+
+def restore_deleted_question(question_id):
+    question = _question_row(question_id)
+    if question["user_uuid"] != g.user["uuid"] and g.user["role"] != "admin":
+        abort(403)
+    connection = get_db()
+    connection.execute(
+        "UPDATE questions SET deleted_at = NULL WHERE id = ?",
+        (question_id,),
+    )
+    connection.commit()
+    return redirect(url_for("question_by_code", code=format_question_number(question_id)))
+
+
 def register_question_routes(app):
     app.add_url_rule(
         "/api/math/hancom-to-latex",
@@ -1293,6 +1352,18 @@ def register_question_routes(app):
     )
     app.add_url_rule(
         "/questions", endpoint="main", view_func=login_required(main), methods=["GET"]
+    )
+    app.add_url_rule(
+        "/questions/code", endpoint="question_by_code",
+        view_func=login_required(question_by_code), methods=["GET"],
+    )
+    app.add_url_rule(
+        "/questions/<int:question_id>/delete", endpoint="delete_question",
+        view_func=login_required(delete_question), methods=["POST"],
+    )
+    app.add_url_rule(
+        "/questions/<int:question_id>/undelete", endpoint="restore_deleted_question",
+        view_func=login_required(restore_deleted_question), methods=["POST"],
     )
     app.add_url_rule(
         "/admin/users",

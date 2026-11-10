@@ -22,6 +22,7 @@ def dashboard():
                 WHEN unit <> '' THEN subject || '|' || grade || '|' || unit
             END) AS unit_count
         FROM questions
+        WHERE deleted_at IS NULL
         """
     ).fetchone()
     folder_count = connection.execute(
@@ -33,6 +34,7 @@ def dashboard():
         """
         SELECT subject, COUNT(*) AS count
         FROM questions
+        WHERE deleted_at IS NULL
         GROUP BY subject
         ORDER BY count DESC, LOWER(subject)
         """
@@ -43,6 +45,7 @@ def dashboard():
         SELECT id, title, subject, grade, unit, passage, prompt, examples,
                choices, source, year, page
         FROM questions
+        WHERE deleted_at IS NULL
         ORDER BY id DESC
         LIMIT 6
         """
