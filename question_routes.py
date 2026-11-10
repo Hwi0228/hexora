@@ -6,7 +6,7 @@ from pathlib import Path
 from flask import abort, current_app, g, jsonify, redirect, render_template, request, url_for
 
 from auth import admin_required, login_required
-from constants import NAV_ITEMS, SUBJECTS
+from constants import NAV_ITEMS, SUBJECTS, LICENSE_CHOICES, SOURCE_TYPES
 from question_constants import (
     QUESTION_CONTENT_FIELDS, QUESTION_FIELD_LABELS, QUESTION_TYPES, DIFFICULTIES,
     SOURCE_TYPES, LICENSE_CHOICES, COURSE_OPTIONS, SUBJECT_COURSE_OPTIONS,
@@ -15,7 +15,7 @@ from question_constants import (
 from question_ids import BASE36_ALPHABET, BASE36_WIDTH, format_question_number, parse_question_number
 from rich_text import sanitize_rich_html, _rich_text_has_content, render_rich_html
 from database import begin_write_transaction, get_db
-from parse_hwp import strip_choice_label
+from parse_hwp import normalize_katex_markup, strip_choice_label
 from hmleq_converter import HmleqConversionError, HmleqUnavailable, convert_hancom_to_latex as run_hmleq
 from curriculum_data import (
     DATASET_URL as CURRICULUM_DATASET_URL,

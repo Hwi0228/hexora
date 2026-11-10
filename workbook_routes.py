@@ -1,11 +1,10 @@
 from flask import abort, g, redirect, render_template, request, url_for
 
 from auth import login_required
-from constants import NAV_ITEMS, GRADE_OPTIONS
+from constants import NAV_ITEMS, SUBJECTS, GRADE_OPTIONS
 from database import get_db
 from question_constants import COURSE_OPTIONS, SUBJECT_COURSE_OPTIONS
 from question_ids import format_question_number, parse_question_number as _parse_question_number
-from constants import SUBJECTS
 
 
 WORKBOOK_SUBJECTS = {
