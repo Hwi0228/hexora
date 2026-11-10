@@ -512,11 +512,34 @@
         });
       }
 
+      // Serialize the editor's source HTML, never KaTeX's rendered SVG.
+      // Quill embeds keep the original TeX in data-latex; their inner DOM is
+      // presentation-only and contains SVG path commands that must not be saved.
+      function serializeEditorNode(node) {
+        const clone = node.cloneNode(true);
+        clone.querySelectorAll(".ql-math-inline, .ql-math-block").forEach((mathNode) => {
+          const displayMode = mathNode.classList.contains("ql-math-block");
+          const cleanNode = document.createElement(displayMode ? "div" : "span");
+          cleanNode.className = displayMode ? "ql-math-block" : "ql-math-inline";
+          cleanNode.setAttribute("data-latex", mathNode.dataset.latex || "");
+          cleanNode.setAttribute("data-input-format", mathNode.dataset.inputFormat || "latex");
+          cleanNode.setAttribute("data-input-source", mathNode.dataset.inputSource || mathNode.dataset.latex || "");
+          cleanNode.setAttribute("data-math-object", displayMode ? "block" : "inline");
+          cleanNode.setAttribute("aria-label", displayMode ? "블록 수식" : "인라인 수식");
+          mathNode.replaceWith(cleanNode);
+        });
+        return clone.outerHTML;
+      }
+
       function serializeChoices(quill) {
         return Array.from(quill.root.children)
           .filter((node) => node.textContent.trim() ||
             node.querySelector(".ql-math-inline, .ql-math-block"))
-          .map((node) => node.outerHTML).join("\n");
+          .map(serializeEditorNode).join("\n");
+      }
+
+      function serializeEditor(quill) {
+        return Array.from(quill.root.children).map(serializeEditorNode).join("");
       }
 
       sources.forEach((source) => {
@@ -581,7 +604,7 @@
         quill.on("text-change", () => {
           source.value = key === "choices"
             ? serializeChoices(quill)
-            : quill.root.innerHTML;
+            : serializeEditor(quill);
         });
 
         mount.addEventListener("dblclick", (event) => {
@@ -613,7 +636,7 @@
           const editor = editors.get(source.dataset.source);
           if (editor) source.value = source.dataset.source === "choices"
             ? serializeChoices(editor)
-            : editor.root.innerHTML;
+            : serializeEditor(editor);
         });
         if (event.submitter && event.submitter.value === "draft") return;
         const missing = ["prompt", "answer"].find((key) => {
