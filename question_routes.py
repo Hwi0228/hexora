@@ -9,7 +9,7 @@ from auth import admin_required, login_required
 from constants import NAV_ITEMS, SUBJECTS, LICENSE_CHOICES, SOURCE_TYPES
 from question_constants import (
     QUESTION_CONTENT_FIELDS, QUESTION_FIELD_LABELS, QUESTION_TYPES, DIFFICULTIES,
-    SOURCE_TYPES, LICENSE_CHOICES, COURSE_OPTIONS, SUBJECT_COURSE_OPTIONS,
+    COURSE_OPTIONS, SUBJECT_COURSE_OPTIONS,
     CURRICULUM_STANDARDS,
 )
 from question_ids import BASE36_ALPHABET, BASE36_WIDTH, format_question_number, parse_question_number
