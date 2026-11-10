@@ -105,6 +105,7 @@ def _question_paragraphs(questions, title, include_answers):
     # Match the supplied HWP: centered heading and right-aligned class fields.
     add(title, char_style="15", para_style="39")
     add("(_____________)반 (______) ", char_style="24", para_style="58")
+    add("이름: ____________________", char_style="24", para_style="58")
     add("")
 
     for number, question in enumerate(questions, start=1):
@@ -167,8 +168,10 @@ def _question_paragraphs(questions, title, include_answers):
                 {"text": f"{number:02d}", "char_style": "60"},
                 {"text": f"  정답: {answer}", "char_style": "17"},
             ])
-            for line in explanation_lines:
-                add(line)
+            if explanation_lines:
+                add("해설:", char_style="23")
+                for line in explanation_lines:
+                    add(line)
 
     return paragraphs
 
