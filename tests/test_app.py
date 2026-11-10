@@ -1186,7 +1186,7 @@ class EditorFrontendRegressionTests(unittest.TestCase):
         stylesheet = (root / "static/styles/pages/legacy-question_form.css").read_text(encoding="utf-8")
         self.assertIn('if (editor) source.value = source.dataset.source === "choices"', template)
         self.assertIn("serializeChoices(editor)", template)
-        self.assertIn("editor.root.innerHTML", template)
+        self.assertIn("serializeEditor(editor)", template)
         self.assertIn('document.documentElement.classList.add("js-editor-ready")', template)
         self.assertIn('document.documentElement.classList.remove("js-editor-ready")', template)
         self.assertIn('element.hidden = true', template)
