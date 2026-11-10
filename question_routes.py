@@ -15,6 +15,9 @@ from question_constants import (
 from question_ids import BASE36_ALPHABET, BASE36_WIDTH, format_question_number, parse_question_number
 from rich_text import sanitize_rich_html, _rich_text_has_content, render_rich_html
 from database import begin_write_transaction, get_db
+from question_drafts import _delete_question_draft, _load_question_draft, _save_question_draft
+from question_revisions import _ensure_initial_question_revision, _insert_question_revision, _question_snapshot
+from question_repository import _question_form_values, _question_row
 from parse_hwp import normalize_katex_markup, strip_choice_label
 from hmleq_converter import HmleqConversionError, HmleqUnavailable, convert_hancom_to_latex as run_hmleq
 from curriculum_data import (
@@ -27,61 +30,6 @@ from curriculum_data import (
 
 
 
-
-def _draft_key(question_id=None):
-    return "new" if question_id is None else f"question:{int(question_id)}"
-
-
-def _load_question_draft(question_id=None):
-    row = get_db().execute(
-        "SELECT payload_json, base_revision, updated_at FROM question_drafts "
-        "WHERE user_uuid = ? AND draft_key = ?",
-        (g.user["uuid"], _draft_key(question_id)),
-    ).fetchone()
-    if row is None:
-        return None
-    try:
-        payload = json.loads(row["payload_json"])
-    except (TypeError, json.JSONDecodeError):
-        return None
-    payload["choices"] = "\n".join(payload.get("choices") or [])
-    payload["draft_updated_at"] = row["updated_at"]
-    payload["draft_base_revision"] = row["base_revision"]
-    return payload
-
-
-def _save_question_draft(data, question_id=None, base_revision=None):
-    payload = {field: data.get(field) for field in QUESTION_CONTENT_FIELDS}
-    payload["choices"] = data.get("choices") or []
-    payload["folder_uuid"] = data.get("folder_uuid")
-    payload["summary"] = data.get("summary", "")
-    payload["base_question_number"] = data.get("base_question_number", "")
-    get_db().execute(
-        """
-        INSERT INTO question_drafts (
-            user_uuid, draft_key, question_id, base_revision, payload_json,
-            created_at, updated_at
-        )
-        VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-        ON CONFLICT(user_uuid, draft_key) DO UPDATE SET
-            question_id = excluded.question_id,
-            base_revision = excluded.base_revision,
-            payload_json = excluded.payload_json,
-            updated_at = CURRENT_TIMESTAMP
-        """,
-        (
-            g.user["uuid"], _draft_key(question_id), question_id, base_revision,
-            json.dumps(payload, ensure_ascii=False, separators=(",", ":")),
-        ),
-    )
-    get_db().commit()
-
-
-def _delete_question_draft(question_id=None):
-    get_db().execute(
-        "DELETE FROM question_drafts WHERE user_uuid = ? AND draft_key = ?",
-        (g.user["uuid"], _draft_key(question_id)),
-    )
 
 
 def _collect_question_data(form):
@@ -556,94 +504,6 @@ def new_folder():
         )
     )
 
-def _question_snapshot(question):
-    snapshot = {field: question[field] for field in QUESTION_CONTENT_FIELDS}
-    raw_choices = snapshot.get("choices") or "[]"
-    if isinstance(raw_choices, str):
-        try:
-            snapshot["choices"] = json.loads(raw_choices)
-        except json.JSONDecodeError:
-            snapshot["choices"] = []
-    return snapshot
-
-
-def _insert_question_revision(connection, question_id, revision_number, editor_uuid, summary, snapshot):
-    connection.execute(
-        """
-        INSERT INTO question_revisions (
-            question_id, revision_number, editor_uuid, summary, snapshot_json
-        )
-        VALUES (?, ?, ?, ?, ?)
-        """,
-        (
-            question_id, revision_number, editor_uuid, summary,
-            json.dumps(snapshot, ensure_ascii=False, separators=(",", ":")),
-        ),
-    )
-
-
-def _ensure_initial_question_revision(connection, question):
-    snapshot = _question_snapshot(question)
-    connection.execute(
-        """
-        INSERT INTO question_revisions (
-            question_id, revision_number, editor_uuid, summary,
-            snapshot_json, created_at
-        )
-        VALUES (?, 1, ?, ?, ?, ?)
-        ON CONFLICT (question_id, revision_number) DO NOTHING
-        """,
-        (
-            question["id"],
-            question["user_uuid"],
-            "최초 등록 버전 · 이력 추적 시작",
-            json.dumps(snapshot, ensure_ascii=False, separators=(",", ":")),
-            question["created_at"],
-        ),
-    )
-
-
-def _question_row(question_id):
-    row = get_db().execute(
-        """
-        SELECT questions.*, users.display_name AS author_name
-        FROM questions
-        LEFT JOIN users ON users.uuid = questions.user_uuid
-        WHERE questions.id = ?
-        """,
-        (question_id,),
-    ).fetchone()
-    if row is None:
-        abort(404)
-    return row
-
-
-def _question_form_values(question):
-    values = dict(question)
-    raw_choices = values.get("choices") or "[]"
-    if isinstance(raw_choices, str):
-        try:
-            raw_choices = json.loads(raw_choices)
-        except json.JSONDecodeError:
-            raw_choices = []
-    values["choices"] = "\n".join(raw_choices)
-    base_link = get_db().execute(
-        "SELECT related_question_id FROM question_links WHERE question_id = ? "
-        "AND relation_type = 'variant' AND related_question_id IS NOT NULL "
-        "ORDER BY id LIMIT 1", (question["id"],),
-    ).fetchone()
-    values["base_question_number"] = (
-        format_question_number(base_link["related_question_id"]) if base_link else ""
-    )
-    if values.get("difficulty") not in DIFFICULTIES:
-        values["difficulty"] = "중"
-    if values.get("question_type") not in QUESTION_TYPES:
-        values["question_type"] = "단답형"
-    if values.get("curriculum") not in COURSE_OPTIONS:
-        values["curriculum"] = "2015 개정 교육과정"
-    if values.get("source_type") not in SOURCE_TYPES:
-        values["source_type"] = "기타"
-    return values
 
 
 def new_question():
