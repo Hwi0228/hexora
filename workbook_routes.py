@@ -1,13 +1,10 @@
 from flask import abort, g, redirect, render_template, request, url_for
 
 from auth import login_required
-from constants import NAV_ITEMS
+from constants import NAV_ITEMS, GRADE_OPTIONS
 from database import get_db
-from question_routes import (
-    COURSE_OPTIONS,
-    SUBJECT_COURSE_OPTIONS,
-    format_question_number,
-)
+from question_constants import COURSE_OPTIONS, SUBJECT_COURSE_OPTIONS
+from question_ids import format_question_number, parse_question_number as _parse_question_number
 from constants import SUBJECTS
 
 
@@ -16,23 +13,8 @@ WORKBOOK_SUBJECTS = {
     for course_list in SUBJECT_COURSE_OPTIONS.values()
     for course in course_list
 }
-WORKBOOK_GRADES = {
-    "초1", "초2", "초3", "초4", "초5", "초6", "중1", "중2", "중3",
-    "고1", "고2", "고3", "대학", "기타",
-}
+WORKBOOK_GRADES = set(GRADE_OPTIONS)
 
-
-def _parse_question_number(value):
-    value = (value or "").strip().upper()
-    if len(value) != 6 or any(character not in "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ" for character in value):
-        return None
-    try:
-        question_id = int(value, 36)
-    except ValueError:
-        return None
-    if format_question_number(question_id) != value:
-        return None
-    return question_id
 
 
 def workbooks():

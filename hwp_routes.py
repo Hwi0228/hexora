@@ -7,7 +7,7 @@ from pathlib import Path
 from flask import abort, g, redirect, render_template, request, send_file, url_for
 
 from auth import login_required
-from constants import NAV_ITEMS, SUBJECTS
+from constants import NAV_ITEMS, SUBJECTS, LICENSE_CHOICES, SOURCE_TYPES
 from database import get_db
 from parse_hwp import parse_questions_from_xml, strip_choice_label
 from parse_rhwp import MAX_DOCUMENT_BYTES, parse_questions_from_rhwp_bytes
@@ -16,18 +16,6 @@ from hwpx_export import build_exam_hwpx
 
 MAX_SECTION_XML_SIZE = 16 * 1024 * 1024
 MAX_IMPORTED_QUESTIONS = 500
-
-LICENSE_CHOICES = {
-    "ORIGINAL": "직접 제작 (권리 보유)",
-    "CC-BY-4.0": "CC BY 4.0",
-    "CC-BY-SA-4.0": "CC BY-SA 4.0",
-    "CC0-1.0": "CC0 1.0 / 퍼블릭 도메인",
-    "PERMISSION": "권리자로부터 공개 허가 받음",
-}
-SOURCE_TYPES = (
-    "직접 제작", "교재 및 참고서", "학교 시험", "수능 및 모의평가",
-    "공개 데이터셋", "기타",
-)
 
 
 def _validated_import(form):

@@ -5,7 +5,8 @@ from flask import g, render_template
 from auth import login_required
 from constants import NAV_ITEMS
 from database import get_db
-from question_routes import format_question_number, render_rich_html
+from question_ids import format_question_number
+from rich_text import render_rich_html
 from parse_hwp import strip_choice_label
 
 
