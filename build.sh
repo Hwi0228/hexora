@@ -68,16 +68,16 @@ if ! command -v cargo >/dev/null 2>&1; then
 fi
 
 cargo install \
-  --git https://github.com/alphaiv-project/hmleq \
-  --branch main \
+  --git https://github.com/Hwi0228/hmleqx \
+  --branch dev \
   hmleq-cli \
   --bin hmleq \
   --root "$PWD/.render-tools" \
   --force
 
 hmleq_version=$("$PWD/.render-tools/bin/hmleq" --version)
-[[ "$hmleq_version" == "hmleq-cli 0.2.0" ]] || {
-  echo "Expected hmleq-cli 0.2.0; found: $hmleq_version" >&2
+[[ "$hmleq_version" == "hmleq-cli 0.2.1" ]] || {
+  echo "Expected hmleq-cli 0.2.1; found: $hmleq_version" >&2
   exit 1
 }
 touch .render-require-hmleq

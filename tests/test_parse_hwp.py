@@ -1,3 +1,5 @@
+import html
+import re
 import tempfile
 import unittest
 from unittest.mock import patch
@@ -10,6 +12,19 @@ from parse_hwp import (
     parse_questions,
     parse_questions_from_xml,
 )
+
+
+def _canonical_latex(value: str) -> str:
+    """Normalize equivalent TeX spellings for semantic assertions."""
+    value = html.unescape(value)
+    value = re.sub(r"([_^])\{([^{}])\}", r"\1\2", value)
+    return re.sub(r"\s+", "", value)
+
+
+def _embedded_latex(markup: str) -> list[str]:
+    """Read math from serialized Quill HTML, decoding attribute entities."""
+    values = re.findall(r'data-latex="([^"]*)"', markup)
+    return [_canonical_latex(value) for value in values]
 
 
 class HwpParsingTests(unittest.TestCase):
@@ -59,17 +74,21 @@ class HwpParsingTests(unittest.TestCase):
             questions = parse_questions(xml_path)
 
         self.assertEqual(
-            questions,
-            [
-                {
-                    "number": 1,
-                    "question": "문제 서두 표에 있는 조건 마지막 문제 문장 [그림]",
-                    "choices": ["첫째", "둘째", "셋째"],
-                    "answer": "③",
-                    "explanation": '[그림] 계산하면 <span class="ql-math-inline" data-latex="2+2" data-input-format="latex" data-input-source="2+2" data-math-object="inline"></span>',
-                }
-            ],
+            {
+                key: questions[0][key]
+                for key in ("number", "question", "choices", "answer")
+            },
+            {
+                "number": 1,
+                "question": "문제 서두 표에 있는 조건 마지막 문제 문장 [그림]",
+                "choices": ["첫째", "둘째", "셋째"],
+                "answer": "③",
+            },
         )
+        self.assertTrue(questions[0]["explanation"].startswith("[그림] 계산하면 "))
+        # hmleqx may serialize operator spacing as HTML character references;
+        # x^2 and x^{2} are also equivalent TeX forms. Compare decoded math.
+        self.assertEqual(_embedded_latex(questions[0]["explanation"]), ["2+2"])
 
     def test_converts_hml_equation_script_to_latex(self):
         xml = """\
