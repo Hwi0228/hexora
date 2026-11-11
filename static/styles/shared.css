@@ -126,3 +126,32 @@ main>.site-header{width:min(100%,1000px);margin-right:auto;margin-left:auto}.app
 .math-content .ql-font-serif { font-family: Georgia, "Noto Serif KR", serif; }
 .math-content .ql-font-monospace { font-family: ui-monospace, SFMono-Regular, Consolas, monospace; }
 .math-content .ql-direction-rtl { direction: rtl; text-align: inherit; }
+
+/* Compact legal and policy links in the shared sidebar. */
+.sidebar-legal-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 10px;
+  margin-top: 10px;
+  padding: 10px 3px 0;
+  border-top: 1px solid #EEF1F4;
+  line-height: 1.5;
+}
+.sidebar-legal-links a {
+  color: #8996A4;
+  font-size: 9px;
+  font-weight: 550;
+  text-decoration: none;
+  transition: color .15s ease;
+}
+.sidebar-legal-links a:hover {
+  color: var(--hexora-primary);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+@media(max-width:1120px) {
+  .app-question-bank .sidebar-legal-links { display: none; }
+}
+@media(max-width:760px) {
+  .app-standard .sidebar-legal-links { display: none; }
+}
