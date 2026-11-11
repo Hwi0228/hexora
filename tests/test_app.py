@@ -209,9 +209,12 @@ class QuestionRegistrationTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertIn(b'id="achievement-standard-options"', response.data)
         self.assertIn(b'role="radiogroup"', response.data)
-        self.assertIn(b'radio.type = "radio"', response.data)
-        self.assertIn(b'code.className = "standard-code"', response.data)
-        self.assertNotIn(b'checkbox.type = "checkbox"', response.data)
+        editor_script = (
+            Path(__file__).resolve().parents[1] / "static/scripts/question-editor.js"
+        ).read_text(encoding="utf-8")
+        self.assertIn('radio.type = "radio"', editor_script)
+        self.assertIn('code.className = "standard-code"', editor_script)
+        self.assertNotIn('checkbox.type = "checkbox"', editor_script)
         self.assertNotIn("단원 <span".encode(), response.data)
 
     def test_personal_question_notes_are_private_to_each_member(self):
