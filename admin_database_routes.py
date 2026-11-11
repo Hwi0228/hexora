@@ -35,6 +35,11 @@ def _reset_database(connection):
 
     before = _database_counts(connection)
 
+    # These records can belong to an admin, whose account is intentionally kept.
+    connection.execute("DELETE FROM question_drafts")
+    connection.execute("DELETE FROM question_notes")
+
+    # Parent deletes cascade into revisions, links, workbook entries, and drafts.
     connection.execute("DELETE FROM workbooks")
     connection.execute("DELETE FROM questions")
 
