@@ -2,32 +2,54 @@
 <html lang="ko">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#F4F7FA">
   <title>권리침해 신고 관리 | HEXORA</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='styles/shared.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='styles/tokens.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='styles/base.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='styles/layout.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='styles/components.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='styles/pages/legal.css') }}">
 </head>
-<body class="legal-body">
-<header class="legal-topbar"><a class="legal-brand" href="{{ url_for('dashboard') }}"><span>⌬</span><strong>HEXORA</strong></a><nav><a href="{{ url_for('report_request') }}">신고 양식</a><a href="{{ url_for('dashboard') }}">대시보드</a></nav></header>
-<main class="legal-main admin-reports">
-  <div class="legal-eyebrow">ADMINISTRATION</div><h1>권리침해 신고 관리</h1>
-  <p class="legal-lead">최근 접수된 신고 최대 200건입니다. 신청인의 개인정보는 신고 처리 목적에 한해 확인하세요.</p>
-  {% for report in reports %}
-  <article class="report-card">
-    <div class="report-card-head"><strong>#{{ report.id }} · {{ report.category }}</strong><span class="report-status">{{ report.status }}</span></div>
-    <p><strong>요청:</strong> {{ report.requested_action }} · {{ report.requester_role }}</p>
-    <p><strong>신청인:</strong> {{ report.requester_name }} · <a href="mailto:{{ report.requester_email }}">{{ report.requester_email }}</a></p>
-    <p><strong>대상 URL:</strong> <a href="{{ report.target_url }}" rel="noopener noreferrer" target="_blank">{{ report.target_url }}</a></p>
-    <p><strong>접수:</strong> {{ report.created_at }}</p>
-    <div class="report-details">{{ report.details }}</div>
-    <form method="post" action="{{ url_for('update_legal_report', report_id=report.id) }}" class="report-status-form">
-      <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
-      <label>처리 상태<select name="status">{% for status in ['접수', '검토 중', '처리 완료', '조치 불가'] %}<option value="{{ status }}" {% if report.status == status %}selected{% endif %}>{{ status }}</option>{% endfor %}</select></label>
-      <button type="submit">상태 저장</button>
-    </form>
-  </article>
-  {% else %}<p class="legal-empty">접수된 신고가 없습니다.</p>{% endfor %}
-</main>
+<body>
+  <div class="app app-standard">
+    {% include "partials/sidebar.html" %}
+    <main class="admin-main">
+      {% set header_section = "ADMINISTRATION" %}
+      {% set header_title = "권리침해 신고 관리" %}
+      {% set header_description = "접수된 권리침해 신고를 검토하고 처리 상태를 관리합니다." %}
+      {% include "partials/header.html" %}
+      <section class="admin-report-content" aria-label="권리침해 신고 목록">
+        <div class="admin-report-toolbar">
+          <p class="legal-lead">최근 접수된 신고 최대 200건입니다. 신청인의 개인정보는 신고 처리 목적에 한해 확인하세요.</p>
+          <a class="site-button" href="{{ url_for('report_request') }}">신고 양식 보기 ↗</a>
+        </div>
+        {% for report in reports %}
+        <article class="report-card">
+          <div class="report-card-head">
+            <div class="report-card-title"><strong>#{{ report.id }} · {{ report.category }}</strong><span class="report-status">{{ report.status }}</span></div>
+            <span class="report-date">접수 {{ report.created_at }}</span>
+          </div>
+          <div class="report-meta-grid">
+            <p><strong>요청 내용</strong><span>{{ report.requested_action }} · {{ report.requester_role }}</span></p>
+            <p><strong>신청인</strong><span>{{ report.requester_name }}</span></p>
+            <p><strong>회신 이메일</strong><span><a href="mailto:{{ report.requester_email }}">{{ report.requester_email }}</a></span></p>
+            <p class="report-url"><strong>대상 콘텐츠 URL</strong><span><a href="{{ report.target_url }}" rel="noopener noreferrer" target="_blank">{{ report.target_url }}</a></span></p>
+          </div>
+          <div class="report-details-label">권리침해 사유 및 소명</div>
+          <div class="report-details">{{ report.details }}</div>
+          <form method="post" action="{{ url_for('update_legal_report', report_id=report.id) }}" class="report-status-form">
+            <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
+            <label>처리 상태<select name="status">{% for status in ['접수', '검토 중', '처리 완료', '조치 불가'] %}<option value="{{ status }}" {% if report.status == status %}selected{% endif %}>{{ status }}</option>{% endfor %}</select></label>
+            <button type="submit">상태 저장</button>
+          </form>
+        </article>
+        {% else %}
+        <div class="legal-empty-state"><strong>접수된 신고가 없습니다.</strong><p>새로운 권리침해 신고가 접수되면 이곳에 표시됩니다.</p></div>
+        {% endfor %}
+      </section>
+    </main>
+  </div>
 </body>
 </html>
