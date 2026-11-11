@@ -1,5 +1,5 @@
 html { color-scheme: light; font-family: var(--hexora-font); background: var(--hexora-bg); }
-body { color: var(--hexora-text); background: var(--hexora-bg); font-family: var(--hexora-font); font-synthesis: none; text-rendering: optimizeLegibility; -webkit-font-smoothing: antialiased; }
+body { min-width: 320px; min-height: 100vh; margin: 0; color: var(--hexora-text); background: var(--hexora-bg); font-family: var(--hexora-font); font-synthesis: none; text-rendering: optimizeLegibility; -webkit-font-smoothing: antialiased; }
 a { color: var(--hexora-primary); }
 button, input, select, textarea { font-family: var(--hexora-font); }
 :focus-visible { outline: 2px solid #8DAFCE; outline-offset: 2px; }
