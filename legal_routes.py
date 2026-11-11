@@ -32,6 +32,11 @@ def _valid_http_url(value):
 
 
 def register_legal_routes(app):
+    @app.get("/other")
+    @admin_required
+    def other():
+        return render_template("other.html")
+
     @app.get("/terms")
     def terms():
         return render_template("legal_page.html", page="terms")
