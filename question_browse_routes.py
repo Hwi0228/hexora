@@ -7,9 +7,10 @@ from constants import NAV_ITEMS, SUBJECTS
 from question_constants import QUESTION_CONTENT_FIELDS, QUESTION_FIELD_LABELS, CURRICULUM_STANDARDS
 from question_ids import format_question_number, parse_question_number
 from rich_text import render_rich_html
+from question_repository import _question_row
 from database import get_db
 from folder_service import get_folder_data
-from parse_hwp import strip_choice_label
+from hwp_equations import strip_choice_label
 from curriculum_data import (
     DATASET_URL as CURRICULUM_DATASET_URL,
     DATASET_VERSION as CURRICULUM_DATASET_VERSION,

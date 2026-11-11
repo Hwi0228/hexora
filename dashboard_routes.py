@@ -7,7 +7,7 @@ from constants import NAV_ITEMS
 from database import get_db
 from question_ids import format_question_number
 from rich_text import render_rich_html
-from parse_hwp import strip_choice_label
+from hwp_equations import strip_choice_label
 
 
 def dashboard():
