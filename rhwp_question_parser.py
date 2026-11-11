@@ -445,6 +445,173 @@ def _parse_separated_answers(paragraphs: list[str]) -> list[dict[str, Any]]:
     return answers
 
 
+
+
+_TRAILING_QUESTION_NUMBER = re.compile(r"^\s*0?(\d{1,3})\s*$")
+
+
+def _is_trailing_question_heading(value: str) -> bool:
+    value = _compact(value)
+    if not value:
+        return True
+    if _is_document_header(value):
+        return True
+    if re.fullmatch(r"[ⅤⅠⅡⅢⅣ]+|주\s*관\s*식|객\s*관\s*식", value):
+        return True
+    if value in {"중단원 마무리", "정답 및 해설"}:
+        return True
+    if re.match(r"^[-–]\s*\d+\s+.+$", value) and len(value) <= 50:
+        return True
+    return False
+
+
+def _parse_trailing_numbered_questions(
+    paragraphs: list[str],
+) -> list[dict[str, Any]]:
+    """문항 본문 뒤에 독립된 번호가 놓이는 교재형 문서를 파싱한다."""
+    markers = [
+        (index, int(match.group(1)))
+        for index, paragraph in enumerate(paragraphs)
+        if (match := _TRAILING_QUESTION_NUMBER.fullmatch(_compact(paragraph)))
+    ]
+    if len(markers) < 2:
+        return []
+
+    def clean_stem(values: list[str]) -> list[str]:
+        return [
+            _compact(value) for value in values
+            if _compact(value) and not _is_trailing_question_heading(value)
+        ]
+
+    first_index, first_number = markers[0]
+    current = {
+        "source_number": first_number,
+        "question_parts": clean_stem(paragraphs[:first_index]),
+        "choices": [],
+    }
+    records: list[dict[str, Any]] = []
+    next_stem: list[str] = []
+
+    def finish() -> None:
+        question = _compact(" ".join(current["question_parts"]))
+        choices: list[str] = []
+        for choice in current["choices"]:
+            choice = _compact(choice)
+            if choice and choice not in choices:
+                choices.append(choice)
+        if question:
+            records.append({
+                "number": len(records) + 1,
+                "source_number": current["source_number"],
+                "unit_index": 0,
+                "question": question,
+                "choices": choices,
+                "answer": "",
+                "explanation": "",
+            })
+
+    for paragraph in paragraphs[first_index + 1:]:
+        value = _compact(paragraph)
+        if not value:
+            continue
+        marker = _TRAILING_QUESTION_NUMBER.fullmatch(value)
+        if marker:
+            finish()
+            current = {
+                "source_number": int(marker.group(1)),
+                "question_parts": clean_stem(next_stem),
+                "choices": [],
+            }
+            next_stem = []
+            continue
+
+        choice_match = CHOICE_PATTERN.search(value)
+        if choice_match:
+            if next_stem:
+                current["choices"].extend(_split_choices(value))
+                continue
+            current["choices"].extend(_split_choices(value))
+        elif current["choices"]:
+            # 선택지 뒤에 나타나는 일반 문단은 다음 문항의 본문으로 보류한다.
+            next_stem.append(value)
+        else:
+            current["question_parts"].append(value)
+
+    finish()
+    return records
+
+
+def _parse_packed_answer_key(paragraphs: list[str]) -> dict[int, str]:
+    """01 ⑤ 02 ③, ④처럼 여러 정답이 한 문단에 나열된 답안표를 읽는다."""
+    text = _compact(" ".join(paragraphs))
+    answers: dict[int, str] = {}
+    matches = list(re.finditer(
+        r"(?<!\d)(\d{2})\s*([①-⑳](?:\s*[,、]\s*[①-⑳])*)",
+        text,
+    ))
+    for index, match in enumerate(matches):
+        number = int(match.group(1))
+        value = _compact(match.group(2))
+        if value:
+            answers[number] = value
+
+    # 주관식 답은 원문 텍스트를 보존하되, 다음 두 자리 문항 번호에서 끊는다.
+    subjective = re.compile(r"(?<!\d)(2[4-9]|30)\s+(.+?)(?=\s+(?:2[4-9]|30)\s+|$)")
+    for match in subjective.finditer(text):
+        value = _compact(match.group(2)).strip(" ,")
+        if value and not re.fullmatch(r"[①-⑳]", value):
+            answers.setdefault(int(match.group(1)), value)
+    return answers
+
+
+def _parse_trailing_numbered_answers(
+    paragraphs: list[str],
+) -> tuple[dict[int, str], dict[int, str]]:
+    """번호별 답안표와 해설 뒤에 놓인 독립 번호를 각각 연결한다."""
+    marker_positions = [
+        (index, int(match.group(1)))
+        for index, paragraph in enumerate(paragraphs)
+        if (match := _TRAILING_QUESTION_NUMBER.fullmatch(_compact(paragraph)))
+    ]
+    if not marker_positions:
+        return _parse_packed_answer_key(paragraphs), {}
+
+    first_explanation_index = marker_positions[0][0]
+    answer_key_paragraphs = paragraphs[:first_explanation_index]
+    answers = _parse_packed_answer_key(answer_key_paragraphs)
+    key_line_indices = [
+        index for index, paragraph in enumerate(answer_key_paragraphs)
+        if re.search(r"(?<!\d)\d{2}\s*(?:[①-⑳]|[가-힣])", _compact(paragraph))
+    ]
+    explanations: dict[int, str] = {}
+    chunk_start = (max(key_line_indices) + 1) if key_line_indices else first_explanation_index
+
+    for index, number in marker_positions:
+        explanation = _compact(" ".join(paragraphs[chunk_start:index]))
+        if explanation:
+            explanations[number] = explanation
+        chunk_start = index + 1
+
+    return answers, explanations
+
+
+def _parse_trailing_numbered_document(
+    question_paragraphs: list[str],
+    answer_paragraphs: list[str],
+) -> list[dict[str, Any]]:
+    questions = _parse_trailing_numbered_questions(question_paragraphs)
+    if not questions:
+        return []
+    answers, explanations = _parse_trailing_numbered_answers(answer_paragraphs)
+    for question in questions:
+        source_number = question["source_number"]
+        question["answer"] = answers.get(source_number, "")
+        question["explanation"] = explanations.get(source_number, "")
+        question.pop("source_number", None)
+        question.pop("unit_index", None)
+    return questions
+
+
 def parse_numbered_document_sections(paragraphs: list[str]) -> list[dict[str, Any]]:
     """문제 영역과 뒤쪽 정답·해설 영역을 분리하고 단원/문항 번호로 연결한다."""
     answer_heading_index = next(
@@ -459,6 +626,11 @@ def parse_numbered_document_sections(paragraphs: list[str]) -> list[dict[str, An
 
     question_paragraphs = paragraphs[:answer_heading_index]
     answer_paragraphs = paragraphs[answer_heading_index + 1:]
+    questions = _parse_trailing_numbered_document(
+        question_paragraphs, answer_paragraphs
+    )
+    if questions:
+        return questions
     questions = _parse_numbered_paragraphs(question_paragraphs)
     answers = _parse_separated_answers(answer_paragraphs)
     answer_map = {
