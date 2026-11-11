@@ -166,3 +166,17 @@ CREATE TABLE IF NOT EXISTS question_links (
     CHECK (related_question_id IS NULL OR related_question_id <> question_id)
 )
 """
+
+
+QUESTION_REVISIONS_SCHEMA = """
+CREATE TABLE IF NOT EXISTS question_revisions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    question_id INTEGER NOT NULL REFERENCES questions(id) ON DELETE CASCADE,
+    revision_number INTEGER NOT NULL,
+    editor_uuid TEXT REFERENCES users(uuid) ON DELETE SET NULL,
+    summary TEXT NOT NULL,
+    snapshot_json TEXT NOT NULL,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(question_id, revision_number)
+)
+"""

@@ -46,20 +46,6 @@ def _create_indexes(connection):
         "CREATE INDEX IF NOT EXISTS idx_questions_user_subject ON questions(user_uuid, subject)"
     )
 
-QUESTION_REVISIONS_SCHEMA = """
-CREATE TABLE IF NOT EXISTS question_revisions (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    question_id INTEGER NOT NULL REFERENCES questions(id) ON DELETE CASCADE,
-    revision_number INTEGER NOT NULL,
-    editor_uuid TEXT REFERENCES users(uuid) ON DELETE SET NULL,
-    summary TEXT NOT NULL,
-    snapshot_json TEXT NOT NULL,
-    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE(question_id, revision_number)
-)
-"""
-
-
 def _create_question_revision_table(connection):
     connection.execute(QUESTION_REVISIONS_SCHEMA)
     connection.execute(
