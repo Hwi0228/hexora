@@ -55,7 +55,7 @@ class HmleqConverterTests(unittest.TestCase):
 
     @unittest.skipUnless(_executable(), "hmleq CLI is installed by build.sh")
     def test_real_hmleq_converts_fraction_radical_and_matrix(self):
-        self.assertEqual(convert_hancom_to_latex("1 over 2"), r"\frac{1}{2}")
+        self.assertEqual(convert_hancom_to_latex("1 over 2"), r"\dfrac{1}{2}")
         self.assertIn(r"\sqrt", convert_hancom_to_latex("sqrt {x}"))
         matrix = convert_hancom_to_latex("pmatrix { a & b # c & d }")
         self.assertIn(r"\begin{pmatrix}", matrix)

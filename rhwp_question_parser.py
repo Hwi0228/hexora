@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import html
 import re
 from typing import Any
 
@@ -47,9 +48,18 @@ def _is_document_header(paragraph: str, next_paragraph: str = "") -> bool:
 
 
 def _canonical(text: str) -> str:
-    """서식 차이를 줄여 요약 문단과 별도 해설 문단의 중복 구간을 비교한다."""
+    """서식과 인라인 수식 Embed 표현 차이를 제거해 중복 문단을 비교한다."""
+    # Summary paragraphs may store an existing Quill math embed as HTML while
+    # the corresponding IR formula block is rendered as $...$. Convert both
+    # representations to the same inline-math text before comparing prefixes.
+    text = re.sub(
+        r'<(?:span|div)\b[^>]*\bdata-latex=["\']([^"\']*)["\'][^>]*>.*?</(?:span|div)>',
+        lambda match: "$" + html.unescape(match.group(1)) + "$",
+        text,
+        flags=re.DOTALL,
+    )
+    text = html.unescape(text)
     return re.sub(r"\s+", "", text).replace("$", "").replace(r"\(", "").replace(r"\)", "")
-
 
 def _strip_canonical_prefix(text: str, prefix: str) -> str:
     if not prefix:

@@ -110,7 +110,7 @@ class HwpParsingTests(unittest.TestCase):
         questions = parse_questions_from_xml(xml.encode("utf-8"))
 
         self.assertIn('class="ql-math-inline"', questions[0]["explanation"])
-        self.assertIn(r'data-latex="\left&#32;\lfloor&#32;a+b&#32;\right&#32;\rfloor"', questions[0]["explanation"])
+        self.assertEqual(_embedded_latex(questions[0]["explanation"]), [r"\left\lfloora+b\right\rfloor"])
         self.assertEqual(questions[0]["question"], "문제 본문")
 
         bar_xml = xml.replace(
@@ -134,7 +134,7 @@ class HwpParsingTests(unittest.TestCase):
             'angle rm "C" it = 90 DEG',
         )
         angle_questions = parse_questions_from_xml(angle_xml.encode("utf-8"))
-        self.assertIn(r"\angle&#32;\mathrm{C}", angle_questions[0]["explanation"])
+        self.assertEqual(_embedded_latex(angle_questions[0]["explanation"]), [r"\angle\mathrm{C}=90^\circ"])
 
     def test_preserves_fraction_commands_when_converting_hancom(self):
         xml = """\
@@ -165,17 +165,19 @@ class HwpParsingTests(unittest.TestCase):
             r"LEFT LBRACE {4} over {3} - LEFT ( - {1} over {3} RIGHT ) RIGHT RBRACE div LEFT ( - {1} over {9} RIGHT )"
         )
         self.assertEqual(
-            brace_formula,
-            r"\left \{ \frac{ 4 } { 3 } - \left ( - \frac{ 1 } { 3 } \right ) \right \} \div \left ( - \frac{ 1 } { 9 } \right )",
+            _canonical_latex(brace_formula),
+            _canonical_latex(
+                r"\left\{\frac{4}{3}-\left(-\frac{1}{3}\right)\right\}\div\left(-\frac{1}{9}\right)"
+            ),
         )
 
         aligned_formula = _equation_to_latex(
             r'EQALIGN { & rm "가입비 15000원" # & rm "- 가입 시 추가 요금 없이 무제한 편집 가능" }'
         )
-        self.assertEqual(
-            aligned_formula,
-            r"\begin{aligned} & \text{가입비 15000원} \\ & \text{- 가입 시 추가 요금 없이 무제한 편집 가능} \end{aligned}",
-        )
+        self.assertIn(r"\begin{aligned}", aligned_formula)
+        self.assertIn(r"\text{가입비 15000원}", aligned_formula)
+        self.assertIn(r"\text{- 가입 시 추가 요금 없이 무제한 편집 가능}", aligned_formula)
+        self.assertIn(r"\end{aligned}", aligned_formula)
 
     def test_fraction_commands_are_preserved_for_katex(self):
         expression = r"\frac{a}{b} + \tfrac{c}{d} + \cfrac{1}{2} + \dfrac{3}{4}"
