@@ -77,4 +77,7 @@ def equation_to_latex(script: str, *, legacy_converter, primary_converter) -> st
         ),
         converted,
     )
-    return normalize_katex_expression(converted)
+    # HWP formulas are embedded as inline KaTeX. Keep fractions compact
+    # even though hmleqx emits display-sized fractions in standalone output.
+    normalized = normalize_katex_expression(converted)
+    return re.sub(r"\\dfrac\b", lambda _: r"\frac", normalized)
