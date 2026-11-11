@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import ctypes
+import html
 import importlib.util
 import re
 from pathlib import Path
@@ -13,6 +14,7 @@ from rhwp_question_parser import (
     _compact,
     _parse_numbered_paragraphs,
     _parse_question_row,
+    parse_numbered_document_sections,
 )
 
 
@@ -45,7 +47,8 @@ def _provenance_key(block: Any) -> tuple[int, int]:
     )
 
 
-def _render_formula(block: Any) -> str:
+def _render_formula(block: Any, *, display_mode: bool = False) -> str:
+    """한컴 수식을 편집기에서 재사용 가능한 Quill 수식 Embed로 직렬화한다."""
     script = str(getattr(block, "script", "") or "").strip()
     if not script:
         return ""
@@ -53,7 +56,20 @@ def _render_formula(block: Any) -> str:
         latex = _equation_to_latex(script)
     except Exception:
         latex = str(getattr(block, "text_alt", "") or script).strip()
-    return "$" + latex + "$" if latex else ""
+    if not latex:
+        return ""
+
+    tag = "div" if display_mode else "span"
+    blot = "ql-math-block" if display_mode else "ql-math-inline"
+    # Encode spaces in attributes so the paragraph compactor cannot alter the
+    # original Hancom source before the rich-text sanitizer decodes it.
+    latex_attr = html.escape(latex, quote=True).replace(" ", "&#32;")
+    source_attr = html.escape(script, quote=True).replace(" ", "&#32;")
+    return (
+        f'<{tag} class="{blot}" data-latex="{latex_attr}" '
+        f'data-input-format="hancom" data-input-source="{source_attr}" '
+        f'data-math-object="{"block" if display_mode else "inline"}"></{tag}>'
+    )
 
 
 def _render_picture(block: Any) -> str:
@@ -94,10 +110,13 @@ def _paragraphs_from_cell(cell: Any) -> list[str]:
             entry["text"] = str(getattr(block, "text", "") or "")
         elif kind in {"formula", "picture"}:
             entry = entries.setdefault(key, {"text": "", "events": []})
-            rendered = _render_formula(block) if kind == "formula" else _render_picture(block)
+            provenance = getattr(block, "prov", None)
+            char_start = getattr(provenance, "char_start", None)
+            rendered = (
+                _render_formula(block, display_mode=char_start is None)
+                if kind == "formula" else _render_picture(block)
+            )
             if rendered:
-                provenance = getattr(block, "prov", None)
-                char_start = getattr(provenance, "char_start", None)
                 entry["events"].append((char_start, len(entry["events"]), rendered))
 
     return [
@@ -144,9 +163,12 @@ def _paragraphs_from_document(ir: Any) -> list[str]:
                     f'{entry["text"]} {value}'.strip() if entry["text"] else value
                 )
         else:
-            rendered = _render_formula(block) if kind == "formula" else _render_picture(block)
+            char_start = getattr(provenance, "char_start", None)
+            rendered = (
+                _render_formula(block, display_mode=char_start is None)
+                if kind == "formula" else _render_picture(block)
+            )
             if rendered:
-                char_start = getattr(provenance, "char_start", None)
                 entry["events"].append((char_start, len(entry["events"]), rendered))
 
     return [
@@ -175,7 +197,7 @@ def parse_questions_from_ir(ir: Any) -> list[dict[str, Any]]:
     if questions:
         return questions
 
-    questions = _parse_numbered_paragraphs(_paragraphs_from_document(ir))
+    questions = parse_numbered_document_sections(_paragraphs_from_document(ir))
     if not questions:
         raise ValueError(
             "문항을 찾지 못했습니다. 문항 번호(예: 1.)로 시작하는 문단이나 "

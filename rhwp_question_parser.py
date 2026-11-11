@@ -167,6 +167,8 @@ def _parse_numbered_paragraphs(paragraphs: list[str]) -> list[dict[str, Any]]:
     """문항 번호로 시작하는 일반 문단형 시험지도 파싱한다. 정답·해설은 선택 항목이다."""
     records: list[dict[str, Any]] = []
     current: dict[str, Any] | None = None
+    unit_index = 0
+    previous_source_number: int | None = None
 
     def append_question_text(value: str) -> None:
         value = _compact(value)
@@ -187,30 +189,54 @@ def _parse_numbered_paragraphs(paragraphs: list[str]) -> list[dict[str, Any]]:
                 choices.append(choice)
         records.append({
             "number": len(records) + 1,
+            "source_number": current["source_number"],
+            "unit_index": current["unit_index"],
             "question": question,
             "choices": choices,
             "answer": _compact(current["answer"]),
             "explanation": _compact(" ".join(current["explanation_parts"])),
         })
 
-    for raw_paragraph in paragraphs:
+    for paragraph_index, raw_paragraph in enumerate(paragraphs):
         paragraph = _compact(raw_paragraph)
         if not paragraph:
             continue
 
         start = _QUESTION_START.match(paragraph)
         if start:
+            source_number = int(start.group(1) or start.group(2) or start.group(3))
+            if previous_source_number is not None and source_number <= previous_source_number:
+                unit_index += 1
             finish()
             current = {
+                "source_number": source_number,
+                "unit_index": unit_index,
                 "question_parts": [],
                 "choices": [],
                 "answer": "",
                 "explanation_parts": [],
             }
+            previous_source_number = source_number
             append_question_text(start.group(4))
             continue
 
         if current is None:
+            continue
+
+        next_paragraph = (
+            _compact(paragraphs[paragraph_index + 1])
+            if paragraph_index + 1 < len(paragraphs) else ""
+        )
+        next_start = _QUESTION_START.match(next_paragraph)
+        if (
+            next_start
+            and previous_source_number is not None
+            and int(next_start.group(1) or next_start.group(2) or next_start.group(3)) <= previous_source_number
+            and len(paragraph) <= 60
+            and not re.search(r"[.!?。！？]", paragraph)
+            and not CHOICE_PATTERN.search(paragraph)
+        ):
+            # 단원 제목은 직전 문항의 마지막 선택지/본문에 합치지 않는다.
             continue
 
         answer_match = re.search(r"\[정답\]\s*(.*?)(?=\[해설\]|$)", paragraph)
@@ -236,3 +262,160 @@ def _parse_numbered_paragraphs(paragraphs: list[str]) -> list[dict[str, Any]]:
 
     finish()
     return records
+
+
+_ANSWER_SECTION_HEADING = re.compile(
+    r"^\s*(?:(?:[ⅠⅡⅢⅣⅤⅥⅦⅧⅨⅩ]+)\s*[.)]?\s*)?"
+    r"(?:정\s*답(?:\s*(?:\(\s*해\s*설\s*\)|및\s*해\s*설|과\s*해\s*설))?|"
+    r"정답\s*/\s*해설)\s*$"
+)
+_ANSWER_ENTRY_START = re.compile(
+    r"^\s*(?:(?:제\s*)?(\d{1,3})\s*[.)]|"
+    r"(\d{1,3})\s*번(?:\s*[.)])?|Q\s*(\d{1,3})\s*[.:)])\s*(.*)$",
+    re.IGNORECASE,
+)
+
+
+def _parse_separated_answers(paragraphs: list[str]) -> list[dict[str, Any]]:
+    """정답·해설 영역의 번호별 항목을 원래 문항 번호와 단원 순서로 읽는다."""
+    answers: list[dict[str, Any]] = []
+    current: dict[str, Any] | None = None
+    unit_index = 0
+    previous_source_number: int | None = None
+    in_explanation = False
+
+    def finish() -> None:
+        if current is None:
+            return
+        answers.append({
+            "source_number": current["source_number"],
+            "unit_index": current["unit_index"],
+            "answer": _compact(current["answer"]),
+            "explanation": _compact(" ".join(current["explanation_parts"])),
+        })
+
+    for paragraph_index, raw in enumerate(paragraphs):
+        paragraph = _compact(raw)
+        if not paragraph:
+            continue
+
+        start = _ANSWER_ENTRY_START.match(paragraph)
+        if start:
+            source_number = int(start.group(1) or start.group(2) or start.group(3))
+            if previous_source_number is not None and source_number <= previous_source_number:
+                unit_index += 1
+            finish()
+            tail = _compact(start.group(4))
+            tail = re.sub(r"^(?:\(\s*답\s*\)|\[\s*답\s*\]|답)\s*", "", tail)
+            explanation_parts: list[str] = []
+            answer_text = tail
+            explanation_match = re.search(r"(?:\(\s*해설\s*\)|\[\s*해설\s*\])", answer_text)
+            if explanation_match:
+                explanation_parts.append(answer_text[explanation_match.end():])
+                answer_text = answer_text[:explanation_match.start()]
+                in_explanation = True
+            else:
+                in_explanation = False
+            current = {
+                "source_number": source_number,
+                "unit_index": unit_index,
+                "answer": answer_text,
+                "explanation_parts": explanation_parts,
+            }
+            previous_source_number = source_number
+            continue
+
+        if current is None:
+            continue
+
+        next_paragraph = (
+            _compact(paragraphs[paragraph_index + 1])
+            if paragraph_index + 1 < len(paragraphs) else ""
+        )
+        next_start = _ANSWER_ENTRY_START.match(next_paragraph)
+        if (
+            next_start
+            and previous_source_number is not None
+            and int(next_start.group(1) or next_start.group(2) or next_start.group(3)) <= previous_source_number
+            and len(paragraph) <= 60
+            and not re.search(r"[.!?。！？]", paragraph)
+            and not CHOICE_PATTERN.search(paragraph)
+        ):
+            # 단원 제목은 앞 문항의 해설에 포함하지 않는다.
+            continue
+
+        explanation_marker = re.search(
+            r"(?:\(\s*해설\s*\)|\[\s*해설\s*\])", paragraph
+        )
+        if explanation_marker:
+            in_explanation = True
+            tail = paragraph[explanation_marker.end():].strip()
+            if tail:
+                current["explanation_parts"].append(tail)
+            continue
+
+        answer_marker = re.match(r"^(?:\(\s*답\s*\)|\[\s*답\s*\]|답)\s*(.*)$", paragraph)
+        if answer_marker and not current["answer"]:
+            current["answer"] = answer_marker.group(1)
+            continue
+
+        if in_explanation:
+            current["explanation_parts"].append(paragraph)
+        elif not current["answer"]:
+            current["answer"] = paragraph
+        else:
+            # 해설 표기가 별도 문단에 생략된 교재도 있어 후속 문단은 해설로 보존한다.
+            in_explanation = True
+            current["explanation_parts"].append(paragraph)
+
+    finish()
+    return answers
+
+
+def parse_numbered_document_sections(paragraphs: list[str]) -> list[dict[str, Any]]:
+    """문제 영역과 뒤쪽 정답·해설 영역을 분리하고 단원/문항 번호로 연결한다."""
+    answer_heading_index = next(
+        (
+            index for index, paragraph in enumerate(paragraphs)
+            if _ANSWER_SECTION_HEADING.fullmatch(_compact(paragraph))
+        ),
+        None,
+    )
+    if answer_heading_index is None:
+        return _parse_numbered_paragraphs(paragraphs)
+
+    question_paragraphs = paragraphs[:answer_heading_index]
+    answer_paragraphs = paragraphs[answer_heading_index + 1:]
+    questions = _parse_numbered_paragraphs(question_paragraphs)
+    answers = _parse_separated_answers(answer_paragraphs)
+    answer_map = {
+        (item["unit_index"], item["source_number"]): item
+        for item in answers
+    }
+
+    # 일부 문서는 답안 번호가 단원별로 다시 시작되지 않는다. 이 경우에만
+    # 문항 번호가 유일한 답안을 보조 키로 사용한다.
+    unique_by_number: dict[int, dict[str, Any]] = {}
+    duplicate_numbers: set[int] = set()
+    for item in answers:
+        number = item["source_number"]
+        if number in unique_by_number:
+            duplicate_numbers.add(number)
+        else:
+            unique_by_number[number] = item
+    for number in duplicate_numbers:
+        unique_by_number.pop(number, None)
+
+    for question in questions:
+        answer_item = answer_map.get(
+            (question["unit_index"], question["source_number"])
+        )
+        if answer_item is None:
+            answer_item = unique_by_number.get(question["source_number"])
+        if answer_item is not None:
+            question["answer"] = answer_item["answer"]
+            question["explanation"] = answer_item["explanation"]
+        question.pop("source_number", None)
+        question.pop("unit_index", None)
+
+    return questions

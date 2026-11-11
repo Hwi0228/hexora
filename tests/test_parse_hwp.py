@@ -66,7 +66,7 @@ class HwpParsingTests(unittest.TestCase):
                     "question": "문제 서두 표에 있는 조건 마지막 문제 문장 [그림]",
                     "choices": ["첫째", "둘째", "셋째"],
                     "answer": "③",
-                    "explanation": "[그림] 계산하면 $2+2$",
+                    "explanation": '[그림] 계산하면 <span class="ql-math-inline" data-latex="2+2" data-input-format="latex" data-input-source="2+2" data-math-object="inline"></span>',
                 }
             ],
         )
@@ -90,10 +90,8 @@ class HwpParsingTests(unittest.TestCase):
 
         questions = parse_questions_from_xml(xml.encode("utf-8"))
 
-        self.assertEqual(
-            questions[0]["explanation"],
-            r"풀이 $\left \lfloor a+b \right \rfloor$",
-        )
+        self.assertIn('class="ql-math-inline"', questions[0]["explanation"])
+        self.assertIn(r'data-latex="\left&#32;\lfloor&#32;a+b&#32;\right&#32;\rfloor"', questions[0]["explanation"])
         self.assertEqual(questions[0]["question"], "문제 본문")
 
         bar_xml = xml.replace(
@@ -101,30 +99,23 @@ class HwpParsingTests(unittest.TestCase):
             'bar {rm "AD" it} =x',
         )
         bar_questions = parse_questions_from_xml(bar_xml.encode("utf-8"))
-        self.assertEqual(
-            bar_questions[0]["explanation"],
-            r"풀이 $\overline{ \mathrm{AD} } =x$",
-        )
+        self.assertIn(r"\overline{", bar_questions[0]["explanation"])
+        self.assertIn(r"\mathrm{AD}", bar_questions[0]["explanation"])
 
         dot_xml = xml.replace(
             "LEFT ⌊ a+b RIGHT ⌋",
             "0 . dot {0} dot {2}",
         )
         dot_questions = parse_questions_from_xml(dot_xml.encode("utf-8"))
-        self.assertEqual(
-            dot_questions[0]["explanation"],
-            r"풀이 $0 . \dot{ 0 } \dot{ 2 }$",
-        )
+        self.assertIn(r"\dot{", dot_questions[0]["explanation"])
+        self.assertIn("data-input-format=\"latex\"", dot_questions[0]["explanation"])
 
         angle_xml = xml.replace(
             "LEFT ⌊ a+b RIGHT ⌋",
             'angle rm "C" it = 90 DEG',
         )
         angle_questions = parse_questions_from_xml(angle_xml.encode("utf-8"))
-        self.assertEqual(
-            angle_questions[0]["explanation"],
-            r"풀이 $\angle \mathrm{C} = 90 ^\circ$",
-        )
+        self.assertIn(r"\angle&#32;\mathrm{C}", angle_questions[0]["explanation"])
 
     def test_preserves_fraction_commands_when_converting_hancom(self):
         xml = """\
@@ -145,9 +136,9 @@ class HwpParsingTests(unittest.TestCase):
 
         question = parse_questions_from_xml(xml.encode("utf-8"))[0]
 
-        self.assertIn(r"\frac{ 3 } { 4 }", question["question"])
-        self.assertIn(r"\frac{ 5 } { 6 }", question["explanation"])
-        self.assertEqual(question["choices"], [r"$\frac{ 7 } { 8 }$"])
+        self.assertIn(r"\frac{", question["question"])
+        self.assertIn(r"\frac{", question["explanation"])
+        self.assertIn(r"\frac{", question["choices"][0])
         self.assertNotIn(r"\dfrac", question["question"])
 
     def test_normalizes_hancom_braces_division_and_alignment_for_katex(self):

@@ -107,15 +107,15 @@
           {% for question in questions %}
           <article class="question">
             <h3><label class="question-select"><input type="checkbox" name="selected_questions" value="{{ loop.index0 }}"{% if not form_data or loop.index0|string in form_data.getlist('selected_questions') %} checked{% endif %} aria-label="{{ question.number }}번 문항 DB 등록"><span>{{ question.number }}번 문항</span></label></h3>
-            <p><span class="label">문제</span><br>{{ question.question }}</p>
+            <div class="math-content"><span class="label">문제</span><br>{{ question.question|render_rich_html }}</div>
             {% if question.choices %}
             <p class="label">선택지</p>
             <ol class="choices imported-choices">
-              {% for choice in question.choices %}<li>{{ '①②③④⑤'[loop.index0] if loop.index0 < 5 else loop.index ~ '.' }} {{ choice }}</li>{% endfor %}
+              {% for choice in question.choices %}<li>{{ '①②③④⑤'[loop.index0] if loop.index0 < 5 else loop.index ~ '.' }} <span class="math-content">{{ choice|render_rich_html }}</span></li>{% endfor %}
             </ol>
             {% endif %}
-            <p><span class="label">정답</span><br>{{ question.answer if question.answer else "문서에 정답이 포함되어 있지 않습니다." }}</p>
-            {% if question.explanation %}<details><summary>해설 보기</summary><p>{{ question.explanation }}</p></details>{% else %}<p class="hint">해설 미포함</p>{% endif %}
+            <div class="math-content"><span class="label">정답</span><br>{{ question.answer|render_rich_html if question.answer else "문서에 정답이 포함되어 있지 않습니다." }}</div>
+            {% if question.explanation %}<details><summary>해설 보기</summary><div class="math-content">{{ question.explanation|render_rich_html }}</div></details>{% else %}<p class="hint">해설 미포함</p>{% endif %}
           </article>
           {% endfor %}
           <button class="button primary" type="submit">선택 문항 DB에 등록</button>
@@ -125,6 +125,7 @@
       {% endif %}
     </main>
   </div>
+  <script defer src="{{ url_for('static', filename='scripts/katex-render.js') }}"></script>
   <script defer src="{{ url_for('static', filename='scripts/hwp-import.js') }}"></script>
 </body>
 </html>

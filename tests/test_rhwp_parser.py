@@ -22,7 +22,7 @@ class RhwpQuestionParserTests(unittest.TestCase):
 
     def test_extracts_question_answer_explanation_and_choices(self):
         blocks = [
-            paragraph("[정답] ②[해설]이 값은 $1+1$ 문제 본문", 0),
+            paragraph('[정답] ②[해설]이 값은 <span class="ql-math-inline" data-latex="1+1" data-input-format="hancom" data-input-source="1+1" data-math-object="inline"></span> 문제 본문', 0),
             paragraph("[정답] ②", 1),
             paragraph("[해설]", 2),
             paragraph("이 값은 ", 3),
@@ -39,7 +39,8 @@ class RhwpQuestionParserTests(unittest.TestCase):
         self.assertEqual(len(questions), 1)
         self.assertEqual(questions[0]["number"], 1)
         self.assertEqual(questions[0]["answer"], "②")
-        self.assertEqual(questions[0]["explanation"], "이 값은 $1+1$")
+        self.assertIn('class="ql-math-inline"', questions[0]["explanation"])
+        self.assertIn('data-latex="1+1"', questions[0]["explanation"])
         self.assertEqual(questions[0]["question"], "문제 본문 추가 조건을 고려하시오.")
         self.assertEqual(questions[0]["choices"], ["하나", "둘"])
 
@@ -70,6 +71,63 @@ if __name__ == "__main__":
 
 
 class RhwpFlexibleDocumentTests(unittest.TestCase):
+
+    def test_matches_separate_answer_sections_by_unit_and_question_number(self):
+        blocks = [
+            paragraph("Ⅰ. 수와 연산", 0),
+            paragraph("소인수분해", 1),
+            paragraph("1. 12의 약수를 고르시오.", 2),
+            paragraph("보기: 1, 2, 3, 4", 3),
+            paragraph("① 1 ② 2", 4),
+            paragraph("2. 18의 약수를 고르시오.", 5),
+            paragraph("① 1 ② 3", 6),
+            paragraph("최대공약수와 최소공배수", 7),
+            paragraph("1. 두 수의 최대공약수를 구하시오.", 8),
+            paragraph("① 2 ② 3", 9),
+            paragraph("정답 (해설)", 10),
+            paragraph("소인수분해", 11),
+            paragraph("1. (답) ④", 12),
+            paragraph("(해설)", 13),
+            paragraph("첫 번째 풀이입니다.", 14),
+            paragraph("2. (답) ②", 15),
+            paragraph("(해설) 두 번째 풀이입니다.", 16),
+            paragraph("최대공약수와 최소공배수", 17),
+            paragraph("1. (답) ①", 18),
+            paragraph("(해설) 세 번째 풀이입니다.", 19),
+        ]
+        ir = SimpleNamespace(iter_blocks=lambda scope="body", recurse=True: iter(blocks))
+
+        questions = parse_questions_from_ir(ir)
+
+        self.assertEqual(len(questions), 3)
+        self.assertEqual([item["number"] for item in questions], [1, 2, 3])
+        self.assertEqual(questions[0]["answer"], "④")
+        self.assertEqual(questions[0]["explanation"], "첫 번째 풀이입니다.")
+        self.assertEqual(questions[1]["answer"], "②")
+        self.assertEqual(questions[1]["explanation"], "두 번째 풀이입니다.")
+        self.assertEqual(questions[2]["answer"], "①")
+        self.assertEqual(questions[2]["explanation"], "세 번째 풀이입니다.")
+        self.assertIn("보기: 1, 2, 3, 4", questions[0]["question"])
+        self.assertEqual(questions[0]["choices"], ["1", "2"])
+
+    def test_does_not_treat_answer_entries_as_new_questions(self):
+        blocks = [
+            paragraph("소인수분해", 0),
+            paragraph("1. 문제 본문", 1),
+            paragraph("① 가 ② 나", 2),
+            paragraph("정답 (해설)", 3),
+            paragraph("1. (답) ②", 4),
+            paragraph("(해설) 정답은 나입니다.", 5),
+        ]
+        ir = SimpleNamespace(iter_blocks=lambda scope="body", recurse=True: iter(blocks))
+
+        questions = parse_questions_from_ir(ir)
+
+        self.assertEqual(len(questions), 1)
+        self.assertEqual(questions[0]["question"], "문제 본문")
+        self.assertEqual(questions[0]["answer"], "②")
+        self.assertEqual(questions[0]["explanation"], "정답은 나입니다.")
+
     def test_parses_numbered_paragraph_document_without_answer_or_explanation(self):
         blocks = [
             paragraph("Ⅰ. 세계화 시대, 지리의 힘", 0),
@@ -126,5 +184,6 @@ class RhwpFlexibleDocumentTests(unittest.TestCase):
 
         question = parse_questions_from_ir(ir)[0]
 
-        self.assertIn("$x^2$", question["question"])
+        self.assertIn('class="ql-math-inline"', question["question"])
+        self.assertIn('data-latex="x^2"', question["question"])
         self.assertIn("[그림: 좌표평면]", question["question"])
