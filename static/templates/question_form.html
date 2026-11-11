@@ -307,7 +307,7 @@
           <label for="math-hancom-input">한컴 수식 스크립트</label>
           <textarea id="math-hancom-input" rows="3" maxlength="5000" spellcheck="false"
                     placeholder="예: {a+b} over {c}"></textarea>
-          <p>브라우저에서 변환합니다. 예: <code>sqrt {x}</code>, <code>root 3 of {x}</code>, <code>{a+b} over {c}</code></p>
+          <p>hmleqx 변환기로 변환합니다. 예: <code>sqrt {x}</code>, <code>root 3 of {x}</code>, <code>{a+b} over {c}</code></p>
         </div>
         <p id="math-conversion-error" class="errors" role="alert" hidden></p>
         <div class="math-dialog-actions">
@@ -319,14 +319,14 @@
   </div>
 
   <script defer src="{{ url_for('static', filename='scripts/katex-render.js') }}"></script>
-  <script src="{{ url_for('static', filename='scripts/hancom-equation.js') }}"></script>
   <script src="https://cdn.jsdelivr.net/npm/quill@2.0.3/dist/quill.js"></script>
   <script id="question-editor-config" type="application/json">
     {{ {
       "selectedCourse": form_data.get("course", ""),
       "subjectCourseOptions": subject_course_options,
       "storedStandard": form_data.get("achievement_standard", ""),
-      "curriculumStandardsUrl": url_for("curriculum_standards")
+      "curriculumStandardsUrl": url_for("curriculum_standards"),
+      "hancomConversionUrl": url_for("hancom_to_latex")
     }|tojson }}
   </script>
   <script defer src="{{ url_for('static', filename='scripts/question-editor.js') }}"></script>
