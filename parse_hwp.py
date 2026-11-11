@@ -12,7 +12,12 @@ from typing import Iterable
 
 from hml_equation_parser import eq2latex
 from hmleq_converter import HmleqUnavailable, convert_hancom_to_latex
-from hwp_equations import CHOICE_LABELS, normalize_katex_markup, strip_choice_label
+from hwp_equations import (
+    CHOICE_LABELS,
+    normalize_katex_expression,
+    normalize_katex_markup,
+    strip_choice_label,
+)
 from hwp_equation_conversion import equation_to_latex
 
 
