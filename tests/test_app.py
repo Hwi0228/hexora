@@ -1066,10 +1066,6 @@ class QuestionRegistrationTests(unittest.TestCase):
 
 
 
-if __name__ == "__main__":
-    unittest.main()
-
-
     def test_soft_deleted_question_is_hidden_but_retrievable_and_restorable_by_code(self):
         self.csrf_post(self.client, "/questions/new", data=self.valid_question())
         code = "000001"
@@ -1309,3 +1305,7 @@ class ChangelogPageTests(unittest.TestCase):
             "/static/styles/shared.css",
             response.get_data(as_text=True),
         )
+
+
+if __name__ == "__main__":
+    unittest.main()
