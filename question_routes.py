@@ -7,9 +7,10 @@ historical imports and URL registration entry point stable.
 from auth import admin_required, login_required
 
 from question_browse_routes import (
-    curriculum_standards, get_selected_owner, get_question_page_data, main,
+    get_selected_owner, get_question_page_data, main,
     admin_users, question_by_code, delete_question, restore_deleted_question,
 )
+from curriculum_routes import curriculum_standards
 from question_edit_routes import render_question_form, new_question, edit_question
 from question_history_routes import question_history, restore_question
 from question_folder_routes import new_folder, save_question_note, move_question
