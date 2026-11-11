@@ -53,6 +53,7 @@ class AnswerTemplate(StrEnum):
     NUMBERED_ENTRIES = "numbered_entries"
     PACKED_KEY = "packed_key"
     SUBJECTIVE = "subjective"
+    MIXED = "mixed"
     UNKNOWN = "unknown"
 
 @dataclass(frozen=True, slots=True)
