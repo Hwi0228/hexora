@@ -39,13 +39,11 @@ from parse_hwp import normalize_katex_markup, strip_choice_label
 
 
 def hancom_to_latex():
-    _conversion_routes.run_hmleq = run_hmleq
-    return _conversion_routes.hancom_to_latex()
+    return _conversion_routes.hancom_to_latex(converter=run_hmleq)
 
 
 def convert_hancom_math():
-    _conversion_routes.run_hmleq = run_hmleq
-    return _conversion_routes.convert_hancom_math()
+    return _conversion_routes.convert_hancom_math(converter=run_hmleq)
 
 
 def register_question_routes(app):
