@@ -1,4 +1,3 @@
-import json
 from pathlib import Path
 
 from flask import abort, current_app, g, jsonify, redirect, render_template, request, url_for
@@ -6,7 +5,7 @@ from flask import abort, current_app, g, jsonify, redirect, render_template, req
 from constants import NAV_ITEMS, SUBJECTS
 from question_constants import QUESTION_CONTENT_FIELDS, QUESTION_FIELD_LABELS, CURRICULUM_STANDARDS
 from question_ids import format_question_number, parse_question_number
-from rich_text import render_rich_html
+from question_presentation import prepare_question_for_display
 from question_repository import _question_row
 from database import get_db
 from folder_service import get_folder_data
@@ -159,13 +158,9 @@ def get_question_page_data():
     rows = get_db().execute(query, parameters).fetchall()
     questions = []
     for row in rows:
-        question = dict(row)
-        question["choices"] = [
-            render_rich_html(strip_choice_label(choice))
-            for choice in json.loads(question["choices"] or "[]")
-        ]
-        for field in ("prompt", "answer", "explanation"):
-            question[field] = render_rich_html(question[field])
+        question = prepare_question_for_display(
+            row, rich_fields=("prompt", "answer", "explanation")
+        )
         question["display_id"] = format_question_number(question["id"])
         questions.append(question)
 
@@ -231,17 +226,10 @@ def question_by_code():
     if question_id is None:
         abort(404)
 
-    question = dict(_question_row(question_id))
-    try:
-        question["choices"] = json.loads(question.get("choices") or "[]")
-    except (TypeError, json.JSONDecodeError):
-        question["choices"] = []
-    question["choices"] = [
-        render_rich_html(strip_choice_label(str(choice or "")))
-        for choice in question["choices"]
-    ]
-    for field in ("passage", "prompt", "examples", "answer", "explanation"):
-        question[field] = render_rich_html(question.get(field, ""))
+    question = prepare_question_for_display(
+        _question_row(question_id),
+        rich_fields=("passage", "prompt", "examples", "answer", "explanation"),
+    )
     question["display_id"] = format_question_number(question_id)
     question["can_manage_question"] = (
         question["user_uuid"] == g.user["uuid"] or g.user["role"] == "admin"
