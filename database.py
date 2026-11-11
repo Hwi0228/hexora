@@ -18,12 +18,11 @@ from sqlite_backend import (
 )
 from postgres_backend import (
     HybridRow,
-    POSTGRES_SCHEMA_STATEMENTS,
     PostgresConnection,
     PostgresCursor,
     _translate_qmark_placeholders,
-    initialize_postgres_database,
 )
+from postgres_schema import POSTGRES_SCHEMA_STATEMENTS, initialize_postgres_database
 
 
 def begin_write_transaction(connection, lock_table=None):
