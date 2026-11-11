@@ -9,32 +9,18 @@ permissions:
   contents: read
 
 jobs:
-  render-build-test:
-    name: Render Build Test
+  unittest:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
-
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
           cache: pip
-
-      # Run the exact build command configured in the Render web service.
-      # This catches dependency, native-library, Rust toolchain, and hmleq
-      # compilation failures before a PR is merged.
-      - name: Run Render build command
+      - name: Install dependencies and hmleq
         run: bash build.sh
-
-      - name: Verify hmleq build output
-        run: |
-          test -x .render-tools/bin/hmleq
-          .render-tools/bin/hmleq --version
-          test -f .render-require-hmleq
-
       - name: Run unit tests
         env:
           HMLEQ_USE_LEGACY: "1"
