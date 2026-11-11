@@ -1,12 +1,11 @@
-import json
 
 from flask import g, render_template
 
 from auth import login_required
 from constants import NAV_ITEMS
 from database import get_db
-from question_routes import format_question_number, render_rich_html
-from parse_hwp import strip_choice_label
+from question_ids import format_question_number
+from question_presentation import prepare_question_for_display
 
 
 def dashboard():
@@ -52,18 +51,10 @@ def dashboard():
     ).fetchall()
     questions = []
     for row in recent_questions:
-        question = dict(row)
-        try:
-            question["choices"] = json.loads(question["choices"] or "[]")
-        except (TypeError, json.JSONDecodeError):
-            question["choices"] = []
-        question["choices"] = [
-            render_rich_html(strip_choice_label(str(choice or "")))
-            for choice in question["choices"]
-        ]
+        question = prepare_question_for_display(
+            row, rich_fields=("passage", "prompt", "examples")
+        )
         question["display_id"] = format_question_number(question["id"])
-        for field in ("passage", "prompt", "examples"):
-            question[field] = render_rich_html(question[field])
         questions.append(question)
 
     return render_template(

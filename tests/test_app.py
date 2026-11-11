@@ -209,9 +209,12 @@ class QuestionRegistrationTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertIn(b'id="achievement-standard-options"', response.data)
         self.assertIn(b'role="radiogroup"', response.data)
-        self.assertIn(b'radio.type = "radio"', response.data)
-        self.assertIn(b'code.className = "standard-code"', response.data)
-        self.assertNotIn(b'checkbox.type = "checkbox"', response.data)
+        editor_script = (
+            Path(__file__).resolve().parents[1] / "static/scripts/question-editor.js"
+        ).read_text(encoding="utf-8")
+        self.assertIn('radio.type = "radio"', editor_script)
+        self.assertIn('code.className = "standard-code"', editor_script)
+        self.assertNotIn('checkbox.type = "checkbox"', editor_script)
         self.assertNotIn("단원 <span".encode(), response.data)
 
     def test_personal_question_notes_are_private_to_each_member(self):
@@ -1063,10 +1066,6 @@ class QuestionRegistrationTests(unittest.TestCase):
 
 
 
-if __name__ == "__main__":
-    unittest.main()
-
-
     def test_soft_deleted_question_is_hidden_but_retrievable_and_restorable_by_code(self):
         self.csrf_post(self.client, "/questions/new", data=self.valid_question())
         code = "000001"
@@ -1093,6 +1092,11 @@ if __name__ == "__main__":
 
 
 class EditorFrontendRegressionTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        root = Path(__file__).resolve().parents[1]
+        cls.editor_script = (root / "static/scripts/question-editor.js").read_text(encoding="utf-8")
+
     def test_standard_workspace_uses_a_grid_for_the_sidebar_column(self):
         stylesheet = (
             Path(__file__).resolve().parents[1]
@@ -1110,8 +1114,8 @@ class EditorFrontendRegressionTests(unittest.TestCase):
         self.assertIn("https://cdn.jsdelivr.net/npm/quill@2.0.3/dist/quill.snow.css", template)
         self.assertNotIn('type="module"', template)
         self.assertNotIn("@tiptap/", template)
-        self.assertIn("if (!window.Quill)", template)
-        self.assertIn("new Quill(mount", template)
+        self.assertIn("if (!window.Quill)", self.editor_script)
+        self.assertIn("new Quill(mount", self.editor_script)
 
     def test_question_editor_supports_converting_hancom_math_scripts(self):
         template = (
@@ -1120,23 +1124,23 @@ class EditorFrontendRegressionTests(unittest.TestCase):
         ).read_text(encoding="utf-8")
         self.assertIn('<option value="hancom">한컴 한/글 수식</option>', template)
         self.assertIn('id="math-hancom-input"', template)
-        self.assertIn("window.EasyConvertEquation.hwpEquationToLaTeX(source)", template)
+        self.assertIn("window.EasyConvertEquation.hwpEquationToLaTeX(source)", self.editor_script)
 
     def test_quill_math_remains_atomic_and_supports_clipboard_roundtrips(self):
         template = (Path(__file__).resolve().parents[1] / "static/templates/question_form.html").read_text(encoding="utf-8")
-        self.assertIn('static blotName = "inlineMath"', template)
-        self.assertIn('static blotName = "blockMath"', template)
-        self.assertIn('node.dataset.latex = latex', template)
-        self.assertIn('node.setAttribute("contenteditable", "false")', template)
-        self.assertIn('quill.insertEmbed(index, format, equation, "user")', template)
-        self.assertIn('data-input-source', template)
-        self.assertIn('quill.clipboard.addMatcher("span.ql-math-inline"', template)
-        self.assertIn('quill.clipboard.addMatcher("div.ql-math-block"', template)
-        self.assertIn('quill.clipboard.addMatcher(\'span[data-type="inline-math"]\'', template)
-        self.assertIn('quill.clipboard.addMatcher(\'div[data-type="block-math"]\'', template)
-        self.assertIn('quill.deleteText(index, 1, "user")', template)
-        self.assertIn("quill.clipboard.convert({ html: initialHtml })", template)
-        self.assertNotIn('quill.insertText(range.index, insertion, "user")', template)
+        self.assertIn('static blotName = "inlineMath"', self.editor_script)
+        self.assertIn('static blotName = "blockMath"', self.editor_script)
+        self.assertIn('node.dataset.latex = latex', self.editor_script)
+        self.assertIn('node.setAttribute("contenteditable", "false")', self.editor_script)
+        self.assertIn('quill.insertEmbed(index, format, equation, "user")', self.editor_script)
+        self.assertIn('data-input-source', self.editor_script)
+        self.assertIn('quill.clipboard.addMatcher("span.ql-math-inline"', self.editor_script)
+        self.assertIn('quill.clipboard.addMatcher("div.ql-math-block"', self.editor_script)
+        self.assertIn('quill.clipboard.addMatcher(\'span[data-type="inline-math"]\'', self.editor_script)
+        self.assertIn('quill.clipboard.addMatcher(\'div[data-type="block-math"]\'', self.editor_script)
+        self.assertIn('quill.deleteText(index, 1, "user")', self.editor_script)
+        self.assertIn("quill.clipboard.convert({ html: initialHtml })", self.editor_script)
+        self.assertNotIn('quill.insertText(range.index, insertion, "user")', self.editor_script)
 
     def test_prompt_editor_has_an_editable_viewing_box_tool(self):
         root = Path(__file__).resolve().parents[1]
@@ -1184,12 +1188,12 @@ class EditorFrontendRegressionTests(unittest.TestCase):
         root = Path(__file__).resolve().parents[1]
         template = (root / "static/templates/question_form.html").read_text(encoding="utf-8")
         stylesheet = (root / "static/styles/pages/legacy-question_form.css").read_text(encoding="utf-8")
-        self.assertIn('if (editor) source.value = source.dataset.source === "choices"', template)
-        self.assertIn("serializeChoices(editor)", template)
-        self.assertIn("serializeEditor(editor)", template)
-        self.assertIn('document.documentElement.classList.add("js-editor-ready")', template)
-        self.assertIn('document.documentElement.classList.remove("js-editor-ready")', template)
-        self.assertIn('element.hidden = true', template)
+        self.assertIn('if (editor) source.value = source.dataset.source === "choices"', self.editor_script)
+        self.assertIn("serializeChoices(editor)", self.editor_script)
+        self.assertIn("serializeEditor(editor)", self.editor_script)
+        self.assertIn('document.documentElement.classList.add("js-editor-ready")', self.editor_script)
+        self.assertIn('document.documentElement.classList.remove("js-editor-ready")', self.editor_script)
+        self.assertIn('element.hidden = true', self.editor_script)
         self.assertIn(".js-editor-ready .rich-source { display:none; }", stylesheet)
         self.assertIn(".rich-source { display:block; }", stylesheet)
 
@@ -1301,3 +1305,7 @@ class ChangelogPageTests(unittest.TestCase):
             "/static/styles/shared.css",
             response.get_data(as_text=True),
         )
+
+
+if __name__ == "__main__":
+    unittest.main()
