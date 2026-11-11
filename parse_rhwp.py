@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib.util
+import re
 from collections import OrderedDict
 from typing import Any, Iterable
 
