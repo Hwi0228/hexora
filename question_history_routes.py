@@ -6,7 +6,7 @@ from constants import NAV_ITEMS
 from question_constants import QUESTION_CONTENT_FIELDS, QUESTION_FIELD_LABELS
 from question_ids import format_question_number
 from rich_text import render_rich_html
-from database import get_db
+from database import begin_write_transaction, get_db
 from question_revisions import _ensure_initial_question_revision, _insert_question_revision
 from question_repository import _question_row
 

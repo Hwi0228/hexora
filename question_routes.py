@@ -13,13 +13,39 @@ from question_browse_routes import (
 from question_edit_routes import render_question_form, new_question, edit_question
 from question_history_routes import question_history, restore_question
 from question_folder_routes import new_folder, save_question_note, move_question
-from question_conversion_routes import hancom_to_latex, convert_hancom_math
+import question_conversion_routes as _conversion_routes
+from flask import jsonify, request
+from hmleq_converter import (
+    HmleqConversionError, HmleqUnavailable,
+    convert_hancom_to_latex as run_hmleq,
+)
+from constants import NAV_ITEMS, SUBJECTS, LICENSE_CHOICES, SOURCE_TYPES
+from question_constants import (
+    QUESTION_CONTENT_FIELDS, QUESTION_FIELD_LABELS, QUESTION_TYPES, DIFFICULTIES,
+    COURSE_OPTIONS, SUBJECT_COURSE_OPTIONS, CURRICULUM_STANDARDS,
+)
+from database import begin_write_transaction, get_db
+from question_validation import _collect_question_data, _form_values_from_data
+from question_repository import _question_form_values, _question_row
+from question_drafts import _delete_question_draft, _load_question_draft, _save_question_draft
+from question_revisions import _ensure_initial_question_revision, _insert_question_revision, _question_snapshot
+from folder_service import get_folder_data
 
 from question_ids import (
     BASE36_ALPHABET, BASE36_WIDTH, format_question_number, parse_question_number,
 )
 from rich_text import sanitize_rich_html, _rich_text_has_content, render_rich_html
 from parse_hwp import normalize_katex_markup, strip_choice_label
+
+
+def hancom_to_latex():
+    _conversion_routes.run_hmleq = run_hmleq
+    return _conversion_routes.hancom_to_latex()
+
+
+def convert_hancom_math():
+    _conversion_routes.run_hmleq = run_hmleq
+    return _conversion_routes.convert_hancom_math()
 
 
 def register_question_routes(app):
