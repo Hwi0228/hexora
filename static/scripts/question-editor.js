@@ -334,6 +334,7 @@ const editorConfig = configNode
                 insertTable: insertTable
               }
             },
+            table: true,
             history: { delay: 1000, maxStack: 100, userOnly: true }
           }
         });
