@@ -1124,7 +1124,11 @@ class EditorFrontendRegressionTests(unittest.TestCase):
         ).read_text(encoding="utf-8")
         self.assertIn('<option value="hancom">한컴 한/글 수식</option>', template)
         self.assertIn('id="math-hancom-input"', template)
-        self.assertIn("window.EasyConvertEquation.hwpEquationToLaTeX(source)", self.editor_script)
+        self.assertIn("fetch(editorConfig.hancomConversionUrl", self.editor_script)
+        self.assertIn('"X-CSRF-Token"', self.editor_script)
+        self.assertNotIn("EasyConvertEquation", self.editor_script)
+        self.assertIn('"hancomConversionUrl": url_for("hancom_to_latex")', template)
+        self.assertNotIn("hancom-equation.js", template)
 
     def test_quill_math_remains_atomic_and_supports_clipboard_roundtrips(self):
         template = (Path(__file__).resolve().parents[1] / "static/templates/question_form.html").read_text(encoding="utf-8")
