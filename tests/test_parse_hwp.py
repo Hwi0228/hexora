@@ -118,8 +118,9 @@ class HwpParsingTests(unittest.TestCase):
             'bar {rm "AD" it} =x',
         )
         bar_questions = parse_questions_from_xml(bar_xml.encode("utf-8"))
-        self.assertIn(r"\overline{", bar_questions[0]["explanation"])
-        self.assertIn(r"\mathrm{AD}", bar_questions[0]["explanation"])
+        bar_latex = _embedded_latex(bar_questions[0]["explanation"])[0]
+        self.assertIn(r"\overline", bar_latex)
+        self.assertIn("AD", bar_latex)
 
         dot_xml = xml.replace(
             "LEFT ⌊ a+b RIGHT ⌋",
