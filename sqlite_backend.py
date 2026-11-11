@@ -53,37 +53,6 @@ def _create_question_revision_table(connection):
         "ON question_revisions(question_id, revision_number DESC)"
     )
 
-QUESTION_DRAFTS_SCHEMA = """
-CREATE TABLE IF NOT EXISTS question_drafts (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    user_uuid TEXT NOT NULL REFERENCES users(uuid) ON DELETE CASCADE,
-    draft_key TEXT NOT NULL,
-    question_id INTEGER REFERENCES questions(id) ON DELETE CASCADE,
-    base_revision INTEGER,
-    payload_json TEXT NOT NULL,
-    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE(user_uuid, draft_key)
-)
-"""
-
-QUESTION_ADDITIONAL_COLUMNS = {
-    "difficulty": "TEXT NOT NULL DEFAULT '중'",
-    "question_type": "TEXT NOT NULL DEFAULT '단답형'",
-    "points": "INTEGER NOT NULL DEFAULT 4",
-    "course": "TEXT NOT NULL DEFAULT ''",
-    "curriculum": "TEXT NOT NULL DEFAULT '2015 개정 교육과정'",
-    "achievement_standard": "TEXT NOT NULL DEFAULT ''",
-    "source_type": "TEXT NOT NULL DEFAULT '기타'",
-    "exam": "TEXT NOT NULL DEFAULT ''",
-    "original_question_number": "TEXT NOT NULL DEFAULT ''",
-    "source_url": "TEXT NOT NULL DEFAULT ''",
-    "license": "TEXT NOT NULL DEFAULT ''",
-    "title": "TEXT NOT NULL DEFAULT ''",
-    "deleted_at": "TEXT",
-}
-
-
 def _ensure_question_additional_columns(connection):
     columns = _table_columns(connection, "questions")
     for name, definition in QUESTION_ADDITIONAL_COLUMNS.items():
@@ -100,72 +69,12 @@ def _create_question_drafts_table(connection):
         "ON question_drafts(user_uuid, updated_at DESC)"
     )
 
-QUESTION_NOTES_SCHEMA = """
-CREATE TABLE IF NOT EXISTS question_notes (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    user_uuid TEXT NOT NULL REFERENCES users(uuid) ON DELETE CASCADE,
-    question_id INTEGER NOT NULL REFERENCES questions(id) ON DELETE CASCADE,
-    note TEXT NOT NULL DEFAULT '',
-    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE(user_uuid, question_id)
-)
-"""
-
-
 def _create_question_notes_table(connection):
     connection.execute(QUESTION_NOTES_SCHEMA)
     connection.execute(
         "CREATE INDEX IF NOT EXISTS idx_question_notes_user "
         "ON question_notes(user_uuid, question_id)"
     )
-
-
-WORKBOOK_SCHEMA = """
-CREATE TABLE IF NOT EXISTS workbooks (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    kind TEXT NOT NULL CHECK (kind IN ('commercial', 'community')),
-    title TEXT NOT NULL,
-    publisher TEXT NOT NULL DEFAULT '',
-    authors TEXT NOT NULL DEFAULT '',
-    isbn TEXT NOT NULL DEFAULT '',
-    edition TEXT NOT NULL DEFAULT '',
-    publication_year INTEGER,
-    subject TEXT NOT NULL DEFAULT '',
-    grade TEXT NOT NULL DEFAULT '',
-    curriculum TEXT NOT NULL DEFAULT '',
-    description TEXT NOT NULL DEFAULT '',
-    created_by TEXT REFERENCES users(uuid) ON DELETE SET NULL,
-    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
-)
-"""
-
-WORKBOOK_ENTRIES_SCHEMA = """
-CREATE TABLE IF NOT EXISTS workbook_entries (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    workbook_id INTEGER NOT NULL REFERENCES workbooks(id) ON DELETE CASCADE,
-    question_id INTEGER REFERENCES questions(id) ON DELETE CASCADE,
-    unit TEXT NOT NULL DEFAULT '',
-    page INTEGER,
-    question_number TEXT NOT NULL DEFAULT '',
-    created_by TEXT REFERENCES users(uuid) ON DELETE SET NULL,
-    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    CHECK (question_id IS NOT NULL OR page IS NOT NULL OR question_number <> '')
-)
-"""
-
-QUESTION_LINKS_SCHEMA = """
-CREATE TABLE IF NOT EXISTS question_links (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    question_id INTEGER NOT NULL REFERENCES questions(id) ON DELETE CASCADE,
-    related_question_id INTEGER REFERENCES questions(id) ON DELETE CASCADE,
-    workbook_entry_id INTEGER REFERENCES workbook_entries(id) ON DELETE CASCADE,
-    relation_type TEXT NOT NULL CHECK (relation_type IN ('variant', 'similar')),
-    created_by TEXT REFERENCES users(uuid) ON DELETE SET NULL,
-    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    CHECK ((related_question_id IS NULL) <> (workbook_entry_id IS NULL)),
-    CHECK (related_question_id IS NULL OR related_question_id <> question_id)
-)
-"""
 
 
 def _create_workbook_tables(connection):
