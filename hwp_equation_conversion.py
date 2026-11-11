@@ -28,6 +28,13 @@ def equation_to_latex(script: str, *, legacy_converter, primary_converter) -> st
     script = re.sub(r"(?<!\w)cdots(?!\w)", "CDOTS", script)
     script = re.sub(r"(?<!\w)EQALIGN(?!\w)", "eqalign", script)
     script = re.sub(r"(?<!\w)angle(?!\w)", "ANGLE", script)
+    # HWP uses "it" to close a roman-style quoted identifier. Explicit braces
+    # keep hmleqx's rm scope from swallowing the following relation/degree.
+    script = re.sub(
+        r'(?<!\w)rm\s+"([^"]*)"\s+it\b',
+        lambda match: "{rm " + match.group(1) + "}",
+        script,
+    )
     script = re.sub(r"(?<!\w)triangle(?!\w)", "TRIANGLE", script)
     search_from = 0
     while True:

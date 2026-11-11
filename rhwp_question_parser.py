@@ -47,23 +47,26 @@ def _is_document_header(paragraph: str, next_paragraph: str = "") -> bool:
     return False
 
 
-def _canonical(text: str) -> str:
-    """서식과 인라인 수식 Embed 표현 차이를 제거해 중복 문단을 비교한다."""
-    # Summary paragraphs may store an existing Quill math embed as HTML while
-    # the corresponding IR formula block is rendered as $...$. Convert both
-    # representations to the same inline-math text before comparing prefixes.
+def _inline_math_html_to_latex(text: str) -> str:
+    """Replace serialized Quill math embeds with their source LaTeX."""
     text = re.sub(
         r'<(?:span|div)\b[^>]*\bdata-latex=["\']([^"\']*)["\'][^>]*>.*?</(?:span|div)>',
         lambda match: "$" + html.unescape(match.group(1)) + "$",
         text,
         flags=re.DOTALL,
     )
-    text = html.unescape(text)
+    return html.unescape(text)
+
+
+def _canonical(text: str) -> str:
+    """서식과 인라인 수식 Embed 표현 차이를 제거해 중복 문단을 비교한다."""
+    text = _inline_math_html_to_latex(text)
     return re.sub(r"\s+", "", text).replace("$", "").replace(r"\(", "").replace(r"\)", "")
 
 def _strip_canonical_prefix(text: str, prefix: str) -> str:
     if not prefix:
         return text
+    text = _inline_math_html_to_latex(text)
     consumed = 0
     index = 0
     while index < len(text) and consumed < len(prefix):

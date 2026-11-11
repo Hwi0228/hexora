@@ -135,7 +135,7 @@ class HwpParsingTests(unittest.TestCase):
             'angle rm "C" it = 90 DEG',
         )
         angle_questions = parse_questions_from_xml(angle_xml.encode("utf-8"))
-        self.assertEqual(_embedded_latex(angle_questions[0]["explanation"]), [r"\angle\mathrm{C}=90^\circ"])
+        self.assertEqual(_embedded_latex(angle_questions[0]["explanation"]), [r"\angle\mathrm{C}=90\deg"])
 
     def test_preserves_fraction_commands_when_converting_hancom(self):
         xml = """\
