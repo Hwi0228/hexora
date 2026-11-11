@@ -45,12 +45,20 @@
 - [x] 문서 IR 및 타입 정의
 - [x] 독립형 템플릿 탐지기 초안
 - [x] 어댑터 레지스트리 인터페이스
-- [ ] HWP/HWPX Reader를 Core Extractor에 연결
-- [ ] 표/문단/인라인 수식·그림 provenance 보존
+- [x] rhwp-python HWP/HWPX Reader 및 바이트 입력 Core Extractor
+- [x] 표/행/셀 경계, 문단, 수식 원문, 그림 참조 및 위치 정보 보존
 - [ ] Q-TABLE, Q-PREFIX, Q-SUFFIX, Q-MIXED 어댑터 구현
 - [ ] A-INLINE, A-NUMBERED, A-PACKED, A-SUBJECTIVE 어댑터 구현
 - [ ] Assembler 및 Validator 구현
-- [ ] 기존 /hwp 업로드 경로 통합 및 회귀 테스트
+- [ ] 기존 /hwp 업로드 경로 통합 및 실제 문서 회귀 테스트
+
+## Core Reader 범위 및 제한
+- .hwp, .hwpx 모두 기존 프로젝트 의존성인 rhwp-python으로 읽는다.
+- Core는 문항/정답을 추정하지 않고 구조 블록만 만든다.
+- 표 셀 내부 블록은 표 → 행 → 셀 → 셀 콘텐츠 계층으로 보존한다.
+- 수식은 원본 한컴 스크립트를 우선 보존한다. LaTeX 변환은 별도 후속 단계다.
+- 그림은 설명 및 BinData 참조를 보존한다. 바이너리 자산 추출·미리보기는 아직 구현 범위가 아니다.
+- HWPX ZIP/XML을 직접 해석하는 별도 Reader는 아직 없으며, 현재는 rhwp-python Reader를 공통 인터페이스로 사용한다.
 
 ## 호환성 전략
 기존 parse_rhwp.py 및 rhwp_question_parser.py는 신규 엔진이 기존 회귀 테스트와 실제 샘플을 통과할 때까지 유지한다. 신규 엔진은 별도 패키지에서 개발하고 전환 시 기존 결과와 diff를 비교한다.
