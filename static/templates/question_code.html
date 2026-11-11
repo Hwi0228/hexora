@@ -14,7 +14,7 @@
 </head>
 <body>
   <div class="app">
-    {% include "partials/sidebar.html" %}
+    {{ render_sidebar() }}
     <main class="results">
       <header class="results-header">
         <a class="detail-button" href="{{ url_for('main', subject=question.subject) }}">문제 DB로 돌아가기</a>

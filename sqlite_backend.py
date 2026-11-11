@@ -16,6 +16,7 @@ from sqlite_schema import (
     QUESTION_NOTES_SCHEMA,
     QUESTION_REVISIONS_SCHEMA,
     QUESTIONS_SCHEMA,
+    RIGHTS_REPORTS_SCHEMA,
     USER_COLUMNS,
     USERS_SCHEMA,
     WORKBOOK_ENTRIES_SCHEMA,
@@ -109,6 +110,14 @@ def _create_workbook_tables(connection):
     )
 
 
+def _create_rights_reports_table(connection):
+    connection.execute(RIGHTS_REPORTS_SCHEMA)
+    connection.execute(
+        "CREATE INDEX IF NOT EXISTS idx_rights_reports_created "
+        "ON rights_reports(created_at DESC)"
+    )
+
+
 def initialize_database(connection):
     connection.execute("PRAGMA foreign_keys = OFF")
     tables = {
@@ -135,6 +144,7 @@ def initialize_database(connection):
         _create_question_drafts_table(connection)
         _create_question_notes_table(connection)
         _create_workbook_tables(connection)
+        _create_rights_reports_table(connection)
         connection.commit()
         connection.execute("PRAGMA foreign_keys = ON")
         return
@@ -234,6 +244,7 @@ def initialize_database(connection):
         _create_question_drafts_table(connection)
         _create_question_notes_table(connection)
         _create_workbook_tables(connection)
+        _create_rights_reports_table(connection)
         connection.commit()
     except Exception:
         connection.rollback()

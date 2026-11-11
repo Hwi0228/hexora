@@ -1,7 +1,7 @@
 .app.app-standard { display: grid; grid-template-columns: 224px minmax(0, 1fr) !important; min-height: 100vh; }
-.app.app-standard > .sidebar { position: sticky; top: 0; display: flex; height: 100vh; min-height: 580px; flex-direction: column; padding: 22px 14px 16px !important; border-right: 1px solid var(--hexora-border) !important; background: #fff !important; }
+.app.app-standard > .sidebar { position: sticky; top: 0; display: flex; height: 100vh; min-height: 0; flex-direction: column; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; padding: 22px 14px 16px !important; border-right: 1px solid var(--hexora-border) !important; background: #fff !important; }
 .app.app-question-bank { grid-template-columns: 224px 246px minmax(400px, 1fr) 246px !important; min-height: 100vh; }
-.app.app-question-bank > .sidebar { position: sticky; top: 0; height: 100vh; }
+.app.app-question-bank > .sidebar { position: sticky; top: 0; height: 100vh; min-height: 0; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; }
 .app main { min-width: 0; }
 .app-standard main { padding: 28px clamp(18px, 3vw, 42px); }
 .app-standard main > .site-header { width: min(100%, 1080px); margin-right: auto; margin-left: auto; }

@@ -41,7 +41,8 @@ def load_user_and_protect_forms():
     else:
         csrf_token()
 
-    if request.endpoint not in {"login", "signup", "static"} and g.user is None:
+    public_endpoints = {"login", "signup", "static", "terms", "privacy", "report_request"}
+    if request.endpoint not in public_endpoints and g.user is None:
         return redirect(url_for("login", next=request.full_path.rstrip("?")))
 
 def inject_template_context():
@@ -95,6 +96,10 @@ def signup():
     password = request.form.get("password", "")
     password_confirm = request.form.get("password_confirm", "")
     errors = []
+    if request.form.get("terms_agreed") != "1":
+        errors.append("이용약관에 동의해 주세요.")
+    if request.form.get("privacy_agreed") != "1":
+        errors.append("개인정보 처리방침을 확인하고 동의해 주세요.")
     if len(email) > 254 or "@" not in email or "." not in email.rsplit("@", 1)[-1]:
         errors.append("올바른 이메일 주소를 입력해 주세요.")
     if not display_name or len(display_name) > 80:

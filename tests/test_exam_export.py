@@ -39,6 +39,8 @@ class ExamExportRouteTests(unittest.TestCase):
                 "display_name": "시험지 테스트",
                 "password": "long-test-password",
                 "password_confirm": "long-test-password",
+                "terms_agreed": "1",
+                "privacy_agreed": "1",
             },
         )
         self.assertEqual(response.status_code, 302)
