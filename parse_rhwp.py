@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import ctypes
 import importlib.util
 import re
+from pathlib import Path
 from collections import OrderedDict
 from typing import Any, Iterable
 
@@ -15,6 +17,20 @@ from rhwp_question_parser import (
 
 
 MAX_DOCUMENT_BYTES = 12 * 1024 * 1024
+
+
+def _preload_bundled_freetype() -> None:
+    """Prefer the deploy-bundled FreeType over an older host system library."""
+    candidates = (
+        Path(__file__).resolve().parent
+        / ".render-libs"
+    ).rglob("libfreetype.so.6")
+    library = next(candidates, None)
+    if library is not None:
+        ctypes.CDLL(str(library), mode=ctypes.RTLD_GLOBAL)
+
+
+_preload_bundled_freetype()
 
 
 def _kind(block: Any) -> str:
@@ -184,6 +200,7 @@ def parse_questions_from_rhwp_bytes(
         )
 
     try:
+        _preload_bundled_freetype()
         import rhwp
 
         document = rhwp.Document.from_bytes(content, source_uri=f"upload://{filename}")
