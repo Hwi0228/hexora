@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>권리침해 신고 관리 | HEXORA</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='styles/tokens.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='styles/base.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='styles/pages/legal.css') }}">
+</head>
+<body class="legal-body">
+<header class="legal-topbar"><a class="legal-brand" href="{{ url_for('dashboard') }}"><span>⌬</span><strong>HEXORA</strong></a><nav><a href="{{ url_for('report_request') }}">신고 양식</a><a href="{{ url_for('dashboard') }}">대시보드</a></nav></header>
+<main class="legal-main admin-reports">
+  <div class="legal-eyebrow">ADMINISTRATION</div><h1>권리침해 신고 관리</h1>
+  <p class="legal-lead">최근 접수된 신고 최대 200건입니다. 신청인의 개인정보는 신고 처리 목적에 한해 확인하세요.</p>
+  {% for report in reports %}
+  <article class="report-card">
+    <div class="report-card-head"><strong>#{{ report.id }} · {{ report.category }}</strong><span class="report-status">{{ report.status }}</span></div>
+    <p><strong>요청:</strong> {{ report.requested_action }} · {{ report.requester_role }}</p>
+    <p><strong>신청인:</strong> {{ report.requester_name }} · <a href="mailto:{{ report.requester_email }}">{{ report.requester_email }}</a></p>
+    <p><strong>대상 URL:</strong> <a href="{{ report.target_url }}" rel="noopener noreferrer" target="_blank">{{ report.target_url }}</a></p>
+    <p><strong>접수:</strong> {{ report.created_at }}</p>
+    <div class="report-details">{{ report.details }}</div>
+    <form method="post" action="{{ url_for('update_legal_report', report_id=report.id) }}" class="report-status-form">
+      <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
+      <label>처리 상태<select name="status">{% for status in ['접수', '검토 중', '처리 완료', '조치 불가'] %}<option value="{{ status }}" {% if report.status == status %}selected{% endif %}>{{ status }}</option>{% endfor %}</select></label>
+      <button type="submit">상태 저장</button>
+    </form>
+  </article>
+  {% else %}<p class="legal-empty">접수된 신고가 없습니다.</p>{% endfor %}
+</main>
+</body>
+</html>

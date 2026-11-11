@@ -11,6 +11,7 @@ from changelog_routes import register_changelog_routes
 from hwp_routes import register_hwp_routes
 from question_routes import register_question_routes
 from workbook_routes import register_workbook_routes
+from legal_routes import register_legal_routes
 from rich_text import render_rich_html
 
 
@@ -58,6 +59,11 @@ def create_app():
     if not app.config["SECRET_KEY"]:
         app.config["SECRET_KEY"] = _secret_key(app)
 
+    app.config["HEXORA_OPERATOR_NAME"] = os.environ.get("HEXORA_OPERATOR_NAME", "[운영자 성명 또는 상호]")
+    app.config["HEXORA_OPERATOR_ADDRESS"] = os.environ.get("HEXORA_OPERATOR_ADDRESS", "[운영자 주소]")
+    app.config["HEXORA_PRIVACY_CONTACT"] = os.environ.get("HEXORA_PRIVACY_CONTACT", "[개인정보 문의 이메일]")
+    app.config["HEXORA_PRIVACY_OFFICER"] = os.environ.get("HEXORA_PRIVACY_OFFICER", "[개인정보 보호책임자 성명]")
+
     version_path = Path(__file__).resolve().parent / "VERSION"
     try:
         app.config["APP_VERSION"] = version_path.read_text(encoding="utf-8").strip() or "dev"
@@ -66,7 +72,13 @@ def create_app():
 
     @app.context_processor
     def inject_app_version():
-        return {"app_version": app.config["APP_VERSION"]}
+        return {
+            "app_version": app.config["APP_VERSION"],
+            "operator_name": app.config["HEXORA_OPERATOR_NAME"],
+            "operator_address": app.config["HEXORA_OPERATOR_ADDRESS"],
+            "privacy_contact": app.config["HEXORA_PRIVACY_CONTACT"],
+            "privacy_officer": app.config["HEXORA_PRIVACY_OFFICER"],
+        }
 
     register_auth_routes(app)
     register_dashboard_routes(app)
@@ -74,6 +86,7 @@ def create_app():
     register_question_routes(app)
     register_workbook_routes(app)
     register_hwp_routes(app)
+    register_legal_routes(app)
     return app
 
 

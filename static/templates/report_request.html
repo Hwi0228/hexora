@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>권리침해 신고 및 임시조치 요청 | HEXORA</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='styles/tokens.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='styles/base.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='styles/pages/legal.css') }}">
+</head>
+<body class="legal-body">
+<header class="legal-topbar">
+  <a class="legal-brand" href="{{ url_for('dashboard') if current_user else url_for('login') }}"><span>⌬</span><strong>HEXORA</strong></a>
+  <nav><a href="{{ url_for('terms') }}">이용약관</a><a href="{{ url_for('privacy') }}">개인정보처리방침</a>{% if current_user %}<a href="{{ url_for('dashboard') }}">서비스로 돌아가기</a>{% else %}<a href="{{ url_for('login') }}">로그인</a>{% endif %}</nav>
+</header>
+<main class="legal-main report-main">
+  <div class="legal-eyebrow">CONTENT RIGHTS · NOTICE</div>
+  <h1>권리침해 신고 및 임시조치 요청</h1>
+  <p class="legal-lead">HEXORA에 공개된 문항이나 게시물이 본인의 권리를 침해한다고 생각한다면 아래 양식으로 신고해 주세요.</p>
+  {% if submitted %}<div class="form-success" role="status"><strong>신고가 접수되었습니다.</strong><p>운영자가 내용을 확인한 뒤 입력한 이메일로 회신할 수 있습니다. 접수만으로 콘텐츠 삭제 또는 임시조치가 자동 결정되는 것은 아닙니다.</p></div>{% endif %}
+  {% if errors %}<div class="form-errors" role="alert"><strong>입력 내용을 확인해 주세요.</strong><ul>{% for error in errors %}<li>{{ error }}</li>{% endfor %}</ul></div>{% endif %}
+  <div class="legal-notice">이 양식은 권리자 본인 또는 적법한 대리인의 신고를 위한 것입니다. 대상 콘텐츠의 정확한 URL과 권리침해 사유를 구체적으로 작성해 주세요. 신고 내용이 불충분하면 추가 자료를 요청할 수 있습니다.</div>
+  <form class="rights-form" method="post" action="{{ url_for('report_request') }}">
+    <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
+    <div class="form-honeypot" aria-hidden="true"><label>웹사이트<input name="website" tabindex="-1" autocomplete="off"></label></div>
+    <label>신고 유형<select name="category" required><option value="">선택해 주세요</option>{% for category in categories %}<option value="{{ category }}" {% if form_data.category == category %}selected{% endif %}>{{ category }}</option>{% endfor %}</select></label>
+    <label>요청 내용<select name="requested_action" required><option value="">선택해 주세요</option>{% for action in actions %}<option value="{{ action }}" {% if form_data.requested_action == action %}selected{% endif %}>{{ action }}</option>{% endfor %}</select><small>임시조치는 운영자가 권리침해 여부를 판단하기 어렵거나 당사자 간 다툼이 예상되는 경우 관련 법령과 절차에 따라 검토합니다.</small></label>
+    <label>신청인과 권리자의 관계<select name="requester_role" required><option value="">선택해 주세요</option>{% for role in reporter_roles %}<option value="{{ role }}" {% if form_data.requester_role == role %}selected{% endif %}>{{ role }}</option>{% endfor %}</select></label>
+    <div class="form-grid">
+      <label>신청인 이름<input name="requester_name" maxlength="80" autocomplete="name" value="{{ form_data.requester_name }}" required></label>
+      <label>회신 이메일<input name="requester_email" type="email" maxlength="254" autocomplete="email" value="{{ form_data.requester_email }}" required></label>
+    </div>
+    <label>대상 콘텐츠 URL<input name="target_url" type="url" maxlength="2048" placeholder="https://hexora.kro.kr/..." value="{{ form_data.target_url }}" required><small>문제가 되는 문항 또는 게시물의 주소를 정확히 입력해 주세요.</small></label>
+    <label>권리침해 사유 및 소명 내용<textarea name="details" rows="8" maxlength="10000" placeholder="침해된 권리, 권리자임을 확인할 수 있는 사정, 문제가 되는 부분과 침해 이유를 구체적으로 작성해 주세요." required>{{ form_data.details }}</textarea></label>
+    <div class="form-check">
+      <label><input type="checkbox" name="truth_confirmed" value="1" required> 작성한 내용과 제출 자료가 사실임을 확인합니다.</label>
+      <label><input type="checkbox" name="privacy_agreed" value="1" required> 신고 접수·검토·회신을 위한 개인정보 수집 및 이용에 동의합니다. <a href="{{ url_for('privacy') }}">개인정보처리방침</a></label>
+    </div>
+    <button class="legal-submit" type="submit">신고 및 조치 요청 제출</button>
+  </form>
+  <section class="report-process"><h2>처리 절차</h2><ol><li><strong>접수</strong> — 신청 정보와 대상 콘텐츠 URL을 접수합니다.</li><li><strong>확인</strong> — 권리자 여부, 침해 주장 및 소명 내용을 확인하고 필요하면 보완을 요청합니다.</li><li><strong>조치 검토</strong> — 삭제 또는 반박내용 게재 요청을 검토하며, 법령상 요건에 해당하면 30일 이내 임시조치를 할 수 있습니다.</li><li><strong>결과 안내</strong> — 신청인 및 게시자에게 필요한 조치와 결과를 안내합니다.</li></ol><p>신고 처리 관련 문의: {{ privacy_contact }}</p></section>
+  <footer class="legal-footer"><a href="{{ url_for('terms') }}">이용약관</a><a href="{{ url_for('privacy') }}">개인정보처리방침</a><span>© HEXORA</span></footer>
+</main>
+</body>
+</html>
