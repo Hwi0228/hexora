@@ -11,11 +11,39 @@ from hwp_equations import CHOICE_LABELS, strip_choice_label
 CHOICE_PATTERN = re.compile(rf"[{CHOICE_LABELS}]")
 
 
+_HWP_CONTROL_SEQUENCE = re.compile(
+    r"(?P<marker>[\x01-\x08\x0b\x0c\x0e-\x1f])[\s\S]{6}?(?P=marker)"
+)
+
+
 def _compact(text: str) -> str:
+    # rhwp-python may retain HWP inline-control records in paragraph.text.
+    # Remove paired control markers before detecting question/answer numbers.
+    text = _HWP_CONTROL_SEQUENCE.sub("", text)
+    text = text.replace("\x00", "")
+    text = re.sub(r"[\x01-\x08\x0b\x0c\x0e-\x1f]", "", text)
     text = re.sub(r"[ \t\r\f\v]+", " ", text)
     text = re.sub(r"\n+", " ", text)
     text = re.sub(r"(\[그림(?::[^\]]*)?\])(?=\S)", r"\1 ", text)
     return text.strip()
+
+
+def _is_document_header(paragraph: str, next_paragraph: str = "") -> bool:
+    if re.fullmatch(r"수학\s*[①-⑳]?", paragraph):
+        return True
+    if re.fullmatch(r"[ⅠⅡⅢⅣⅤⅥⅦⅧⅨⅩ]+\s*[.)]?\s*수와\s*연산", paragraph):
+        return True
+    if re.search(r"반\s*/\s*번호|이름", paragraph):
+        return True
+    if (
+        next_paragraph
+        and re.search(r"반\s*/\s*번호|이름", next_paragraph)
+        and len(paragraph) <= 80
+        and not re.search(r"[.!?。！？]", paragraph)
+        and not CHOICE_PATTERN.search(paragraph)
+    ):
+        return True
+    return False
 
 
 def _canonical(text: str) -> str:
@@ -227,6 +255,9 @@ def _parse_numbered_paragraphs(paragraphs: list[str]) -> list[dict[str, Any]]:
             _compact(paragraphs[paragraph_index + 1])
             if paragraph_index + 1 < len(paragraphs) else ""
         )
+        if _is_document_header(paragraph, next_paragraph):
+            continue
+
         next_start = _QUESTION_START.match(next_paragraph)
         if (
             next_start
@@ -277,16 +308,22 @@ _ANSWER_ENTRY_START = re.compile(
 
 
 def _parse_separated_answers(paragraphs: list[str]) -> list[dict[str, Any]]:
-    """정답·해설 영역의 번호별 항목을 원래 문항 번호와 단원 순서로 읽는다."""
+    """정답·해설 영역을 읽고, 번호 없는 첫 해설과 페이지 머리글을 보존/제외한다."""
     answers: list[dict[str, Any]] = []
     current: dict[str, Any] | None = None
     unit_index = 0
     previous_source_number: int | None = None
     in_explanation = False
+    pending_parts: list[str] = []
+    pending_has_section_heading = False
+    leading_explanation_parts: list[str] = []
+    leading_explanation_active = False
 
     def finish() -> None:
         if current is None:
             return
+        if pending_parts and not in_explanation and not pending_has_section_heading:
+            current["explanation_parts"].extend(pending_parts)
         answers.append({
             "source_number": current["source_number"],
             "unit_index": current["unit_index"],
@@ -302,14 +339,28 @@ def _parse_separated_answers(paragraphs: list[str]) -> list[dict[str, Any]]:
         start = _ANSWER_ENTRY_START.match(paragraph)
         if start:
             source_number = int(start.group(1) or start.group(2) or start.group(3))
+            if current is not None:
+                finish()
+            elif leading_explanation_parts and source_number == 2:
+                # 일부 교재는 첫 문항 해설만 먼저 싣고 2번부터 답 번호를 표시한다.
+                # 정답은 추측하지 않고 첫 문항의 해설만 연결한다.
+                answers.append({
+                    "source_number": 1,
+                    "unit_index": unit_index,
+                    "answer": "",
+                    "explanation": _compact(" ".join(leading_explanation_parts)),
+                })
+            leading_explanation_parts = []
+            leading_explanation_active = False
+
             if previous_source_number is not None and source_number <= previous_source_number:
                 unit_index += 1
-            finish()
+
             tail = _compact(start.group(4))
-            tail = re.sub(r"^(?:\(\s*답\s*\)|\[\s*답\s*\]|답)\s*", "", tail)
+            tail = re.sub(r"^(\(\s*답\s*\)|\[\s*답\s*\]|답)\s*", "", tail)
             explanation_parts: list[str] = []
             answer_text = tail
-            explanation_match = re.search(r"(?:\(\s*해설\s*\)|\[\s*해설\s*\])", answer_text)
+            explanation_match = re.search(r"(\(\s*해설\s*\)|\[\s*해설\s*\])", answer_text)
             if explanation_match:
                 explanation_parts.append(answer_text[explanation_match.end():])
                 answer_text = answer_text[:explanation_match.start()]
@@ -323,50 +374,55 @@ def _parse_separated_answers(paragraphs: list[str]) -> list[dict[str, Any]]:
                 "explanation_parts": explanation_parts,
             }
             previous_source_number = source_number
-            continue
-
-        if current is None:
-            continue
-
-        next_paragraph = (
-            _compact(paragraphs[paragraph_index + 1])
-            if paragraph_index + 1 < len(paragraphs) else ""
-        )
-        next_start = _ANSWER_ENTRY_START.match(next_paragraph)
-        if (
-            next_start
-            and previous_source_number is not None
-            and int(next_start.group(1) or next_start.group(2) or next_start.group(3)) <= previous_source_number
-            and len(paragraph) <= 60
-            and not re.search(r"[.!?。！？]", paragraph)
-            and not CHOICE_PATTERN.search(paragraph)
-        ):
-            # 단원 제목은 앞 문항의 해설에 포함하지 않는다.
+            pending_parts = []
+            pending_has_section_heading = False
             continue
 
         explanation_marker = re.search(
-            r"(?:\(\s*해설\s*\)|\[\s*해설\s*\])", paragraph
+            r"(\(\s*해설\s*\)|\[\s*해설\s*\])", paragraph
         )
+        if current is None:
+            if explanation_marker:
+                leading_explanation_active = True
+                tail = paragraph[explanation_marker.end():].strip()
+                if tail:
+                    leading_explanation_parts.append(tail)
+            elif leading_explanation_active:
+                leading_explanation_parts.append(paragraph)
+            continue
+
+        if _ANSWER_SECTION_HEADING.fullmatch(paragraph):
+            # 일부 파일은 단원/페이지마다 '정답' 머리글을 반복한다.
+            pending_has_section_heading = True
+            continue
+
         if explanation_marker:
+            if pending_has_section_heading:
+                pending_parts = []
+            else:
+                current["explanation_parts"].extend(pending_parts)
+            pending_parts = []
+            pending_has_section_heading = False
             in_explanation = True
             tail = paragraph[explanation_marker.end():].strip()
             if tail:
                 current["explanation_parts"].append(tail)
             continue
 
-        answer_marker = re.match(r"^(?:\(\s*답\s*\)|\[\s*답\s*\]|답)\s*(.*)$", paragraph)
+        answer_marker = re.match(r"^(\(\s*답\s*\)|\[\s*답\s*\]|답)\s*(.*)$", paragraph)
         if answer_marker and not current["answer"]:
-            current["answer"] = answer_marker.group(1)
+            current["answer"] = answer_marker.group(2)
             continue
 
         if in_explanation:
             current["explanation_parts"].append(paragraph)
         elif not current["answer"]:
-            current["answer"] = paragraph
+            if not _is_document_header(paragraph):
+                current["answer"] = paragraph
         else:
-            # 해설 표기가 별도 문단에 생략된 교재도 있어 후속 문단은 해설로 보존한다.
-            in_explanation = True
-            current["explanation_parts"].append(paragraph)
+            # 다음 (해설) 표식이 나오기 전까지는 보류한다.
+            # 중간에 '정답' 머리글이 나오면 페이지 헤더로 판단해 버린다.
+            pending_parts.append(paragraph)
 
     finish()
     return answers

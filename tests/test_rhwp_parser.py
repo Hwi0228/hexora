@@ -72,6 +72,77 @@ if __name__ == "__main__":
 
 class RhwpFlexibleDocumentTests(unittest.TestCase):
 
+    def test_strips_hwp_control_sequences_and_page_headers_around_unit_questions(self):
+        control_prefix = "\x0b氠瑢\x00\x00\x00\x00\x0b"
+        blocks = [
+            paragraph("\x02捤獥\x00\x00\x00\x00\x02" + "1. 첫 단원 첫 문항", 0),
+            paragraph("① 가 ② 나", 1),
+            paragraph("51. 첫 단원 마지막 문항", 2),
+            paragraph("① 다 ② 라", 3),
+            paragraph(control_prefix + "1. 둘째 단원 첫 문항", 4),
+            paragraph("수학 ①", 5),
+            paragraph("Ⅰ. 수와 연산", 6),
+            paragraph("최대공약수와 최소공배수", 7),
+            paragraph("반 / 번호 이름", 8),
+            paragraph("① 마 ② 바", 9),
+            paragraph("2. 둘째 단원 두 번째 문항", 10),
+        ]
+        ir = SimpleNamespace(iter_blocks=lambda scope="body", recurse=True: iter(blocks))
+
+        questions = parse_questions_from_ir(ir)
+
+        self.assertEqual(len(questions), 4)
+        self.assertEqual(
+            [item["question"] for item in questions],
+            ["첫 단원 첫 문항", "첫 단원 마지막 문항", "둘째 단원 첫 문항", "둘째 단원 두 번째 문항"],
+        )
+        self.assertEqual(questions[1]["choices"], ["다", "라"])
+        self.assertEqual(questions[2]["choices"], ["마", "바"])
+
+    def test_matches_actual_style_answer_pages_with_unlabelled_first_explanation(self):
+        control_prefix = "\x0b氠瑢\x00\x00\x00\x00\x0b"
+        blocks = [
+            paragraph("1. 첫 단원 첫 문항", 0),
+            paragraph("2. 첫 단원 두 번째 문항", 1),
+            paragraph("51. 첫 단원 마지막 문항", 2),
+            paragraph(control_prefix + "1. 둘째 단원 첫 문항", 3),
+            paragraph("2. 둘째 단원 두 번째 문항", 4),
+            paragraph("정답", 5),
+            paragraph("소인수분해", 6),
+            paragraph("(해설)", 7),
+            paragraph("첫 문항 해설", 8),
+            paragraph("2. (답) ②", 9),
+            paragraph("(해설)", 10),
+            paragraph("두 번째 문항 해설", 11),
+            paragraph("51. (답) ④", 12),
+            paragraph("(해설)", 13),
+            paragraph("마지막 문항 해설", 14),
+            paragraph(control_prefix + "1. (답) ⑤", 15),
+            paragraph("수학 ①", 16),
+            paragraph("Ⅰ. 수와 연산", 17),
+            paragraph("최대공약수와 최소공배수", 18),
+            paragraph("정답", 19),
+            paragraph("(해설)", 20),
+            paragraph("둘째 단원 첫 문항 해설", 21),
+            paragraph("2. (답) ③", 22),
+            paragraph("(해설)", 23),
+            paragraph("둘째 단원 두 번째 해설", 24),
+        ]
+        ir = SimpleNamespace(iter_blocks=lambda scope="body", recurse=True: iter(blocks))
+
+        questions = parse_questions_from_ir(ir)
+
+        self.assertEqual(len(questions), 5)
+        self.assertEqual(questions[0]["answer"], "")
+        self.assertEqual(questions[0]["explanation"], "첫 문항 해설")
+        self.assertEqual(questions[1]["answer"], "②")
+        self.assertEqual(questions[2]["answer"], "④")
+        self.assertEqual(questions[3]["answer"], "⑤")
+        self.assertEqual(questions[3]["explanation"], "둘째 단원 첫 문항 해설")
+        self.assertEqual(questions[4]["answer"], "③")
+        self.assertEqual(questions[4]["explanation"], "둘째 단원 두 번째 해설")
+
+
     def test_matches_separate_answer_sections_by_unit_and_question_number(self):
         blocks = [
             paragraph("Ⅰ. 수와 연산", 0),
