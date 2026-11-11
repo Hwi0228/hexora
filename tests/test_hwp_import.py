@@ -7,6 +7,24 @@ from hwp_routes import _validated_import
 
 
 class HwpImportValidationTests(unittest.TestCase):
+    def test_import_sanitizes_and_preserves_math_embed_metadata(self):
+        math = '<span class="ql-math-inline" data-latex="x^2" data-input-format="hancom" data-input-source="x ^ 2" data-math-object="inline"></span>'
+        form = MultiDict([
+            ("questions_json", json.dumps({"questions": [{
+                "number": 1, "question": "다음 식 " + math, "choices": [],
+                "answer": math, "explanation": "",
+            }]}, ensure_ascii=False)),
+            ("subject", "수학"), ("grade", "고1"), ("unit", "테스트 단원"),
+            ("source", "업로드 문서"), ("license", "ORIGINAL"),
+            ("source_type", "기타"), ("selected_questions", "0"),
+        ])
+        questions, selection, errors, error = _validated_import(form)
+        self.assertIsNone(error)
+        self.assertEqual(errors, [])
+        self.assertIn('class="ql-math-inline"', questions[0]["question"])
+        self.assertIn('data-latex="x^2"', questions[0]["answer"])
+        self.assertIn('data-input-format="hancom"', questions[0]["answer"])
+
     def test_document_without_answer_or_explanation_can_be_imported(self):
         form = MultiDict([
             ("questions_json", json.dumps({

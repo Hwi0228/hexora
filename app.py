@@ -3,6 +3,7 @@ import secrets
 from pathlib import Path
 
 from flask import Flask
+from markupsafe import Markup
 
 from auth import register_auth_routes
 from dashboard_routes import register_dashboard_routes
@@ -10,6 +11,7 @@ from changelog_routes import register_changelog_routes
 from hwp_routes import register_hwp_routes
 from question_routes import register_question_routes
 from workbook_routes import register_workbook_routes
+from rich_text import render_rich_html
 
 
 def _secret_key(app):
@@ -28,6 +30,7 @@ def _secret_key(app):
 
 def create_app():
     app = Flask(__name__, template_folder="static/templates")
+    app.jinja_env.filters["render_rich_html"] = lambda value: Markup(render_rich_html(value))
     database_type = os.environ.get("DATABASE_TYPE", "sqlite").strip().lower()
     if database_type == "postgres":
         database_type = "postgresql"

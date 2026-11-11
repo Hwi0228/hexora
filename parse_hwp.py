@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import html
 import json
 import os
 import re
@@ -53,6 +54,26 @@ def _events(element: ET.Element) -> list[tuple[str, str]]:
         elif node.tag == f"{HP}pic":
             events.append(("image", "[그림]"))
     return events
+
+
+def _math_delimiters_to_embeds(value: str) -> str:
+    """기존 HWPML 스트림의 수식 구분자를 Quill 수식 Embed HTML로 바꾼다."""
+    pattern = re.compile(r"\$\$(.+?)\$\$|\$(.+?)\$", re.DOTALL)
+
+    def replace(match: re.Match[str]) -> str:
+        display_mode = match.group(1) is not None
+        latex = (match.group(1) if display_mode else match.group(2)) or ""
+        tag = "div" if display_mode else "span"
+        blot = "ql-math-block" if display_mode else "ql-math-inline"
+        latex_attr = html.escape(latex, quote=True).replace(" ", "&#32;")
+        mode = "block" if display_mode else "inline"
+        return (
+            f'<{tag} class="{blot}" data-latex="{latex_attr}" '
+            f'data-input-format="latex" data-input-source="{latex_attr}" '
+            f'data-math-object="{mode}"></{tag}>'
+        )
+
+    return pattern.sub(replace, value)
 
 
 def _stream(events: Iterable[tuple[str, str]]) -> tuple[str, str, list[int]]:
@@ -219,10 +240,10 @@ def _parse_row(row: ET.Element, number: int) -> dict[str, object]:
 
     return {
         "number": number,
-        "question": question,
-        "choices": choices,
-        "answer": answer,
-        "explanation": explanation,
+        "question": _math_delimiters_to_embeds(question),
+        "choices": [_math_delimiters_to_embeds(choice) for choice in choices],
+        "answer": _math_delimiters_to_embeds(answer),
+        "explanation": _math_delimiters_to_embeds(explanation),
     }
 
 
