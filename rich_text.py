@@ -2,7 +2,7 @@ import html
 import re
 from html.parser import HTMLParser
 
-from parse_hwp import normalize_katex_markup
+from hwp_equations import normalize_katex_markup
 
 
 class _RichTextSanitizer(HTMLParser):
