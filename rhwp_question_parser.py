@@ -391,6 +391,23 @@ def _parse_separated_answers(paragraphs: list[str]) -> list[dict[str, Any]]:
                 leading_explanation_parts.append(paragraph)
             continue
 
+        next_paragraph = (
+            _compact(paragraphs[paragraph_index + 1])
+            if paragraph_index + 1 < len(paragraphs) else ""
+        )
+        next_start = _ANSWER_ENTRY_START.match(next_paragraph)
+        if (
+            in_explanation
+            and next_start
+            and previous_source_number is not None
+            and int(next_start.group(1) or next_start.group(2) or next_start.group(3)) <= previous_source_number
+            and len(paragraph) <= 60
+            and not re.search(r"[.!?。！？]", paragraph)
+            and not CHOICE_PATTERN.search(paragraph)
+        ):
+            # 단원 제목은 다음 단원의 첫 답안 직전에 나타날 수 있다.
+            continue
+
         if _ANSWER_SECTION_HEADING.fullmatch(paragraph):
             # 일부 파일은 단원/페이지마다 '정답' 머리글을 반복한다.
             pending_has_section_heading = True
