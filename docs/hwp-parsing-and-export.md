@@ -19,7 +19,7 @@ flowchart TD
     PrimaryParser --> ExtractMath[한컴 수식 스크립트 추출]
     FallbackParser --> ExtractMath
 
-    ExtractMath --> HmleqConverter{hmleq CLI 변환<br/>Rusthmleq_converter.py}
+    ExtractMath --> HmleqConverter{hmleqx Python API<br/>hmleq_converter.py}
     HmleqConverter -->|성공| LatexMath[LaTeX 구문 정규화]
     HmleqConverter -->|실패/미설치| PyFallback[hml-equation-parser 폴백]
     PyFallback --> LatexMath
@@ -96,22 +96,18 @@ sequenceDiagram
 
 ### 3.3 `hmleq_converter.py` (한컴 수식 -> LaTeX 변환기)
 
-HWP 문서의 고유 수식 스크립트(예: `{a} over {b}`, `root {3} {x}`)를 Web/KaTeX 표준의 LaTeX 구문(`\frac{a}{b}`, `\sqrt[3]{x}`)으로 변환하기 위해 Rust CLI 도구인 `hmleq`과 프로세스 파이프라인으로 통신합니다.
+HWP 문서에서 추출한 한컴 수식 스크립트를 PyPI 패키지 `hmleqx`의 Python API로 직접 변환합니다. 별도의 Rust CLI 실행 파일이나 `subprocess` 호출은 필요하지 않습니다.
 
 ```python
-def convert_hmleq_script(script: str) -> str:
-    # Python subprocess를 이용해 Rust hmleq CLI 실행
-    result = subprocess.run(
-        ["hmleq", script],
-        capture_output=True,
-        text=True,
-        timeout=5
-    )
-    return result.stdout.strip()
+import hmleqx
+
+latex = hmleqx.to_latex("{a} over {b}")
+ast = hmleqx.parse("1 over pi")
+version = hmleqx.version()
 ```
 
-- CLI가 설치되어 있지 않거나 실행 실패 시, `hml-equation-parser` Python 패키지로 폴백(Fallback)되어 수식 손실을 방지합니다.
-
+- HEXORA의 `hmleq_converter.py`는 입력 길이와 빈 입력을 검증하고 `hmleqx.to_latex()`의 `ValueError`를 기존 변환 오류 형식으로 전달합니다.
+- `hmleqx`를 사용할 수 없는 개발 환경에서는 기존 `hml-equation-parser`를 폴백으로 유지합니다. Render 빌드에서는 `hmleqx` import와 기본 변환을 확인합니다.
 ---
 
 ## 4. HWPX 시험지 생성 파이프라인 (`hwpx_export.py`)

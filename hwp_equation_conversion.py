@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import os
 import re
-from pathlib import Path
 
 from hmleq_converter import HmleqUnavailable
 from hwp_equations import normalize_katex_expression
@@ -60,13 +59,8 @@ def equation_to_latex(script: str, *, legacy_converter, primary_converter) -> st
         try:
             converted = primary_converter(script)
         except HmleqUnavailable:
-            # Local parsing remains available before Rust is installed. Render's
-            # build marker makes a missing production binary a hard failure.
-            if (
-                os.environ.get("HMLEQ_REQUIRED") == "1"
-                or Path(__file__).with_name(".render-require-hmleq").exists()
-            ):
-                raise
+            # Keep the established local parser as a fallback when hmleqx is
+            # absent in a developer environment. Render verifies hmleqx at build time.
             converted = legacy_converter(script).strip()
     converted = re.sub(
         r'\brm\s+"([^"]*)"(?:\s+it\b)?',

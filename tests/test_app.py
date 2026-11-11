@@ -7,7 +7,7 @@ import uuid
 from pathlib import Path
 
 from app import app
-from hmleq_converter import _executable
+from hmleq_converter import hmleqx
 
 
 class QuestionRegistrationTests(unittest.TestCase):
@@ -525,7 +525,7 @@ class QuestionRegistrationTests(unittest.TestCase):
         too_long = self.client.post("/questions/math/convert-hancom", json={"expression": "x" * 5001}, headers={"X-CSRF-Token": csrf})
         self.assertEqual(too_long.status_code, 400)
 
-    @unittest.skipUnless(_executable(), "hmleq CLI is installed by build.sh")
+    @unittest.skipUnless(hmleqx is not None, "hmleqx package is installed by build.sh")
     def test_real_hmleq_math_input_can_be_saved_and_rendered(self):
         self.client.get("/questions/new")
         with self.client.session_transaction() as user_session:
