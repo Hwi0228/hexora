@@ -75,6 +75,11 @@
       {% set header_description = "모든 회원이 문항을 함께 탐색·편집하고, 변경 이력을 투명하게 관리합니다." %}
       {% include "partials/header.html" %}
       <header class="results-header">
+        <form class="question-code-search" method="get" action="{{ url_for('question_by_code') }}">
+          <label class="sr-only" for="question-code-search">문제 코드 검색</label>
+          <input id="question-code-search" name="code" type="text" minlength="6" maxlength="6" pattern="[A-Za-z0-9]{6}" placeholder="문제 코드 (6자리)" required>
+          <button class="detail-button" type="submit">코드 검색</button>
+        </form>
         <label class="select-all"><input id="select-all-questions" type="checkbox" aria-label="현재 목록 전체 선택"> 전체 선택{% if questions %} <span class="result-count">{{ "{:,}".format(questions | length) }}</span>{% endif %}</label>
         <select class="select-control" aria-label="정렬">
           <option>출처순</option>
@@ -123,6 +128,12 @@
               <a class="detail-button" href="{{ url_for('edit_question', question_id=question.id) }}">편집</a>
               <a class="detail-button" href="{{ url_for('question_links', question_id=question.id) }}">출처·변형 링크</a>
               <a class="detail-button" href="{{ url_for('question_history', question_id=question.id) }}">수정 이력</a>
+              {% if question.can_delete_question %}
+              <form method="post" action="{{ url_for('delete_question', question_id=question.id) }}" onsubmit="return confirm('문제를 삭제할까요? 일반 목록에서는 숨겨지지만 6자리 코드로 계속 조회할 수 있습니다.');">
+                <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
+                <button class="detail-button" type="submit">삭제</button>
+              </form>
+              {% endif %}
             </div>
             <details class="question-more">
               <summary>문제 더보기</summary>

@@ -4,3 +4,14 @@
 .draft-conflict-actions { margin-top: 9px; }
 @media (max-width:760px) { .editor-layout { padding:18px 13px 36px; } }
 @media (max-width:540px) { .editor-layout { padding-bottom:36px; } }
+
+/* Quill's content area should follow the editor's normal text hierarchy. */
+.rich-editor.ql-container.ql-snow,
+.rich-editor .ql-editor {
+  font-weight: 400 !important;
+}
+
+.rich-editor .ql-editor strong,
+.rich-editor .ql-editor b {
+  font-weight: 700 !important;
+}

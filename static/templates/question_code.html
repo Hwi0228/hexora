@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#f6f7f8">
+  <title>{{ question.display_id }} | HEXORA</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='styles/math-rendering.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='styles/shared.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='styles/tokens.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='styles/base.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='styles/layout.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='styles/components.css') }}">
+</head>
+<body>
+  <div class="app">
+    {% include "partials/sidebar.html" %}
+    <main class="results">
+      <header class="results-header">
+        <a class="detail-button" href="{{ url_for('main', subject=question.subject) }}">문제 DB로 돌아가기</a>
+        <span class="tag question-id-tag">{{ question.display_id }}</span>
+        {% if question.deleted_at %}<span class="tag">삭제된 문제</span>{% endif %}
+      </header>
+      <article class="question-card">
+        <h1>{{ question.title or question.display_id }}</h1>
+        <p>{{ question.subject }} · {{ question.grade }} · {{ question.course or question.unit }}</p>
+        {% if question.deleted_at %}
+        <p role="status">이 문제는 일반 목록에서 숨겨진 상태입니다. 문제 내용과 코드는 보존되어 있습니다.</p>
+        {% endif %}
+        {% if question.passage %}<section><h2>지문</h2><div class="math-content">{{ question.passage|safe }}</div></section>{% endif %}
+        <section><h2>문제</h2><div class="math-content">{{ question.prompt|safe }}</div></section>
+        {% if question.examples %}<section><h2>보기</h2><div class="math-content">{{ question.examples|safe }}</div></section>{% endif %}
+        {% if question.choices %}
+        <section><h2>선택지</h2>
+          {% for choice in question.choices %}<div class="math-content">{{ '①②③④⑤'[loop.index0] if loop.index0 < 5 else loop.index ~ '.' }} {{ choice|safe }}</div>{% endfor %}
+        </section>
+        {% endif %}
+        <details><summary>정답 및 해설</summary>
+          <h2>정답</h2><div class="math-content">{{ question.answer|safe }}</div>
+          {% if question.explanation %}<h2>해설</h2><div class="math-content">{{ question.explanation|safe }}</div>{% endif %}
+        </details>
+        <p>작성자: {{ question.author_name or "탈퇴한 사용자" }}</p>
+        {% if question.deleted_at and question.can_manage_question %}
+        <form method="post" action="{{ url_for('restore_deleted_question', question_id=question.id) }}">
+          <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
+          <button class="primary-button" type="submit">문제 복구</button>
+        </form>
+        {% elif not question.deleted_at and question.can_manage_question %}
+        <a class="detail-button" href="{{ url_for('edit_question', question_id=question.id) }}">문제 편집</a>
+        {% endif %}
+      </article>
+    </main>
+  </div>
+  <script defer src="{{ url_for('static', filename='scripts/katex-render.js') }}"></script>
+</body>
+</html>
