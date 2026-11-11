@@ -16,10 +16,8 @@
     <a class="nav-link{% if request.endpoint == 'changelog' %} active{% endif %}" href="{{ url_for('changelog') }}"{% if request.endpoint == 'changelog' %} aria-current="page"{% endif %}><span class="nav-icon" aria-hidden="true">◷</span><span class="nav-label-text">변경 이력</span></a>
   </nav>
   {% if current_user.role == 'admin' %}
-  <div class="nav-label">기타</div>
-  <nav class="nav-section" aria-label="기타 메뉴">
-    <a class="nav-link{% if request.endpoint == 'admin_users' %} active{% endif %}" href="{{ url_for('admin_users') }}"{% if request.endpoint == 'admin_users' %} aria-current="page"{% endif %}><span class="nav-icon" aria-hidden="true">▥</span><span class="nav-label-text">작성자별 문항 현황</span></a>
-    <a class="nav-link{% if request.endpoint == 'admin_legal_reports' %} active{% endif %}" href="{{ url_for('admin_legal_reports') }}"{% if request.endpoint == 'admin_legal_reports' %} aria-current="page"{% endif %}><span class="nav-icon" aria-hidden="true">⚑</span><span class="nav-label-text">권리침해 신고 관리</span></a>
+  <nav class="nav-section" aria-label="기타">
+    <a class="nav-link{% if request.endpoint in ['other', 'admin_users', 'admin_legal_reports'] %} active{% endif %}" href="{{ url_for('other') }}"{% if request.endpoint in ['other', 'admin_users', 'admin_legal_reports'] %} aria-current="page"{% endif %}><span class="nav-icon" aria-hidden="true">⋯</span><span class="nav-label-text">기타</span></a>
   </nav>
   {% endif %}
   <div class="sidebar-spacer"></div>
