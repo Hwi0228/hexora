@@ -74,7 +74,7 @@ def _collect_question_data(form):
     for field, label, maximum in (
         ("title", "문항 제목", 200), ("grade", "학년", 50), ("course", "교과목", 100),
         ("unit", "단원", 200), ("achievement_standard", "성취기준", 4000),
-        ("prompt", "문제 내용", 50000), ("answer", "정답", 10000),
+        ("prompt", "문제 내용", 1500000), ("answer", "정답", 10000),
         ("explanation", "해설", 20000), ("source", "출처명", 300),
         ("exam", "시험 / 회차", 200), ("original_question_number", "원본 문항 번호", 50),
         ("source_url", "출처 URL", 1000), ("summary", "수정 요약", 200),

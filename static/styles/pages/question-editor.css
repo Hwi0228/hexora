@@ -15,3 +15,45 @@
 .rich-editor .ql-editor b {
   font-weight: 700 !important;
 }
+
+
+/* Content structures use the service's canonical visual scale, not pasted sizing. */
+.rich-editor .ql-editor img,
+.rich-content img,
+.question-content img,
+.question-body img {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  margin: 12px auto;
+  object-fit: contain;
+}
+.rich-editor .ql-editor table,
+.rich-content table,
+.question-content table,
+.question-body table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+  margin: 12px 0;
+}
+.rich-editor .ql-editor td,
+.rich-editor .ql-editor th,
+.rich-content td,
+.rich-content th,
+.question-content td,
+.question-content th,
+.question-body td,
+.question-body th {
+  min-width: 48px;
+  padding: 7px 9px;
+  border: 1px solid #D8E2EC;
+  vertical-align: top;
+}
+.rich-editor .ql-editor th,
+.rich-content th,
+.question-content th,
+.question-body th {
+  background: #F3F6F9;
+  font-weight: 700;
+}

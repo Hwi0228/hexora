@@ -9,8 +9,9 @@ class _RichTextSanitizer(HTMLParser):
     ALLOWED_TAGS = {
         "p", "br", "strong", "b", "em", "i", "u", "s", "ul", "ol",
         "li", "blockquote", "pre", "code", "h2", "h3", "hr", "span", "div",
+        "table", "thead", "tbody", "tr", "th", "td", "img",
     }
-    VOID_TAGS = {"br", "hr"}
+    VOID_TAGS = {"br", "hr", "img"}
     LITERAL_TAGS = {"script", "style", "iframe", "object", "embed", "svg"}
 
     def __init__(self):
@@ -59,7 +60,27 @@ class _RichTextSanitizer(HTMLParser):
             self.math_close_tag = safe_tag
             return
 
-        self.parts.append(f"<{tag}>")
+        if tag == "img":
+            src = (attr_map.get("src") or "").strip()
+            safe_data_image = re.fullmatch(
+                r"data:image/(?:png|jpeg|webp);base64,[A-Za-z0-9+/=]+", src
+            )
+            safe_remote_image = src.startswith("https://") and len(src) <= 2048
+            if not (safe_data_image and len(src) <= 1_400_000 or safe_remote_image):
+                return
+            alt = html.escape((attr_map.get("alt") or "")[:300], quote=True)
+            self.parts.append(f'<img src="{html.escape(src, quote=True)}" alt="{alt}">')
+            return
+
+        if tag in {"td", "th"}:
+            attrs = []
+            for name in ("rowspan", "colspan"):
+                raw = attr_map.get(name, "")
+                if raw.isdigit() and 1 <= int(raw) <= 20:
+                    attrs.append(f' {name}="{int(raw)}"')
+            self.parts.append(f"<{tag}{''.join(attrs)}>")
+        else:
+            self.parts.append(f"<{tag}>")
         if tag not in self.VOID_TAGS:
             self.stack.append(tag)
 
@@ -116,7 +137,11 @@ def _rich_text_has_content(value):
     if not value:
         return False
     stripped = re.sub(r"<[^>]*>", "", value)
-    return bool(html.unescape(stripped).strip() or 'data-latex="' in value)
+    return bool(
+        html.unescape(stripped).strip()
+        or 'data-latex="' in value
+        or re.search(r"<img\b", value, re.IGNORECASE)
+    )
 
 
 def render_rich_html(value):

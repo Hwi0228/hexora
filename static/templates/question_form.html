@@ -151,6 +151,8 @@
                     <button class="tool-button ql-inlineMath" type="button">∑ 수식</button>
                     <button class="tool-button ql-blockMath" type="button">∑ 블록</button>
                     <button class="tool-button ql-blockquote" type="button" title="선택한 문단을 보기 박스로 전환">▤ 보기</button>
+                    <button class="tool-button ql-image" type="button" aria-label="사진 삽입">▧ 사진</button>
+                    <button class="tool-button ql-insertTable" type="button" aria-label="표 삽입">▦ 표</button>
                   </div>
                   <div class="rich-editor" data-editor="prompt"></div>
                   <textarea class="rich-source" name="prompt" data-source="prompt" required>{{ form_data.get('prompt', '') }}</textarea>
@@ -312,6 +314,21 @@
         <p id="math-conversion-error" class="errors" role="alert" hidden></p>
         <div class="math-dialog-actions">
           <button class="button" id="math-input-cancel" type="button">취소</button>
+          <button class="button primary" type="submit">삽입</button>
+        </div>
+      </form>
+    </section>
+  </div>
+
+  <div class="math-dialog-backdrop" id="image-input-dialog" hidden>
+    <section class="math-dialog" role="dialog" aria-modal="true" aria-labelledby="image-dialog-title">
+      <form id="image-input-form">
+        <h2 id="image-dialog-title">사진 삽입</h2>
+        <label for="image-file-input">이미지 파일</label>
+        <input id="image-file-input" type="file" accept="image/png,image/jpeg,image/webp,image/gif">
+        <p>이미지는 긴 변 1,600px 이하의 WebP로 압축해 본문에 저장합니다. 원본 파일은 별도 서버 저장소에 업로드하지 않습니다.</p>
+        <div class="math-dialog-actions">
+          <button class="button" id="image-input-cancel" type="button">취소</button>
           <button class="button primary" type="submit">삽입</button>
         </div>
       </form>

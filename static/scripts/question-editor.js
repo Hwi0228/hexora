@@ -162,12 +162,107 @@ const editorConfig = configNode
       mathInput.addEventListener("input", () => mathInput.setCustomValidity(""));
       hancomInput.addEventListener("input", () => hancomInput.setCustomValidity(""));
       mathCancel.addEventListener("click", closeMathDialog);
+
+      const imageDialog = document.getElementById("image-input-dialog");
+      const imageDialogForm = document.getElementById("image-input-form");
+      const imageFileInput = document.getElementById("image-file-input");
+      const imageCancel = document.getElementById("image-input-cancel");
+      let imageDialogAction = null;
+
+      function closeImageDialog() {
+        imageDialog.hidden = true;
+        imageDialogAction = null;
+        imageFileInput.value = "";
+      }
+
+      function openImageDialog(action) {
+        imageDialogAction = action;
+        imageDialog.hidden = false;
+        imageFileInput.focus();
+      }
+
+      imageCancel.addEventListener("click", closeImageDialog);
+      imageDialog.addEventListener("click", (event) => {
+        if (event.target === imageDialog) closeImageDialog();
+      });
+      imageDialogForm.addEventListener("submit", (event) => {
+        event.preventDefault();
+        const file = imageFileInput.files && imageFileInput.files[0];
+        if (!file) {
+          imageFileInput.setCustomValidity("삽입할 이미지 파일을 선택해 주세요.");
+          imageFileInput.reportValidity();
+          return;
+        }
+        imageFileInput.setCustomValidity("");
+        if (!/^image\/(?:png|jpeg|webp|gif)$/i.test(file.type) || file.size > 8 * 1024 * 1024) {
+          window.alert("PNG, JPEG, WebP, GIF 이미지 중 8MB 이하 파일만 삽입할 수 있습니다.");
+          return;
+        }
+
+        const reader = new FileReader();
+        reader.onerror = () => window.alert("이미지 파일을 읽지 못했습니다.");
+        reader.onload = () => {
+          const image = new Image();
+          image.onerror = () => window.alert("이미지 파일을 해석하지 못했습니다.");
+          image.onload = () => {
+            const maxSide = 1600;
+            const scale = Math.min(1, maxSide / Math.max(image.naturalWidth, image.naturalHeight));
+            const canvas = document.createElement("canvas");
+            canvas.width = Math.max(1, Math.round(image.naturalWidth * scale));
+            canvas.height = Math.max(1, Math.round(image.naturalHeight * scale));
+            const context = canvas.getContext("2d");
+            if (!context) {
+              window.alert("이미지 변환을 지원하지 않는 브라우저입니다.");
+              return;
+            }
+            context.drawImage(image, 0, 0, canvas.width, canvas.height);
+            let dataUrl = canvas.toDataURL("image/webp", 0.78);
+            if (!dataUrl.startsWith("data:image/webp;")) {
+              dataUrl = canvas.toDataURL("image/jpeg", 0.78);
+            }
+            if (dataUrl.length > 1350000) {
+              dataUrl = canvas.toDataURL("image/jpeg", 0.62);
+            }
+            if (dataUrl.length > 1400000) {
+              window.alert("압축 후에도 이미지가 너무 큽니다. 해상도가 낮은 이미지로 다시 시도해 주세요.");
+              return;
+            }
+            const action = imageDialogAction;
+            closeImageDialog();
+            if (action) action(dataUrl);
+          };
+          image.src = String(reader.result || "");
+        };
+        reader.readAsDataURL(file);
+      });
       mathDialog.addEventListener("click", (event) => {
         if (event.target === mathDialog) closeMathDialog();
       });
       document.addEventListener("keydown", (event) => {
         if (event.key === "Escape" && !mathDialog.hidden) closeMathDialog();
       });
+
+      function insertImage() {
+        const quill = this.quill;
+        const range = quill.getSelection(true) || {
+          index: Math.max(0, quill.getLength() - 1), length: 0
+        };
+        openImageDialog((dataUrl) => {
+          quill.focus();
+          if (range.length) quill.deleteText(range.index, range.length, "user");
+          quill.insertEmbed(range.index, "image", dataUrl, "user");
+          quill.setSelection(range.index + 1, 0, "silent");
+        });
+      }
+
+      function insertTable() {
+        const table = this.quill.getModule("table");
+        if (!table || typeof table.insertTable !== "function") {
+          window.alert("표 편집 모듈을 불러오지 못했습니다.");
+          return;
+        }
+        table.insertTable(2, 2);
+      }
 
       function insertMath(format) {
         const quill = this.quill;
@@ -234,7 +329,9 @@ const editorConfig = configNode
               container: toolbar,
               handlers: {
                 inlineMath: function () { insertMath.call(this, "inlineMath"); },
-                blockMath: function () { insertMath.call(this, "blockMath"); }
+                blockMath: function () { insertMath.call(this, "blockMath"); },
+                image: function () { insertImage.call(this); },
+                insertTable: insertTable
               }
             },
             history: { delay: 1000, maxStack: 100, userOnly: true }

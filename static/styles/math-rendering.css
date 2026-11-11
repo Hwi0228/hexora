@@ -50,3 +50,28 @@
     flex-direction: column;
   }
 }
+
+
+/* Normalize embedded media and tables when rendered outside the editor too. */
+.rich-content img,
+.question-content img,
+.question-body img {
+  max-width: 100%;
+  height: auto;
+  object-fit: contain;
+}
+.rich-content table,
+.question-content table,
+.question-body table {
+  width: 100%;
+  max-width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+.rich-content td, .rich-content th,
+.question-content td, .question-content th,
+.question-body td, .question-body th {
+  padding: 7px 9px;
+  border: 1px solid #D8E2EC;
+  vertical-align: top;
+}
