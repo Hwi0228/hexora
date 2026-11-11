@@ -8,7 +8,7 @@ from question_ids import format_question_number
 from database import begin_write_transaction, get_db
 from question_drafts import _delete_question_draft, _load_question_draft, _save_question_draft
 from question_revisions import _ensure_initial_question_revision, _insert_question_revision, _question_snapshot
-from question_repository import _question_form_values, _question_row
+from question_repository import _question_form_values, _question_row, _update_question_content
 from question_validation import _collect_question_data, _form_values_from_data
 from folder_service import get_folder_data
 
@@ -194,29 +194,7 @@ def edit_question(question_id):
             )
 
         next_revision = latest + 1
-        connection.execute(
-            """
-            UPDATE questions
-            SET subject = ?, grade = ?, unit = ?, passage = ?, prompt = ?,
-                examples = ?, choices = ?, answer = ?, explanation = ?,
-                source = ?, year = ?, page = ?, difficulty = ?, question_type = ?,
-                points = ?, course = ?, curriculum = ?, achievement_standard = ?,
-                source_type = ?, exam = ?, original_question_number = ?,
-                source_url = ?, license = ?, title = ?
-            WHERE id = ?
-            """,
-            (
-                data["subject"], data["grade"], data["unit"], data["passage"],
-                data["prompt"], data["examples"],
-                json.dumps(data["choices"], ensure_ascii=False),
-                data["answer"], data["explanation"], data["source"],
-                data["year"], data["page"], data["difficulty"],
-                data["question_type"], data["points"], data["course"],
-                data["curriculum"], data["achievement_standard"],
-                data["source_type"], data["exam"], data["original_question_number"],
-                data["source_url"], data["license"], data["title"], question_id,
-            ),
-        )
+        _update_question_content(connection, question_id, data)
         snapshot = {field: data[field] for field in QUESTION_CONTENT_FIELDS}
         connection.execute(
             "DELETE FROM question_links WHERE question_id = ? AND relation_type = 'variant' "

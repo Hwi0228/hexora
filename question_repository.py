@@ -4,7 +4,7 @@ from flask import abort
 
 from constants import SOURCE_TYPES
 from database import get_db
-from question_constants import COURSE_OPTIONS, DIFFICULTIES, QUESTION_TYPES
+from question_constants import COURSE_OPTIONS, DIFFICULTIES, QUESTION_TYPES, QUESTION_CONTENT_FIELDS
 from question_ids import format_question_number
 
 
@@ -49,3 +49,23 @@ def _question_form_values(question):
     if values.get("source_type") not in SOURCE_TYPES:
         values["source_type"] = "기타"
     return values
+
+
+def _update_question_content(connection, question_id, values):
+    """Persist the canonical editable question fields in their shared order."""
+    serialized = {
+        field: (
+            json.dumps(values.get(field) or [], ensure_ascii=False)
+            if field == "choices"
+            else values.get(field)
+        )
+        for field in QUESTION_CONTENT_FIELDS
+    }
+    assignments = ", ".join(f"{field} = ?" for field in QUESTION_CONTENT_FIELDS)
+    parameters = [serialized[field] for field in QUESTION_CONTENT_FIELDS]
+    parameters.append(question_id)
+    connection.execute(
+        f"UPDATE questions SET {assignments} WHERE id = ?",
+        parameters,
+    )
+

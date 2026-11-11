@@ -8,7 +8,7 @@ from question_ids import format_question_number
 from rich_text import render_rich_html
 from database import begin_write_transaction, get_db
 from question_revisions import _ensure_initial_question_revision, _insert_question_revision
-from question_repository import _question_row
+from question_repository import _question_row, _update_question_content
 
 
 def question_history(question_id):
@@ -118,30 +118,7 @@ def restore_question(question_id, revision_number):
         for field, default in defaults.items():
             snapshot.setdefault(field, default)
         next_revision = latest + 1
-        connection.execute(
-            """
-            UPDATE questions
-            SET subject = ?, grade = ?, unit = ?, passage = ?, prompt = ?,
-                examples = ?, choices = ?, answer = ?, explanation = ?,
-                source = ?, year = ?, page = ?, difficulty = ?, question_type = ?,
-                points = ?, course = ?, curriculum = ?, achievement_standard = ?,
-                source_type = ?, exam = ?, original_question_number = ?,
-                source_url = ?, license = ?, title = ?
-            WHERE id = ?
-            """,
-            (
-                snapshot["subject"], snapshot["grade"], snapshot["unit"],
-                snapshot["passage"], snapshot["prompt"], snapshot["examples"],
-                json.dumps(snapshot["choices"], ensure_ascii=False),
-                snapshot["answer"], snapshot["explanation"], snapshot["source"],
-                snapshot["year"], snapshot["page"], snapshot.get("difficulty", "중"),
-                snapshot.get("question_type", "단답형"), snapshot.get("points", 4), snapshot.get("course", ""),
-                snapshot.get("curriculum", "2015 개정 교육과정"), snapshot.get("achievement_standard", ""),
-                snapshot.get("source_type", "기타"), snapshot.get("exam", ""),
-                snapshot.get("original_question_number", ""), snapshot.get("source_url", ""),
-                snapshot.get("license", ""), snapshot.get("title", ""), question_id,
-            ),
-        )
+        _update_question_content(connection, question_id, snapshot)
         _insert_question_revision(
             connection, question_id, next_revision, g.user["uuid"],
             f"이전 버전 v{revision_number} 복원", snapshot,
