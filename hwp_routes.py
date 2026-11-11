@@ -1,133 +1,16 @@
-import io
 import json
-import re
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
-from flask import abort, g, redirect, render_template, request, send_file, url_for
+from flask import abort, g, redirect, render_template, request, url_for
 
 from auth import login_required
 from constants import NAV_ITEMS, SUBJECTS, LICENSE_CHOICES, SOURCE_TYPES
 from database import get_db
-from parse_hwp import parse_questions_from_xml, strip_choice_label
+from parse_hwp import parse_questions_from_xml
 from parse_rhwp import MAX_DOCUMENT_BYTES, parse_questions_from_rhwp_bytes
-from hwpx_export import build_exam_hwpx
-
-
-MAX_SECTION_XML_SIZE = 16 * 1024 * 1024
-MAX_IMPORTED_QUESTIONS = 500
-
-
-def _validated_import(form):
-    errors = []
-    try:
-        payload = json.loads(form.get("questions_json", ""))
-    except (TypeError, ValueError):
-        return None, None, errors, "파싱 결과가 올바르지 않습니다. 파일을 다시 업로드해 주세요."
-    questions = payload.get("questions") if isinstance(payload, dict) else payload
-
-    if not isinstance(questions, list) or not 1 <= len(questions) <= MAX_IMPORTED_QUESTIONS:
-        return None, None, errors, "등록할 문항이 없거나 허용 개수(500개)를 초과했습니다."
-
-    subject = form.get("subject", "").strip()
-    grade = form.get("grade", "").strip()
-    unit = form.get("unit", "").strip()
-    source = form.get("source", "").strip()
-    license_value = form.get("license", "").strip()
-    source_type = form.get("source_type", "기타").strip() or "기타"
-    year_value = form.get("year", "").strip()
-
-    if subject not in SUBJECTS:
-        errors.append("과목을 선택해 주세요.")
-    if license_value not in LICENSE_CHOICES:
-        errors.append("문항 공개에 사용할 라이선스를 선택해 주세요.")
-    if source_type not in SOURCE_TYPES:
-        errors.append("출처 유형이 올바르지 않습니다.")
-    for value, label in ((grade, "학년"), (unit, "단원"), (source, "출처")):
-        if not value:
-            errors.append(f"{label}을(를) 입력해 주세요.")
-    for value, label, maximum in (
-        (grade, "학년", 50),
-        (unit, "단원", 200),
-        (source, "출처", 300),
-    ):
-        if len(value) > maximum:
-            errors.append(f"{label}은 {maximum}자 이내로 입력해 주세요.")
-
-    year = None
-    if year_value:
-        try:
-            year = int(year_value)
-            if not 1 <= year <= 2200:
-                raise ValueError
-        except ValueError:
-            errors.append("연도는 1에서 2200 사이의 정수로 입력해 주세요.")
-
-    selected_values = form.getlist("selected_questions")
-    selected_indices = []
-    for value in selected_values:
-        try:
-            index = int(value)
-        except (TypeError, ValueError):
-            errors.append("선택한 문항이 올바르지 않습니다.")
-            break
-        if not 0 <= index < len(questions):
-            errors.append("선택한 문항이 올바르지 않습니다.")
-            break
-        if index not in selected_indices:
-            selected_indices.append(index)
-    if not selected_indices:
-        errors.append("DB에 등록할 문항을 하나 이상 선택해 주세요.")
-
-    normalized_questions = []
-    for question in questions:
-        if not isinstance(question, dict):
-            errors.append("파싱 결과의 문항 형식이 올바르지 않습니다.")
-            break
-        prompt = question.get("question")
-        answer = question.get("answer")
-        explanation = question.get("explanation", "")
-        choices = question.get("choices", [])
-        if (
-            not isinstance(prompt, str)
-            or not prompt.strip()
-            or len(prompt) > 10000
-            or not isinstance(answer, str)
-            or len(answer) > 2000
-            or not isinstance(explanation, str)
-            or len(explanation) > 10000
-            or not isinstance(choices, list)
-            or len(choices) > 20
-            or any(
-                not isinstance(choice, str) or len(choice) > 2000
-                for choice in choices
-            )
-        ):
-            errors.append("문항 내용, 정답, 해설 또는 선택지의 형식이 올바르지 않습니다.")
-            break
-        normalized_questions.append(
-            {
-                "number": len(normalized_questions) + 1,
-                "question": prompt.strip(),
-                "answer": answer.strip(),
-                "explanation": explanation.strip(),
-                "choices": [strip_choice_label(choice) for choice in choices],
-            }
-        )
-
-    if errors:
-        return normalized_questions or None, None, errors, None
-    metadata = {
-        "subject": subject,
-        "grade": grade,
-        "unit": unit,
-        "source": source,
-        "folder_uuid": None,
-        "year": year,
-        "license": license_value,
-        "source_type": source_type,
-    }
-    return normalized_questions, (metadata, selected_indices), errors, None
+from hwp_import_validation import MAX_IMPORTED_QUESTIONS, MAX_SECTION_XML_SIZE, _get_section_xml, _validated_import
+from exam_export_routes import export_exam_hwpx, register_exam_export_routes
 
 
 def _render_page(questions=None, result_json=None, error=None, form_data=None):
@@ -147,16 +30,6 @@ def _render_page(questions=None, result_json=None, error=None, form_data=None):
         error=error,
         form_data=form_data or {},
     )
-
-
-def _get_section_xml(filename: str, content: bytes) -> bytes:
-    if Path(filename).suffix.lower() != ".xml":
-        raise ValueError("단독 HWPML XML 파일만 이 경로에서 처리할 수 있습니다.")
-    if not content:
-        raise ValueError("파싱할 XML 내용이 비어 있습니다.")
-    if len(content) > MAX_SECTION_XML_SIZE:
-        raise ValueError("XML 크기가 허용 한도(16MB)를 초과합니다.")
-    return content
 
 
 def hwp_parser_page():
@@ -285,64 +158,6 @@ def hwp_parser_page():
 
 
 
-def export_exam_hwpx():
-    selected_values = request.form.getlist("question_ids")
-    selected_ids = []
-    seen = set()
-    for value in selected_values:
-        try:
-            question_id = int(value)
-        except (TypeError, ValueError):
-            abort(400, description="선택한 문항 번호가 올바르지 않습니다.")
-        if question_id < 1:
-            abort(400, description="선택한 문항 번호가 올바르지 않습니다.")
-        if question_id not in seen:
-            selected_ids.append(question_id)
-            seen.add(question_id)
-
-    if not selected_ids:
-        abort(400, description="시험지에 넣을 문항을 하나 이상 선택해 주세요.")
-    if len(selected_ids) > 100:
-        abort(400, description="시험지에는 최대 100문항까지 넣을 수 있습니다.")
-
-    placeholders = ", ".join("?" for _ in selected_ids)
-    rows = get_db().execute(
-        f"""
-        SELECT id, subject, grade, title, passage, prompt, examples, choices,
-               answer, explanation, points
-        FROM questions
-        WHERE id IN ({placeholders}) AND deleted_at IS NULL
-        """,
-        selected_ids,
-    ).fetchall()
-    questions_by_id = {int(row["id"]): dict(row) for row in rows}
-    if len(questions_by_id) != len(selected_ids):
-        abort(404, description="선택한 문항 중 삭제되었거나 존재하지 않는 문항이 있습니다.")
-
-    # 공개 문제 은행이므로 작성자와 관계없이 로그인 회원이 선택한 문항을 내보낼 수 있습니다.
-    questions = [questions_by_id[question_id] for question_id in selected_ids]
-    title = request.form.get("exam_title", "").strip() or "HEXORA 시험지"
-    if len(title) > 100:
-        abort(400, description="시험지 제목은 100자 이내로 입력해 주세요.")
-
-    include_answers = request.form.get("include_answers") == "1"
-    hwpx_bytes = build_exam_hwpx(
-        questions,
-        title=title,
-        include_answers=include_answers,
-    )
-    filename = re.sub(r"[^\w가-힣 .()-]", "", title, flags=re.UNICODE).strip(" .")
-    filename = (filename or "HEXORA_시험지")[:80]
-
-    return send_file(
-        io.BytesIO(hwpx_bytes),
-        mimetype="application/hwp+zip",
-        as_attachment=True,
-        download_name=f"{filename}.hwpx",
-        max_age=0,
-    )
-
-
 def register_hwp_routes(app):
     app.add_url_rule(
         "/hwp",
@@ -350,9 +165,4 @@ def register_hwp_routes(app):
         view_func=login_required(hwp_parser_page),
         methods=["GET", "POST"],
     )
-    app.add_url_rule(
-        "/exams/export",
-        endpoint="export_exam_hwpx",
-        view_func=login_required(export_exam_hwpx),
-        methods=["POST"],
-    )
+    register_exam_export_routes(app)

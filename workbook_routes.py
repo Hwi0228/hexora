@@ -84,7 +84,7 @@ def workbooks():
     return render_template(
         "workbooks.html", workbooks=rows, search=search, selected_kind=kind,
         subjects=SUBJECTS, subject_course_options=SUBJECT_COURSE_OPTIONS,
-        grade_options=["초1", "초2", "초3", "초4", "초5", "초6", "중1", "중2", "중3", "고1", "고2", "고3", "대학", "기타"],
+        grade_options=GRADE_OPTIONS,
         curriculum_options=list(COURSE_OPTIONS),
         nav_items=NAV_ITEMS, active_page="workbooks",
     )
