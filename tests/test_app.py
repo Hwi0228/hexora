@@ -557,7 +557,7 @@ class QuestionRegistrationTests(unittest.TestCase):
         rendered = self.client.get("/questions")
         self.assertEqual(rendered.status_code, 200)
         self.assertIn("변환 수식".encode(), rendered.data)
-        self.assertIn(r"\frac{1}{2}".encode(), rendered.data)
+        self.assertIn(r"\dfrac{1}{2}".encode(), rendered.data)
         self.assertIn(b'class="math-content"', rendered.data)
         self.assertIn(b"scripts/katex-render.js", rendered.data)
 
