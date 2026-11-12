@@ -156,10 +156,9 @@ class HwpParsingTests(unittest.TestCase):
 
         question = parse_questions_from_xml(xml.encode("utf-8"))[0]
 
-        self.assertIn(r"\frac{", question["question"])
-        self.assertIn(r"\frac{", question["explanation"])
-        self.assertIn(r"\frac{", question["choices"][0])
-        self.assertNotIn(r"\dfrac", question["question"])
+        self.assertIn(r"\dfrac{3}{4}", question["question"])
+        self.assertIn(r"\dfrac{5}{6}", question["explanation"])
+        self.assertIn(r"\dfrac{7}{8}", question["choices"][0])
 
     def test_normalizes_hancom_braces_division_and_alignment_for_katex(self):
         brace_formula = _equation_to_latex(
@@ -168,7 +167,7 @@ class HwpParsingTests(unittest.TestCase):
         self.assertEqual(
             _canonical_latex(brace_formula),
             _canonical_latex(
-                r"\left\{\frac{4}{3}-\left(-\frac{1}{3}\right)\right\}\div\left(-\frac{1}{9}\right)"
+                r"\left\{\dfrac{4}{3}-\left(-\dfrac{1}{3}\right)\right\}\div\left(-\dfrac{1}{9}\right)"
             ),
         )
 
