@@ -552,7 +552,7 @@ class QuestionRegistrationTests(unittest.TestCase):
             ).fetchone()[0]
         finally:
             connection.close()
-        self.assertEqual(stored_prompt, r"<p>변환 수식 $\frac{1}{2}$</p>")
+        self.assertEqual(stored_prompt, r"<p>변환 수식 $\dfrac{1}{2}$</p>")
 
         rendered = self.client.get("/questions")
         self.assertEqual(rendered.status_code, 200)

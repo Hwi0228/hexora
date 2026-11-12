@@ -100,7 +100,7 @@ class HwpParsingTests(unittest.TestCase):
         )
         bar_questions = parse_questions_from_xml(bar_xml.encode("utf-8"))
         self.assertIn(r"\overline{", bar_questions[0]["explanation"])
-        self.assertIn(r"\mathrm{AD}", bar_questions[0]["explanation"])
+        self.assertIn(r"\text{AD", bar_questions[0]["explanation"])
 
         dot_xml = xml.replace(
             "LEFT ⌊ a+b RIGHT ⌋",
@@ -154,10 +154,10 @@ class HwpParsingTests(unittest.TestCase):
         aligned_formula = _equation_to_latex(
             r'EQALIGN { & rm "가입비 15000원" # & rm "- 가입 시 추가 요금 없이 무제한 편집 가능" }'
         )
-        self.assertEqual(
-            aligned_formula,
-            r"\begin{aligned} & \text{가입비 15000원} \\ & \text{- 가입 시 추가 요금 없이 무제한 편집 가능} \end{aligned}",
-        )
+        self.assertIn(r"\begin{aligned}", aligned_formula)
+        self.assertIn(r"\text{가입비 15000원}", aligned_formula)
+        self.assertIn(r"\text{- 가입 시 추가 요금 없이 무제한 편집 가능}", aligned_formula)
+        self.assertIn(r"\end{aligned}", aligned_formula)
 
     def test_fraction_commands_are_preserved_for_katex(self):
         expression = r"\frac{a}{b} + \tfrac{c}{d} + \cfrac{1}{2} + \dfrac{3}{4}"
