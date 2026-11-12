@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import html
 import re
 from typing import Any
 
@@ -46,25 +47,42 @@ def _is_document_header(paragraph: str, next_paragraph: str = "") -> bool:
     return False
 
 
+_HTML_ENTITY = re.compile(r"&(?:#[0-9]+|#x[0-9a-f]+|[a-z][a-z0-9]+);", re.IGNORECASE)
+
+
 def _canonical(text: str) -> str:
-    """서식 차이를 줄여 요약 문단과 별도 해설 문단의 중복 구간을 비교한다."""
+    """HTML entity 및 LaTeX 공백 차이를 제거해 문단의 의미상 접두사를 비교한다."""
+    text = html.unescape(text)
     return re.sub(r"\s+", "", text).replace("$", "").replace(r"\(", "").replace(r"\)", "")
 
 
 def _strip_canonical_prefix(text: str, prefix: str) -> str:
+    """정규화된 접두사를 원문 HTML에서 제거하되 entity 표기는 보존한다."""
     if not prefix:
         return text
+
     consumed = 0
     index = 0
     while index < len(text) and consumed < len(prefix):
-        character = text[index]
-        if not character.isspace() and character != "$":
-            consumed += 1
-        index += 1
-    while index < len(text) and (text[index].isspace() or text[index] == "$"):
-        index += 1
-    return text[index:]
+        entity = _HTML_ENTITY.match(text, index)
+        end = entity.end() if entity else index + 1
+        decoded = html.unescape(text[index:end])
+        for character in decoded:
+            if not character.isspace() and character != "$":
+                consumed += 1
+                if consumed >= len(prefix):
+                    break
+        index = end
 
+    while index < len(text):
+        entity = _HTML_ENTITY.match(text, index)
+        end = entity.end() if entity else index + 1
+        decoded = html.unescape(text[index:end])
+        if decoded and all(character.isspace() or character == "$" for character in decoded):
+            index = end
+            continue
+        break
+    return text[index:]
 
 def _split_choices(text: str) -> list[str]:
     starts = list(CHOICE_PATTERN.finditer(text))

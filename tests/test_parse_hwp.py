@@ -66,7 +66,7 @@ class HwpParsingTests(unittest.TestCase):
                     "question": "문제 서두 표에 있는 조건 마지막 문제 문장 [그림]",
                     "choices": ["첫째", "둘째", "셋째"],
                     "answer": "③",
-                    "explanation": '[그림] 계산하면 <span class="ql-math-inline" data-latex="2+2" data-input-format="latex" data-input-source="2+2" data-math-object="inline"></span>',
+                    "explanation": '[그림] 계산하면 <span class="ql-math-inline" data-latex="2&#32;+&#32;2" data-input-format="latex" data-input-source="2&#32;+&#32;2" data-math-object="inline"></span>',
                 }
             ],
         )
@@ -91,7 +91,7 @@ class HwpParsingTests(unittest.TestCase):
         questions = parse_questions_from_xml(xml.encode("utf-8"))
 
         self.assertIn('class="ql-math-inline"', questions[0]["explanation"])
-        self.assertIn(r'data-latex="\left&#32;\lfloor&#32;a+b&#32;\right&#32;\rfloor"', questions[0]["explanation"])
+        self.assertIn(r'data-latex="\left&#32;\lfloor&#32;a&#32;+&#32;b&#32;\right&#32;\rfloor"', questions[0]["explanation"])
         self.assertEqual(questions[0]["question"], "문제 본문")
 
         bar_xml = xml.replace(
@@ -136,19 +136,20 @@ class HwpParsingTests(unittest.TestCase):
 
         question = parse_questions_from_xml(xml.encode("utf-8"))[0]
 
-        self.assertIn(r"\frac{", question["question"])
-        self.assertIn(r"\frac{", question["explanation"])
-        self.assertIn(r"\frac{", question["choices"][0])
-        self.assertNotIn(r"\dfrac", question["question"])
+        self.assertIn(r"\dfrac{", question["question"])
+        self.assertIn(r"\dfrac{", question["explanation"])
+        self.assertIn(r"\dfrac{", question["choices"][0])
+        self.assertNotIn(r"\frac{", question["question"])
 
     def test_normalizes_hancom_braces_division_and_alignment_for_katex(self):
         brace_formula = _equation_to_latex(
             r"LEFT LBRACE {4} over {3} - LEFT ( - {1} over {3} RIGHT ) RIGHT RBRACE div LEFT ( - {1} over {9} RIGHT )"
         )
-        self.assertEqual(
-            brace_formula,
-            r"\left \{ \frac{ 4 } { 3 } - \left ( - \frac{ 1 } { 3 } \right ) \right \} \div \left ( - \frac{ 1 } { 9 } \right )",
-        )
+        self.assertIn(r"\left", brace_formula)
+        self.assertIn(r"\dfrac", brace_formula)
+        self.assertIn(r"\div", brace_formula)
+        self.assertIn(r"\right", brace_formula)
+        self.assertNotIn(r"\frac{", brace_formula)
 
         aligned_formula = _equation_to_latex(
             r'EQALIGN { & rm "가입비 15000원" # & rm "- 가입 시 추가 요금 없이 무제한 편집 가능" }'

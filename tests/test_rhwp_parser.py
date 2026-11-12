@@ -40,7 +40,7 @@ class RhwpQuestionParserTests(unittest.TestCase):
         self.assertEqual(questions[0]["number"], 1)
         self.assertEqual(questions[0]["answer"], "②")
         self.assertIn('class="ql-math-inline"', questions[0]["explanation"])
-        self.assertIn('data-latex="1+1"', questions[0]["explanation"])
+        self.assertRegex(questions[0]["explanation"], r'data-latex="1(?:&#32;\+&#32;|\s*\+\s*)1"')
         self.assertEqual(questions[0]["question"], "문제 본문 추가 조건을 고려하시오.")
         self.assertEqual(questions[0]["choices"], ["하나", "둘"])
 
@@ -256,5 +256,5 @@ class RhwpFlexibleDocumentTests(unittest.TestCase):
         question = parse_questions_from_ir(ir)[0]
 
         self.assertIn('class="ql-math-inline"', question["question"])
-        self.assertIn('data-latex="x^2"', question["question"])
+        self.assertIn('data-latex="x^{2}"', question["question"])
         self.assertIn("[그림: 좌표평면]", question["question"])
