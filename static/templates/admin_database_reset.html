@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#F4F7FA">
+  <title>데이터베이스 초기화 | HEXORA</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='styles/shared.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='styles/tokens.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='styles/base.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='styles/layout.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='styles/components.css') }}">
+  <style>
+    .reset-main { width: min(100%, 920px); margin: 0 auto; }
+    .reset-panel { margin: 8px 0 36px; padding: clamp(20px, 3vw, 30px); border: 1px solid #ead6d6; border-radius: 14px; background: #fff; }
+    .reset-alert { display: flex; gap: 13px; align-items: flex-start; padding: 16px; border: 1px solid #efd4d4; border-radius: 10px; background: #fff7f7; color: #813d3d; }
+    .reset-alert-icon { flex: 0 0 auto; font-size: 22px; line-height: 1.2; }
+    .reset-alert strong { display: block; margin-bottom: 5px; font-size: 14px; }
+    .reset-alert p { margin: 0; font-size: 12px; line-height: 1.8; }
+    .reset-panel h2 { margin: 25px 0 12px; color: #2c4054; font-size: 15px; }
+    .reset-counts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+    .reset-count { padding: 14px; border: 1px solid #e4e9ee; border-radius: 9px; background: #fbfcfd; }
+    .reset-count span { display: block; color: #788797; font-size: 11px; }
+    .reset-count strong { display: block; margin-top: 6px; color: #2e4358; font-size: 20px; font-variant-numeric: tabular-nums; }
+    .reset-keep { margin-top: 18px; padding: 14px 16px; border: 1px solid #dce8df; border-radius: 9px; background: #f6fbf7; color: #42624c; font-size: 12px; line-height: 1.8; }
+    .reset-form { display: grid; gap: 14px; margin-top: 22px; padding-top: 22px; border-top: 1px solid #e9edf1; }
+    .reset-form label { color: #42566a; font-size: 12px; font-weight: 700; }
+    .reset-form input[type="text"] { width: 100%; min-height: 44px; margin-top: 8px; padding: 10px 12px; border: 1px solid #d8e0e8; border-radius: 8px; font: inherit; }
+    .reset-form input:focus { outline: 2px solid #d5e3ef; border-color: #7898b5; }
+    .reset-check { display: flex; gap: 9px; align-items: flex-start; color: #687889 !important; font-weight: 500 !important; line-height: 1.7; }
+    .reset-check input { margin-top: 3px; accent-color: #a43f3f; }
+    .reset-submit { min-height: 45px; padding: 0 18px; border: 0; border-radius: 8px; background: #a43f3f; color: #fff; font-size: 12px; font-weight: 800; cursor: pointer; }
+    .reset-submit:disabled { background: #c9b6b6; cursor: not-allowed; opacity: .7; }
+    .reset-error, .reset-success { margin: 16px 0; padding: 13px 15px; border-radius: 8px; font-size: 12px; line-height: 1.7; }
+    .reset-error { border: 1px solid #efd1d1; background: #fff7f7; color: #8c4141; }
+    .reset-success { border: 1px solid #c9e5d6; background: #f2faf5; color: #2e6546; }
+    .reset-back { display: inline-block; margin-top: 14px; color: #526b83; font-size: 12px; text-decoration: none; }
+    @media (max-width: 620px) { .reset-counts { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+  </style>
+</head>
+<body>
+  <div class="app app-standard">
+    {{ render_sidebar() }}
+    <main class="reset-main">
+      {% set header_section = "ADMINISTRATION / DANGER ZONE" %}
+      {% set header_title = "데이터베이스 초기화" %}
+      {% set header_description = "서비스 데이터를 삭제하고 관리자 계정만 남깁니다." %}
+      {% include "partials/header.html" %}
+
+      <section class="reset-panel" aria-labelledby="reset-warning-title">
+        <div class="reset-alert" role="alert">
+          <span class="reset-alert-icon" aria-hidden="true">⚠</span>
+          <div>
+            <strong id="reset-warning-title">되돌릴 수 없는 작업입니다.</strong>
+            <p>초기화를 실행하면 모든 문제, 폴더, 문제집, 수정 이력, 임시 저장, 개인 메모, 권리침해 신고 및 일반 사용자 계정이 삭제됩니다. 삭제된 데이터는 이 화면에서 복구할 수 없습니다.</p>
+          </div>
+        </div>
+
+        <h2>현재 DB의 삭제 대상 규모</h2>
+        <div class="reset-counts">
+          <div class="reset-count"><span>전체 계정</span><strong>{{ counts.users }}</strong></div>
+          <div class="reset-count"><span>일반 사용자 계정</span><strong>{{ counts.members }}</strong></div>
+          <div class="reset-count"><span>관리자 계정</span><strong>{{ counts.admins }}</strong></div>
+          <div class="reset-count"><span>문제</span><strong>{{ counts.questions }}</strong></div>
+          <div class="reset-count"><span>폴더</span><strong>{{ counts.folders }}</strong></div>
+          <div class="reset-count"><span>문제집</span><strong>{{ counts.workbooks }}</strong></div>
+          <div class="reset-count"><span>권리침해 신고</span><strong>{{ counts.rights_reports }}</strong></div>
+        </div>
+
+        <div class="reset-keep"><strong>유지되는 항목</strong><br>관리자 계정과 로그인 정보는 보존됩니다. 초기화 후에도 현재 관리자 계정으로 로그인할 수 있습니다.</div>
+
+        {% if error %}<div class="reset-error" role="alert">{{ error }}</div>{% endif %}
+        {% with messages = get_flashed_messages(with_categories=true) %}
+          {% for category, message in messages %}
+            <div class="reset-success" role="status">{{ message }}</div>
+          {% endfor %}
+        {% endwith %}
+        {% if completed %}<div class="reset-success" role="status">초기화 후 DB가 비워진 상태입니다. 관리자 계정은 유지되었습니다.</div>{% endif %}
+
+        <form class="reset-form" method="post" action="{{ url_for('admin_database_reset') }}" id="database-reset-form">
+          <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
+          <label for="reset-confirmation">실행하려면 아래 문구를 그대로 입력하세요: <strong>{{ confirmation_phrase }}</strong>
+            <input id="reset-confirmation" name="confirmation" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" required>
+          </label>
+          <label class="reset-check">
+            <input id="reset-acknowledge" type="checkbox" name="acknowledge_irreversible" value="1" required>
+            <span>삭제 대상과 복구 불가 사실을 확인했으며, 관리자 계정만 보존하는 초기화를 실행하는 데 동의합니다.</span>
+          </label>
+          <button class="reset-submit" id="reset-submit" type="submit" disabled>DB 영구 초기화</button>
+        </form>
+        <a class="reset-back" href="{{ url_for('other') }}">← 관리자 메뉴로 돌아가기</a>
+      </section>
+    </main>
+  </div>
+  <script>
+    (() => {
+      const form = document.getElementById("database-reset-form");
+      const phrase = document.getElementById("reset-confirmation");
+      const acknowledge = document.getElementById("reset-acknowledge");
+      const submit = document.getElementById("reset-submit");
+      const expected = {{ confirmation_phrase | tojson }};
+      const update = () => { submit.disabled = phrase.value !== expected || !acknowledge.checked; };
+      phrase.addEventListener("input", update);
+      acknowledge.addEventListener("change", update);
+      form.addEventListener("submit", (event) => {
+        if (submit.disabled || !window.confirm("정말로 HEXORA DB를 초기화할까요? 이 작업은 되돌릴 수 없습니다.")) {
+          event.preventDefault();
+        }
+      });
+    })();
+  </script>
+</body>
+</html>
