@@ -538,7 +538,7 @@ class QuestionRegistrationTests(unittest.TestCase):
         )
         self.assertEqual(converted.status_code, 200)
         latex = converted.get_json()["latex"]
-        self.assertEqual(latex, r"\frac{1}{2}")
+        self.assertEqual(latex, r"\dfrac{1}{2}")
 
         self.csrf_post(
             self.client,

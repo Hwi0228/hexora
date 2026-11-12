@@ -91,7 +91,7 @@ class HwpParsingTests(unittest.TestCase):
         questions = parse_questions_from_xml(xml.encode("utf-8"))
 
         self.assertIn('class="ql-math-inline"', questions[0]["explanation"])
-        self.assertIn(r'data-latex="\left&#32;\lfloor&#32;a&#32;+&#32;b&#32;\right&#32;\rfloor"', questions[0]["explanation"])
+        self.assertIn(r'data-latex="\left\lfloor&#32;a&#32;+&#32;b&#32;\right\rfloor"', questions[0]["explanation"])
         self.assertEqual(questions[0]["question"], "문제 본문")
 
         bar_xml = xml.replace(
@@ -147,7 +147,7 @@ class HwpParsingTests(unittest.TestCase):
         )
         self.assertIn(r"\left", brace_formula)
         self.assertIn(r"\dfrac", brace_formula)
-        self.assertIn(r"\div", brace_formula)
+        self.assertIn("÷", brace_formula)
         self.assertIn(r"\right", brace_formula)
         self.assertNotIn(r"\frac{", brace_formula)
 
