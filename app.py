@@ -15,6 +15,7 @@ from hwp_routes import register_hwp_routes
 from question_routes import register_question_routes
 from workbook_routes import register_workbook_routes
 from legal_routes import register_legal_routes
+from rate_limit import register_rate_limit
 from admin_database_routes import register_admin_database_routes
 from rich_text import render_rich_html
 from sidebar import render_sidebar
@@ -192,6 +193,7 @@ def create_app():
     register_workbook_routes(app)
     register_hwp_routes(app)
     register_legal_routes(app)
+    register_rate_limit(app)
     register_admin_database_routes(app)
 
     @app.cli.command("create-admin")
