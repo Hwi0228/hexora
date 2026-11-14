@@ -129,7 +129,7 @@ class QuestionSearchBackendParityTests(unittest.TestCase):
                         "/questions?" + urlencode({"subject": "수학", "q": "미분", "sort": sort})
                     )
                     self.assertEqual(sorted_response.status_code, 200)
-                    self.assertIn(("value=\\"" + sort + "\\"").encode(), sorted_response.data)
+                    self.assertIn(f'value="{sort}"'.encode(), sorted_response.data)
             finally:
                 with application.app_context():
                     try:
