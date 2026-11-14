@@ -69,6 +69,36 @@ class HwpImportValidationTests(unittest.TestCase):
         self.assertIn('data-latex="x^2"', questions[0]["answer"])
         self.assertIn('data-input-format="hancom"', questions[0]["answer"])
 
+    def test_structural_validation_failure_is_rejected_before_persistence(self):
+        form = MultiDict([
+            ("questions_json", json.dumps({
+                "questions": [{
+                    "number": 1,
+                    "source_number": "1",
+                    "question": "다음 중 옳은 것은?",
+                    "choices": ["가", "나"],
+                    "answer": "⑤",
+                    "explanation": "",
+                }],
+                "validation": {
+                    "valid": False,
+                    "issues": [{
+                        "code": "ANSWER_OUT_OF_RANGE",
+                        "message": "선택지에 없는 정답 표식입니다.",
+                        "question_number": "1",
+                        "severity": "error",
+                    }],
+                },
+            }, ensure_ascii=False)),
+        ])
+
+        questions, selection, errors, error = _validated_import(form)
+
+        self.assertIsNone(questions)
+        self.assertIsNone(selection)
+        self.assertIsNone(error)
+        self.assertIn("선택지에 없는 정답 표식입니다.", errors)
+
     def test_document_without_answer_or_explanation_can_be_imported(self):
         form = MultiDict([
             ("questions_json", json.dumps({
