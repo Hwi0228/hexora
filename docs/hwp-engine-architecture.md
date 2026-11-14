@@ -51,6 +51,7 @@
 - [x] A-INLINE, A-NUMBERED, A-PACKED, A-SUBJECTIVE 어댑터 구현 및 유형별 테스트
 - [x] Assembler 및 Validator 구현 (중복/누락/범위/고아 정답 검사)
 - [x] 기존 /hwp 업로드 경로 통합 및 저장 전 검증 실패 차단
+- [x] 문항별 편집·경계 분리/병합·원본/수정 필드 추적 및 경고 확인
 - [x] 자체 제작 최소 HWPX의 Reader → Detector → Adapter → Assembler smoke test
 - [ ] 재배포 권한이 확인된 실제 HWP/HWPX 코퍼스와 human-reviewed golden IR
 
@@ -58,7 +59,7 @@
 - Detector는 문항/정답 영역을 분리해 독립적으로 분류하고, 점수·근거 feature·경고를 반환한다. 후보 점수가 경합하면 자동 선택하지 않는다.
 - AdapterRegistry의 기본 구성은 4개 문항 어댑터와 5개 정답 어댑터(혼합형 포함)다.
 - Assembler는 원본 문항 번호와 SourcePosition을 유지하고, 정답을 연결한 뒤 Validator를 실행한다.
-- 구조 엔진이 확정한 결과는 /hwp 미리보기로 전달된다. validation.valid가 false면 저장 단계에서 다시 거부한다.
+- 구조 엔진이 확정한 결과는 /hwp 미리보기로 전달된다. validation.valid가 false면 저장 단계에서 다시 거부한다. 경고가 있으면 사용자가 확인 동의해야 저장할 수 있으며, 문항별 수정·분리·병합 결과와 원본 값은 첫 버전의 가져오기 출처 메타데이터로 보존한다.
 
 ## Core Reader 범위 및 제한
 - .hwp, .hwpx 모두 기존 프로젝트 의존성인 rhwp-python으로 읽는다.

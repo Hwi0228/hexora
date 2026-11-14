@@ -24,7 +24,7 @@ static/styles/
     ├── workbooks.css       # 문제집 및 문항 수록 관리
     ├── dashboard.css       # 메인 대시보드 위젯
     ├── history.css         # 버전 비교 diff 뷰
-    ├── hwp-import.css      # HWP 파싱 업로드 폼 및 로그
+    ├── hwp-import.css      # HWP 파싱 업로드 및 문항별 보정 폼
     └── auth.css            # 로그인 / 회원가입 폼
 ```
 
@@ -98,3 +98,14 @@ document.addEventListener("DOMContentLoaded", function () {
 - 응답 본문: `{"latex": "\\frac{a}{b}"}`
 
 이 구조는 브라우저와 HWP 가져오기 경로가 동일한 `hmleqx` 변환 엔진을 사용하게 하며, 별도의 브라우저용 변환 규칙이 서로 달라지는 문제를 방지합니다.
+
+
+## 5. HWP 가져오기 검토 UI
+
+`hwp-import-review.js`는 각 문항의 원본 번호·문제·선택지·정답·해설을 수정할 수 있게 하고, 커서 위치 분리 및 다음 문항 병합을 지원합니다. 수정 전 원본과 수정 필드를 `questions_json`에 기록하며, 서버는 저장 시 허용 태그로 다시 정화하고 최초 버전 스냅샷에 출처 메타데이터를 남깁니다. 구조 검증 경고가 있으면 확인 체크가 필요합니다.
+
+## 6. HWPX 수식 객체와 수정 이력 Diff
+
+- `latex_to_hancom.py`가 지원하는 LaTeX 부분집합을 Hancom 수식 스크립트로 바꾸고 `hwpx_export.py`가 `hp:equation` 객체로 직렬화합니다. 지원하지 않는 명령은 명시적 변환 오류로 처리합니다.
+- 수정 이력은 HTML 태그만 다른 경우를 동일한 표시 텍스트로 정규화하고, 실제 텍스트 변경은 필드별 `<del>` / `<ins>`로 표시합니다.
+- 문제 편집기는 입력 변경 후 1.5초 대기해 기존 비공개 Draft 저장 경로에 자동 저장합니다.
