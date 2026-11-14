@@ -21,7 +21,7 @@ flowchart TD
 
     ExtractMath --> HmleqConverter{hmleqx Python API<br/>hmleq_converter.py}
     HmleqConverter -->|성공| LatexMath[LaTeX 구문 정규화]
-    HmleqConverter -->|실패/미설치| PyFallback[hml-equation-parser 폴백]
+    HmleqConverter -->|실패| ConversionError[명시적 변환 오류]
     PyFallback --> LatexMath
 
     LatexMath --> PicturePlaceholder[그림 위치 표시자 삽입<br/>BIN0001.png]
@@ -41,7 +41,7 @@ sequenceDiagram
     actor User as 사용자
     participant Route as hwp_routes.py (/exams/export)
     participant Exporter as hwpx_export.py
-    participant Parser as HTMLToTextLinesParser
+    participant Parser as RichTextToRuns
     participant Zip as ZipFile Package
 
     User->>Route: POST /exams/export (question_ids, include_answers)
@@ -95,6 +95,12 @@ sequenceDiagram
 ---
 
 ### 3.3 `hmleq_converter.py` (한컴 수식 -> LaTeX 변환기)
+
+`hmleqx.to_latex()`를 호출하는 입력 검증 래퍼이며, Rust CLI나 `subprocess`를 사용하지 않습니다.
+
+### 3.4 `latex_to_hancom.py` (LaTeX -> 한컴 수식 변환기)
+
+HWPX 내보내기에서 분수·근호·첨자·그리스 문자·일부 행렬 및 연산자 등 지원되는 LaTeX 명령을 한컴 수식 스크립트로 변환합니다. 지원하지 않는 명령은 원문 TeX를 잘못된 수식 객체로 기록하지 않도록 `LatexEquationConversionError`로 내보내기를 거부합니다. 전체 LaTeX 문법을 지원하는 범용 변환기는 아닙니다.
 
 HWP 문서에서 추출한 한컴 수식 스크립트를 PyPI 패키지 `hmleqx`의 Python API로 직접 변환합니다. 별도의 Rust CLI 실행 파일이나 `subprocess` 호출은 필요하지 않습니다.
 
@@ -162,3 +168,10 @@ hmleqx.to_latex()의 결과를 저장하기 전에 일괄 정규화하거나 `\f
 - 이미 존재하는 `\frac`, `\dfrac` 등 LaTeX 명령은 변환 래퍼에서 변경하지 않습니다.
 - 원본 한컴 스크립트는 DocumentIR의 `original_script`에 보존하며 기존 DB 문항의 LaTeX 저장값을 일괄 변경하지 않습니다.
 - GitHub Actions는 설치된 hmleqx 버전에서 동일한 회귀 테스트를 실행합니다. 변환 결과가 달라지면 버전과 golden assertion을 함께 검토합니다.
+
+
+## 4. HWP 가져오기 검토 및 수식 객체
+
+HWP 미리보기는 원본 문항 번호·문제·선택지·정답·해설을 직접 수정할 수 있고, 문항 경계 분리 및 병합을 제공합니다. 구조 검증 경고가 있으면 사용자가 확인한 뒤 저장할 수 있습니다. 수동 보정된 값은 최초 버전 스냅샷의 `import_provenance`에 원본 값과 수정 필드 목록으로 보존됩니다.
+
+HWPX 내보내기는 일반 텍스트를 `hp:t`, 지원되는 LaTeX 수식을 한컴 수식 스크립트가 담긴 `hp:equation` 객체로 기록합니다. 변환 대상은 분수·근호·첨자·기본 연산자·일부 행렬 등 명시된 부분집합이며, 알 수 없는 LaTeX 명령은 422 변환 오류로 반환합니다. 실제 한컴오피스에서의 수식 크기와 줄 배치는 배포 전 별도 시각 검증이 필요합니다.
