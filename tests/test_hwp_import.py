@@ -69,6 +69,14 @@ class HwpImportValidationTests(unittest.TestCase):
         self.assertIn('data-latex="x^2"', questions[0]["answer"])
         self.assertIn('data-input-format="hancom"', questions[0]["answer"])
 
+    def test_import_review_does_not_render_processing_logs_in_the_user_interface(self):
+        template = (
+            Path(__file__).resolve().parents[1]
+            / "static" / "templates" / "hwp_parser.html"
+        ).read_text(encoding="utf-8")
+        self.assertNotIn("processing-log", template)
+        self.assertNotIn("process-feedback", template)
+
     def test_manual_corrections_keep_original_values_and_source_number(self):
         form = MultiDict([
             ("questions_json", json.dumps({"questions": [{

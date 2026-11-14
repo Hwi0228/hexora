@@ -34,24 +34,7 @@
           </label>
           <button class="button primary" type="submit">문항 추출</button>
         </form>
-        <ol class="processing-log" id="processing-log" aria-live="polite">
-          <li class="{% if questions %}done{% elif error %}error{% else %}active{% endif %}" id="log-file">
-            {% if questions %}문서 파일 확인 완료{% elif error %}파일 확인 중 오류{% else %}파일 선택 대기{% endif %}
-          </li>
-          <li class="{% if questions %}done{% elif error %}error{% endif %}" id="log-upload">
-            {% if questions %}서버 업로드 완료{% elif error %}업로드 또는 요청 실패{% else %}서버 업로드 대기{% endif %}
-          </li>
-          <li class="{% if questions %}done{% elif error %}error{% endif %}" id="log-extract">
-            {% if questions %}문항 구조 추출 완료 · {{ questions|length }}문항{% elif error %}문항 추출 실패{% else %}문항 추출 대기{% endif %}
-          </li>
-          <li class="{% if questions %}active{% endif %}" id="log-review">
-            {% if questions %}추출 결과 확인 및 등록 대상 선택{% else %}결과 검토 대기{% endif %}
-          </li>
-        </ol>
-        <p class="hint" id="process-feedback" role="status">
-          {% if questions %}추출된 문항을 확인하고 등록할 문항만 선택하세요.{% elif error %}오류 내용을 확인한 뒤 파일 형식과 문서 상태를 점검하세요.{% else %}파일을 선택하면 처리 단계가 여기에 기록됩니다.{% endif %}
-        </p>
-      </section>
+</section>
       {% if questions %}
       <section class="card" aria-labelledby="results-heading">
         <div class="results-header">
