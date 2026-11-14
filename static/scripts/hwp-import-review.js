@@ -143,13 +143,20 @@
     syncPayload();
   }
 
+  function appendSafeContent(target, source) {
+    const separator = document.createElement("p");
+    separator.append(document.createElement("br"));
+    target.append(separator);
+    Array.from(source.childNodes).forEach((node) => target.append(node.cloneNode(true)));
+  }
+
   function mergeWithNext(card) {
     const nextCard = card.nextElementSibling;
     if (!nextCard || !nextCard.matches("[data-import-question]")) return;
     const getField = (element, name) => element.querySelector('[data-import-field="' + name + '"]');
     const currentQuestion = getField(card, "question");
     const nextQuestion = getField(nextCard, "question");
-    currentQuestion.insertAdjacentHTML("beforeend", "<p><br></p>" + nextQuestion.innerHTML);
+    appendSafeContent(currentQuestion, nextQuestion);
     const currentChoices = getField(card, "choices");
     const nextChoices = getField(nextCard, "choices");
     Array.from(nextChoices.children).forEach((choice) => currentChoices.append(choice.cloneNode(true)));
@@ -158,7 +165,7 @@
       const current = getField(card, field);
       const next = getField(nextCard, field);
       if (!current.innerHTML.trim()) current.innerHTML = next.innerHTML;
-      else if (next.innerHTML.trim()) current.insertAdjacentHTML("beforeend", "<p><br></p>" + next.innerHTML);
+      else if (next.innerHTML.trim()) appendSafeContent(current, next);
     }
 
     const leftOriginal = JSON.parse(card.dataset.original || "{}");
@@ -184,6 +191,24 @@
     }
     const merge = event.target.closest("[data-merge-next]");
     if (merge) mergeWithNext(merge.closest("[data-import-question]"));
+  });
+
+  list.querySelectorAll('[contenteditable="true"]').forEach((editor) => {
+    editor.addEventListener("paste", (event) => {
+      event.preventDefault();
+      const plainText = event.clipboardData?.getData("text/plain") || "";
+      const selection = window.getSelection();
+      if (!selection || !selection.rangeCount) return;
+      const range = selection.getRangeAt(0);
+      range.deleteContents();
+      const textNode = document.createTextNode(plainText);
+      range.insertNode(textNode);
+      range.setStartAfter(textNode);
+      range.collapse(true);
+      selection.removeAllRanges();
+      selection.addRange(range);
+      syncPayload();
+    });
   });
 
   form.addEventListener("input", syncPayload);
