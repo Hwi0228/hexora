@@ -176,7 +176,7 @@ class HwpParsingTests(unittest.TestCase):
         )
         self.assertEqual(
             aligned_formula,
-            r"\begin{aligned} & \text{가입비 15000원} \\ & \text{- 가입 시 추가 요금 없이 무제한 편집 가능} \end{aligned}",
+            r"\begin{aligned}  & \text{가입비 15000원} \\  & \text{- 가입 시 추가 요금 없이 무제한 편집 가능} \end{aligned}",
         )
 
     def test_fraction_commands_are_preserved_for_katex(self):
