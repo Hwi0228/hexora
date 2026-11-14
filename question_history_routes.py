@@ -53,16 +53,19 @@ def _plain_revision_text(value):
 
 
 def _render_diff_side(before, after, side):
-    matcher = SequenceMatcher(None, before, after, autojunk=False)
+    token_pattern = re.compile(r"\$\$[\s\S]+?\$\$|\$[^$\n]+\$|\s+|[^\s$]+")
+    before_tokens = token_pattern.findall(before)
+    after_tokens = token_pattern.findall(after)
+    matcher = SequenceMatcher(None, before_tokens, after_tokens, autojunk=False)
     parts = []
     for tag, before_start, before_end, after_start, after_end in matcher.get_opcodes():
         if side == "before":
-            value = before[before_start:before_end]
+            value = "".join(before_tokens[before_start:before_end])
             changed = tag in {"replace", "delete"}
             wrapper = "del"
             css_class = "diff-removed"
         else:
-            value = after[after_start:after_end]
+            value = "".join(after_tokens[after_start:after_end])
             changed = tag in {"replace", "insert"}
             wrapper = "ins"
             css_class = "diff-added"
