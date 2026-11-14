@@ -1,4 +1,5 @@
 import json
+import os
 import sqlite3
 import tempfile
 import unittest
@@ -105,9 +106,11 @@ class DatabaseBackupRestoreTests(unittest.TestCase):
         self.assertEqual(environment["PGDATABASE"], "mathdb")
         self.assertEqual(environment["PGSSLMODE"], "require")
 
+    @patch("backup_restore._verify_restored_summary", return_value={})
+    @patch("backup_restore._postgres_summary", return_value={"counts": {}, "foreign_key_violations": 0})
     @patch("backup_restore.shutil.which", side_effect=lambda name: f"/usr/bin/{name}")
     @patch("backup_restore.subprocess.run")
-    def test_postgres_backup_and_restore_use_pg_dump_and_pg_restore(self, run, which):
+    def test_postgres_backup_and_restore_use_pg_dump_and_pg_restore(self, run, which, summary, verify):
         def fake_run(command, **kwargs):
             if command[0].endswith("pg_dump"):
                 Path(command[command.index("--file") + 1]).write_bytes(b"custom-format-dump")
@@ -136,6 +139,52 @@ class DatabaseBackupRestoreTests(unittest.TestCase):
         self.assertGreaterEqual(commands.count("/usr/bin/pg_restore"), 2)
         dump_call = next(call for call in run.call_args_list if call.args[0][0].endswith("pg_dump"))
         self.assertNotIn("password", " ".join(dump_call.args[0]))
+
+    @unittest.skipUnless(
+        os.environ.get("HEXORA_TEST_POSTGRES_URL"),
+        "실제 PostgreSQL 통합 테스트는 HEXORA_TEST_POSTGRES_URL이 필요합니다.",
+    )
+    def test_postgres_backup_restore_against_real_server(self):
+        import psycopg
+
+        database_url = os.environ["HEXORA_TEST_POSTGRES_URL"]
+        with psycopg.connect(database_url) as connection:
+            with connection.cursor() as cursor:
+                cursor.execute("DROP TABLE IF EXISTS backup_restore_probe")
+                cursor.execute(
+                    "CREATE TABLE backup_restore_probe "
+                    "(id INTEGER PRIMARY KEY, value TEXT NOT NULL)"
+                )
+                cursor.execute(
+                    "INSERT INTO backup_restore_probe(id, value) VALUES (1, 'before-backup')"
+                )
+
+        archive = create_backup(
+            "postgresql",
+            database_url,
+            output=self.root / "postgres-integration.zip",
+            schema_version=0,
+        )
+        with psycopg.connect(database_url) as connection:
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    "UPDATE backup_restore_probe SET value = 'after-backup' WHERE id = 1"
+                )
+
+        restore_backup(
+            archive,
+            "postgresql",
+            database_url,
+            confirm_overwrite=True,
+            supported_schema_version=0,
+        )
+        with psycopg.connect(database_url) as connection:
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    "SELECT value FROM backup_restore_probe WHERE id = 1"
+                )
+                self.assertEqual(cursor.fetchone()[0], "before-backup")
+                cursor.execute("DROP TABLE backup_restore_probe")
 
 
 if __name__ == "__main__":
