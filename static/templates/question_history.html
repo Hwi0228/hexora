@@ -42,7 +42,7 @@
         {% if comparison %}
         <div class="history-comparison-list">
           {% for item in comparison %}
-          <div class="history-change"><strong>{{ item.field }}</strong><div class="value before math-content">{{ item.before_html|safe if item.before_html else "내용 없음" }}</div><div class="value after math-content">{{ item.after_html|safe if item.after_html else "내용 없음" }}</div></div>
+          <div class="history-change"><strong>{{ item.field }}</strong><div class="value before math-content"><span class="diff-side-label">이전</span>{{ item.before_html|safe if item.before_html else "내용 없음" }}</div><div class="value after math-content"><span class="diff-side-label">변경</span>{{ item.after_html|safe if item.after_html else "내용 없음" }}</div></div>
           {% endfor %}
         </div>
         {% else %}<p class="empty">선택한 두 버전 사이에 변경된 항목이 없습니다.</p>{% endif %}

@@ -1,14 +1,82 @@
 import json
+import re
+from difflib import SequenceMatcher
+from html import escape
+from html.parser import HTMLParser
 
 from flask import abort, g, redirect, render_template, request, url_for
 
 from constants import NAV_ITEMS
 from question_constants import QUESTION_CONTENT_FIELDS, QUESTION_FIELD_LABELS
 from question_ids import format_question_number
-from rich_text import render_rich_html
 from database import begin_write_transaction, get_db
 from question_revisions import _ensure_initial_question_revision, _insert_question_revision
 from question_repository import _question_row, _update_question_content
+
+
+
+
+class _RevisionTextExtractor(HTMLParser):
+    BLOCK_TAGS = {"p", "div", "li", "blockquote", "pre", "br", "h1", "h2", "h3"}
+
+    def __init__(self):
+        super().__init__(convert_charrefs=True)
+        self.parts = []
+
+    def handle_starttag(self, tag, attrs):
+        attributes = dict(attrs)
+        classes = set((attributes.get("class") or "").split())
+        if "ql-math-inline" in classes:
+            self.parts.append("$" + (attributes.get("data-latex") or "") + "$")
+            return
+        if "ql-math-block" in classes:
+            self.parts.append("$" + (attributes.get("data-latex") or "") + "$")
+            return
+        if tag in self.BLOCK_TAGS:
+            self.parts.append("\\n")
+
+    def handle_endtag(self, tag):
+        if tag in self.BLOCK_TAGS:
+            self.parts.append("\\n")
+
+    def handle_data(self, data):
+        self.parts.append(data)
+
+
+def _plain_revision_text(value):
+    if value is None:
+        return ""
+    parser = _RevisionTextExtractor()
+    parser.feed(str(value))
+    parser.close()
+    text = "".join(parser.parts).replace("\\r\\n", "\\n").replace("\\r", "\\n")
+    text = re.sub(r"[ \\t]+", " ", text)
+    text = re.sub(r" *\\n *", "\\n", text)
+    return text.strip()
+
+
+def _render_diff_side(before, after, side):
+    matcher = SequenceMatcher(None, before, after, autojunk=False)
+    parts = []
+    for tag, before_start, before_end, after_start, after_end in matcher.get_opcodes():
+        if side == "before":
+            value = before[before_start:before_end]
+            changed = tag in {"replace", "delete"}
+            wrapper = "del"
+            css_class = "diff-removed"
+        else:
+            value = after[after_start:after_end]
+            changed = tag in {"replace", "insert"}
+            wrapper = "ins"
+            css_class = "diff-added"
+        if not value:
+            continue
+        safe_value = escape(value, quote=False).replace("\\n", "<br>")
+        if changed:
+            parts.append(f'<{wrapper} class="{css_class}">{safe_value}</{wrapper}>')
+        else:
+            parts.append(safe_value)
+    return "".join(parts)
 
 
 def question_history(question_id):
@@ -59,14 +127,14 @@ def question_history(question_id):
             if field == "choices":
                 before = "\n".join(before or [])
                 after = "\n".join(after or [])
-            if before != after:
-                before_value = "" if before is None else str(before)
-                after_value = "" if after is None else str(after)
+            before_text = _plain_revision_text(before)
+            after_text = _plain_revision_text(after)
+            # Ignore markup-only differences; compare visible text and TeX payloads.
+            if before_text != after_text:
                 comparison.append({
                     "field": QUESTION_FIELD_LABELS[field],
-                    # Only sanitizer-produced markup reaches the template's safe renderer.
-                    "before_html": render_rich_html(before_value),
-                    "after_html": render_rich_html(after_value),
+                    "before_html": _render_diff_side(before_text, after_text, "before"),
+                    "after_html": _render_diff_side(before_text, after_text, "after"),
                 })
 
     return render_template(
@@ -83,7 +151,7 @@ def restore_question(question_id, revision_number):
     question = _question_row(question_id)
     connection = get_db()
     try:
-        begin_write_transaction(connection)
+        begin_write_transaction(connection, lock_table="questions")
         question = _question_row(question_id)
         _ensure_initial_question_revision(connection, question)
         target = connection.execute(
