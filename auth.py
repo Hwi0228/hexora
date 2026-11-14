@@ -75,10 +75,6 @@ def render_account_form(mode, form_data=None, errors=None, status=200):
         render_template(
             "account_form.html",
             mode=mode,
-            first_account=(
-                mode == "signup"
-                and get_db().execute("SELECT COUNT(*) FROM users").fetchone()[0] == 0
-            ),
             form_data=form_data or {},
             errors=errors or [],
         ),
@@ -120,9 +116,6 @@ def signup():
     user_uuid = str(uuid.uuid4())
     try:
         begin_write_transaction(connection, lock_table="users")
-        is_first_user = (
-            connection.execute("SELECT COUNT(*) FROM users").fetchone()[0] == 0
-        )
         connection.execute(
             """
             INSERT INTO users (uuid, email, display_name, password_hash, role)
@@ -133,18 +126,9 @@ def signup():
                 email,
                 display_name,
                 generate_password_hash(password),
-                "admin" if is_first_user else "user",
+                "user",
             ),
         )
-        if is_first_user:
-            connection.execute(
-                "UPDATE folders SET user_uuid = ? WHERE user_uuid IS NULL",
-                (user_uuid,),
-            )
-            connection.execute(
-                "UPDATE questions SET user_uuid = ? WHERE user_uuid IS NULL",
-                (user_uuid,),
-            )
         connection.commit()
     except Exception as exc:
         connection.rollback()

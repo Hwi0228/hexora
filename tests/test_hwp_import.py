@@ -1,12 +1,56 @@
 import json
 import unittest
+import zipfile
+from io import BytesIO
 
 from werkzeug.datastructures import MultiDict
 
 from hwp_routes import _validated_import
+from parse_rhwp import _validate_hwpx_archive
+from hwp_import_validation import _get_section_xml, MAX_SECTION_XML_SIZE
 
 
 class HwpImportValidationTests(unittest.TestCase):
+    def _hwpx(self, files):
+        output = BytesIO()
+        with zipfile.ZipFile(output, "w", compression=zipfile.ZIP_DEFLATED) as archive:
+            for name, content in files.items():
+                archive.writestr(name, content)
+        return output.getvalue()
+
+    def test_valid_hwpx_zip_is_accepted(self):
+        content = self._hwpx({
+            "mimetype": "application/hwp+zip",
+            "Contents/section0.xml": "<section><p>문항</p></section>",
+        })
+        _validate_hwpx_archive(content)
+
+    def test_non_zip_hwpx_is_rejected(self):
+        with self.assertRaisesRegex(ValueError, "ZIP"):
+            _validate_hwpx_archive(b"not a zip")
+
+    def test_zip_path_traversal_is_rejected(self):
+        content = self._hwpx({
+            "../outside.xml": "<root/>",
+            "Contents/section0.xml": "<root/>",
+        })
+        with self.assertRaisesRegex(ValueError, "파일 경로"):
+            _validate_hwpx_archive(content)
+
+    def test_unsafe_xml_entities_are_rejected(self):
+        content = self._hwpx({
+            "Contents/section0.xml": (
+                '<!DOCTYPE root [<!ENTITY x "expanded">]><root>&x;</root>'
+            ),
+        })
+        with self.assertRaises(ValueError):
+            _validate_hwpx_archive(content)
+
+    def test_single_xml_upload_limit_is_16_mib(self):
+        self.assertEqual(_get_section_xml("section0.xml", b"<root/>"), b"<root/>")
+        with self.assertRaisesRegex(ValueError, "16MB"):
+            _get_section_xml("section0.xml", b"x" * (MAX_SECTION_XML_SIZE + 1))
+
     def test_import_sanitizes_and_preserves_math_embed_metadata(self):
         math = '<span class="ql-math-inline" data-latex="x^2" data-input-format="hancom" data-input-source="x ^ 2" data-math-object="inline"></span>'
         form = MultiDict([
@@ -24,6 +68,36 @@ class HwpImportValidationTests(unittest.TestCase):
         self.assertIn('class="ql-math-inline"', questions[0]["question"])
         self.assertIn('data-latex="x^2"', questions[0]["answer"])
         self.assertIn('data-input-format="hancom"', questions[0]["answer"])
+
+    def test_structural_validation_failure_is_rejected_before_persistence(self):
+        form = MultiDict([
+            ("questions_json", json.dumps({
+                "questions": [{
+                    "number": 1,
+                    "source_number": "1",
+                    "question": "다음 중 옳은 것은?",
+                    "choices": ["가", "나"],
+                    "answer": "⑤",
+                    "explanation": "",
+                }],
+                "validation": {
+                    "valid": False,
+                    "issues": [{
+                        "code": "ANSWER_OUT_OF_RANGE",
+                        "message": "선택지에 없는 정답 표식입니다.",
+                        "question_number": "1",
+                        "severity": "error",
+                    }],
+                },
+            }, ensure_ascii=False)),
+        ])
+
+        questions, selection, errors, error = _validated_import(form)
+
+        self.assertIsNone(questions)
+        self.assertIsNone(selection)
+        self.assertIsNone(error)
+        self.assertIn("선택지에 없는 정답 표식입니다.", errors)
 
     def test_document_without_answer_or_explanation_can_be_imported(self):
         form = MultiDict([

@@ -22,6 +22,10 @@ class QuestionRegistrationTests(unittest.TestCase):
         self.client = app.test_client()
         self.register(self.client, "admin@example.com", "관리자")
         self.admin_uuid = self.get_user_uuid("admin@example.com")
+        with sqlite3.connect(self.database) as connection:
+            connection.execute(
+                "UPDATE users SET role = 'admin' WHERE uuid = ?", (self.admin_uuid,)
+            )
 
     def tearDown(self):
         self.temp_directory.cleanup()
@@ -283,7 +287,7 @@ class QuestionRegistrationTests(unittest.TestCase):
         self.assertEqual(snapshot["title"], "미분계수 문항")
         self.assertEqual(snapshot["license"], "CC-BY-4.0")
 
-    def test_first_account_is_admin_and_login_required(self):
+    def test_bootstrapped_admin_and_login_required(self):
         response = self.client.get("/")
         self.assertEqual(response.status_code, 200)
         self.assertIn("관리자".encode(), response.data)
@@ -825,7 +829,7 @@ class QuestionRegistrationTests(unittest.TestCase):
         self.assertIn(b"&lt;script&gt;alert(1)&lt;/script&gt;", response.data)
         self.assertNotIn(b"<script>alert(1)</script>", response.data)
 
-    def test_legacy_database_migrates_folder_ids_to_uuids_and_first_admin_owns_data(self):
+    def test_legacy_database_migrates_folder_ids_and_cli_admin_owns_unassigned_data(self):
         legacy_database = Path(self.temp_directory.name) / "legacy.sqlite3"
         connection = sqlite3.connect(legacy_database)
         connection.executescript(
@@ -871,6 +875,15 @@ class QuestionRegistrationTests(unittest.TestCase):
             migrated_uuid = self.get_user_uuid_from_database(
                 legacy_database, "legacy-admin@example.com"
             )
+            bootstrap = app.test_cli_runner().invoke(
+                args=[
+                    "create-admin",
+                    "--email", "legacy-admin@example.com",
+                    "--display-name", "기존 관리자",
+                ],
+                input="LegacyAdminPassword123!\nLegacyAdminPassword123!\n",
+            )
+            self.assertEqual(bootstrap.exit_code, 0, bootstrap.output)
 
             connection = sqlite3.connect(legacy_database)
             try:

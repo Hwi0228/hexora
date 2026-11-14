@@ -108,6 +108,15 @@ class LegalAndRightsReportTests(unittest.TestCase):
             },
         )
         self.assertEqual(signup.status_code, 302)
+        bootstrap = app.test_cli_runner().invoke(
+            args=[
+                "create-admin",
+                "--email", "legal-admin@example.com",
+                "--display-name", "법무 관리자",
+            ],
+            input="LegalAdminPass123!\nLegalAdminPass123!\n",
+        )
+        self.assertEqual(bootstrap.exit_code, 0, bootstrap.output)
 
         report_token = self.csrf_token()
         self.client.post(
