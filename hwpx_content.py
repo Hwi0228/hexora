@@ -96,7 +96,7 @@ def _question_paragraphs(questions, title, include_answers):
             if match.start() > cursor:
                 runs.append({"text": source[cursor:match.start()], "char_style": char_style})
             token = match.group(0)
-            display_mode = token.startswith("$")
+            display_mode = token.startswith("$$")
             latex = token[2:-2] if display_mode else token[1:-1]
             runs.append({
                 "equation_script": convert_latex_to_hancom(latex),
