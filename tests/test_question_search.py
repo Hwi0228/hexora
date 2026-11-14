@@ -96,6 +96,7 @@ class QuestionSearchBackendParityTests(unittest.TestCase):
                     source_type="수능 및 모의평가",
                     year="2025",
                     achievement_standard="[10수학01-01] 다항식의 연산을 할 수 있다.",
+                    prompt="<p>다항식의 연산</p>",
                 )
 
                 query = urlencode({
@@ -110,11 +111,15 @@ class QuestionSearchBackendParityTests(unittest.TestCase):
                     "achievement_standard": "12수학Ⅱ02-01",
                     "sort": "relevance",
                 })
+                all_questions = client.get("/questions?subject=수학")
+                self.assertEqual(all_questions.status_code, 200)
+                self.assertIn("미분계수와 도함수".encode(), all_questions.data)
+
                 filtered = client.get("/questions?" + query)
                 self.assertEqual(filtered.status_code, 200)
-                self.assertIn("미분 기본 문항".encode(), filtered.data)
-                self.assertNotIn("미분 응용 문항".encode(), filtered.data)
                 self.assertIn("검색 결과 1개".encode(), filtered.data)
+                self.assertIn("미분계수와 도함수".encode(), filtered.data)
+                self.assertNotIn("다항식의 연산".encode(), filtered.data)
                 self.assertIn('name="q" maxlength="120" value="미분"'.encode(), filtered.data)
 
                 no_results = client.get("/questions?" + urlencode({
@@ -129,7 +134,7 @@ class QuestionSearchBackendParityTests(unittest.TestCase):
                         "/questions?" + urlencode({"subject": "수학", "q": "미분", "sort": sort})
                     )
                     self.assertEqual(sorted_response.status_code, 200)
-                    self.assertIn(f'value="{sort}"'.encode(), sorted_response.data)
+                    self.assertIn(f'<option value="{sort}" selected>'.encode(), sorted_response.data)
             finally:
                 with application.app_context():
                     try:
