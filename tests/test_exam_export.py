@@ -194,7 +194,7 @@ class ExamExportRouteTests(unittest.TestCase):
 
     def test_unsupported_latex_commands_reject_the_export_explicitly(self):
         question_id = self.add_question(
-            r"<p>지원하지 않는 명령 $\\notARealMathCommand{x}$</p>",
+            r"<p>지원하지 않는 명령 $\notARealMathCommand{x}$</p>",
             "1",
         )
         response = self.export([question_id])
