@@ -39,7 +39,7 @@
 - 문제 템플릿과 답안 템플릿은 조합 가능해야 한다. 예: Q-SUFFIX + A-PACKED.
 - Detector는 추정값만 제공하며 원본 블록을 제거하거나 재배열하지 않는다.
 - confidence가 낮거나 후보가 경합하면 경고와 사용자 검토를 요구한다.
-- 원본 HWP는 회귀 fixture로 저장소에 추가하지 않는다.
+- 제3자 원본 HWP/HWPX는 재배포 권한이 확인된 경우에만 회귀 fixture로 추가한다. 현재는 자체 제작한 최소 HWPX smoke fixture만 테스트 코드에서 생성하며, 실제 HWP 원본 코퍼스는 미확보 상태다.
 
 ## 구현 단계
 - [x] 문서 IR 및 타입 정의
@@ -47,10 +47,18 @@
 - [x] 어댑터 레지스트리 인터페이스
 - [x] rhwp-python HWP/HWPX Reader 및 바이트 입력 Core Extractor
 - [x] 표/행/셀 경계, 문단, 수식 원문, 그림 참조 및 위치 정보 보존
-- [ ] Q-TABLE, Q-PREFIX, Q-SUFFIX, Q-MIXED 어댑터 구현
-- [ ] A-INLINE, A-NUMBERED, A-PACKED, A-SUBJECTIVE 어댑터 구현
-- [ ] Assembler 및 Validator 구현
-- [ ] 기존 /hwp 업로드 경로 통합 및 실제 문서 회귀 테스트
+- [x] Q-TABLE, Q-PREFIX, Q-SUFFIX, Q-MIXED 어댑터 구현 및 유형별 테스트
+- [x] A-INLINE, A-NUMBERED, A-PACKED, A-SUBJECTIVE 어댑터 구현 및 유형별 테스트
+- [x] Assembler 및 Validator 구현 (중복/누락/범위/고아 정답 검사)
+- [x] 기존 /hwp 업로드 경로 통합 및 저장 전 검증 실패 차단
+- [x] 자체 제작 최소 HWPX의 Reader → Detector → Adapter → Assembler smoke test
+- [ ] 재배포 권한이 확인된 실제 HWP/HWPX 코퍼스와 human-reviewed golden IR
+
+## 현재 구현 상태
+- Detector는 문항/정답 영역을 분리해 독립적으로 분류하고, 점수·근거 feature·경고를 반환한다. 후보 점수가 경합하면 자동 선택하지 않는다.
+- AdapterRegistry의 기본 구성은 4개 문항 어댑터와 5개 정답 어댑터(혼합형 포함)다.
+- Assembler는 원본 문항 번호와 SourcePosition을 유지하고, 정답을 연결한 뒤 Validator를 실행한다.
+- 구조 엔진이 확정한 결과는 /hwp 미리보기로 전달된다. validation.valid가 false면 저장 단계에서 다시 거부한다.
 
 ## Core Reader 범위 및 제한
 - .hwp, .hwpx 모두 기존 프로젝트 의존성인 rhwp-python으로 읽는다.
@@ -59,6 +67,7 @@
 - 수식은 원본 한컴 스크립트를 우선 보존한다. LaTeX 변환은 별도 후속 단계다.
 - 그림은 설명 및 BinData 참조를 보존한다. 바이너리 자산 추출·미리보기는 아직 구현 범위가 아니다.
 - HWPX ZIP/XML을 직접 해석하는 별도 Reader는 아직 없으며, 현재는 rhwp-python Reader를 공통 인터페이스로 사용한다.
+- 최소 HWPX smoke fixture는 원본 시험지 내용을 포함하지 않는 자체 제작 OWPML 문서다. 실제 한컴오피스에서 저장한 HWP/HWPX와 모든 버전 호환성을 보장하지 않으므로 #36은 계속 열린 상태로 둔다.
 
 ## 호환성 전략
 기존 parse_rhwp.py 및 rhwp_question_parser.py는 신규 엔진이 기존 회귀 테스트와 실제 샘플을 통과할 때까지 유지한다. 신규 엔진은 별도 패키지에서 개발하고 전환 시 기존 결과와 diff를 비교한다.
