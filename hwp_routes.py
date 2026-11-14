@@ -1,9 +1,10 @@
 import json
+import time
 from defusedxml import ElementTree as ET
 from defusedxml.common import DefusedXmlException
 from pathlib import Path
 
-from flask import abort, g, redirect, render_template, request, url_for
+from flask import abort, current_app, g, redirect, render_template, request, url_for
 
 from auth import login_required
 from constants import NAV_ITEMS, SUBJECTS, LICENSE_CHOICES, SOURCE_TYPES
@@ -135,8 +136,9 @@ def hwp_parser_page():
         if uploaded is None or not uploaded.filename:
             error = "파싱할 HWP, HWPX 또는 section0.xml 파일을 선택해 주세요."
         else:
+            started_at = time.perf_counter()
+            extension = Path(uploaded.filename).suffix.lower()
             try:
-                extension = Path(uploaded.filename).suffix.lower()
                 file_limit = (
                     MAX_SECTION_XML_SIZE if extension == ".xml"
                     else MAX_DOCUMENT_BYTES
@@ -198,7 +200,27 @@ def hwp_parser_page():
                         ensure_ascii=False,
                         indent=2,
                     )
+                current_app.logger.info(
+                    "hwp_parse_complete",
+                    extra={
+                        "event": "hwp_parse_complete",
+                        "stage": "document_parse",
+                        "file_type": extension.lstrip("."),
+                        "question_count": len(questions or []),
+                        "elapsed_ms": round((time.perf_counter() - started_at) * 1000, 2),
+                    },
+                )
             except (ValueError, RuntimeError, ET.ParseError, DefusedXmlException) as exc:
+                current_app.logger.warning(
+                    "hwp_parse_failed",
+                    extra={
+                        "event": "hwp_parse_failed",
+                        "stage": "document_parse",
+                        "file_type": extension.lstrip("."),
+                        "error_type": type(exc).__name__,
+                        "elapsed_ms": round((time.perf_counter() - started_at) * 1000, 2),
+                    },
+                )
                 error = str(exc)
 
     return _render_page(questions=questions, result_json=result_json, error=error)

@@ -18,6 +18,9 @@ def csrf_token():
     return token
 
 def load_user_and_protect_forms():
+    if request.endpoint in {"health_live", "health_ready"}:
+        g.user = None
+        return None
     g.user = None
     get_db()
     user_uuid = session.get("user_uuid")
