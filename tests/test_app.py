@@ -156,6 +156,14 @@ class QuestionRegistrationTests(unittest.TestCase):
         self.register(other, "draft-reader@example.com", "다른 사용자")
         self.assertNotIn("작성 중인 문제".encode(), other.get("/questions").data)
 
+    def test_question_editor_uses_debounced_private_draft_autosave(self):
+        script_path = Path(__file__).resolve().parents[1] / "static" / "scripts" / "question-editor.js"
+        script = script_path.read_text(encoding="utf-8")
+        self.assertIn("setTimeout(saveDraftAutomatically, 1500)", script)
+        self.assertIn('formData.set("form_action", "draft")', script)
+        self.assertIn("fetch(form.action", script)
+        self.assertIn("lastSavedDraftPayload", script)
+
     def test_edit_temporary_draft_does_not_overwrite_public_question_or_add_revision(self):
         self.csrf_post(self.client, "/questions/new", data=self.valid_question())
         response = self.client.get("/questions/1/edit")
