@@ -4,7 +4,6 @@ import tempfile
 import unittest
 from unittest.mock import patch
 from pathlib import Path
-from unittest.mock import patch
 
 from parse_hwp import (
     _equation_to_latex,

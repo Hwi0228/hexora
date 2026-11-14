@@ -192,8 +192,6 @@ POSTGRES_SCHEMA_STATEMENTS = (
 
 def initialize_postgres_database(connection):
     """Create the HEXORA schema once per app process and database URL."""
-    from flask import current_app
-
     database_key = current_app.config["DATABASE_URL"]
     if database_key in _POSTGRES_SCHEMA_READY:
         return

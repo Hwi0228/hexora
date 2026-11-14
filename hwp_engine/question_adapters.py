@@ -56,7 +56,8 @@ class PrefixQuestionAdapter:
             if match:
                 if number is not None:
                     item = _make_question(number, parts, source)
-                    if item: result.append(item)
+                    if item:
+                        result.append(item)
                 number = _number(match)
                 source = block.position
                 parts = [block.text[match.end():]]
@@ -64,7 +65,8 @@ class PrefixQuestionAdapter:
                 parts.append(block.text)
         if number is not None:
             item = _make_question(number, parts, source)
-            if item: result.append(item)
+            if item:
+                result.append(item)
         return result
 
 class SuffixQuestionAdapter:
@@ -84,15 +86,18 @@ class SuffixQuestionAdapter:
             if int(marker[1]) == int(current[-1][1]) + 1:
                 current.append(marker)
             else:
-                if len(current) >= 2: runs.append(current)
+                if len(current) >= 2:
+                    runs.append(current)
                 current = [marker]
-        if len(current) >= 2: runs.append(current)
+        if len(current) >= 2:
+            runs.append(current)
         accepted = {index: number for run in runs for index, number in run}
         result, parts, source = [], [], None
         for index, block in enumerate(blocks):
             if index in accepted:
                 item = _make_question(accepted[index], parts, source)
-                if item: result.append(item)
+                if item:
+                    result.append(item)
                 parts, source = [], None
             else:
                 if source is None: source = block.position
@@ -134,7 +139,8 @@ class TableQuestionAdapter:
                 number = str(len(result) + 1)
             source = blocks[0].position
             item = _make_question(number, parts, source)
-            if item: result.append(item)
+            if item:
+                result.append(item)
         return result
 
 class MixedQuestionAdapter:
