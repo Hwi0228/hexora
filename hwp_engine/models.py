@@ -63,6 +63,8 @@ class TemplateDetection:
     question_scores: dict[str, float] = field(default_factory=dict)
     answer_scores: dict[str, float] = field(default_factory=dict)
     warnings: tuple[str, ...] = ()
+    question_evidence: dict[str, int | bool] = field(default_factory=dict)
+    answer_evidence: dict[str, int | bool] = field(default_factory=dict)
 
 @dataclass(frozen=True, slots=True)
 class ExtractedChoice:

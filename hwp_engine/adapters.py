@@ -20,4 +20,20 @@ class AdapterRegistry:
     def register_answer(self, adapter: AnswerAdapter) -> None:
         self.answer_adapters[adapter.template] = adapter
     def select(self, detection: TemplateDetection) -> tuple[QuestionAdapter | None, AnswerAdapter | None]:
-        return (self.question_adapters.get(detection.question_template.value), self.answer_adapters.get(detection.answer_template.value))
+        return (
+            self.question_adapters.get(detection.question_template.value),
+            self.answer_adapters.get(detection.answer_template.value),
+        )
+
+
+def default_registry() -> AdapterRegistry:
+    """Build the standard registry without importing adapters during module load."""
+    from .answer_adapters import answer_adapters
+    from .question_adapters import question_adapters
+
+    registry = AdapterRegistry()
+    for adapter in question_adapters():
+        registry.register_question(adapter)
+    for adapter in answer_adapters():
+        registry.register_answer(adapter)
+    return registry

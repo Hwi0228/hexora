@@ -161,10 +161,26 @@ def detect_templates(document: DocumentIR) -> TemplateDetection:
     if not has_answer_heading and not inline_count:
         warnings.append("명시적인 정답 영역 표식을 찾지 못했습니다.")
 
+    question_evidence = {
+        "table_rows": question_table_rows,
+        "prefix_markers": prefix_count,
+        "suffix_markers": suffix_count,
+        "choice_markers": choice_count,
+        "subjective_heading": has_subjective_heading,
+    }
+    answer_evidence = {
+        "inline_markers": inline_count,
+        "packed_entries": len(packed_matches),
+        "numbered_entries": numbered_entries,
+        "subjective_heading": subjective_answer,
+        "answer_heading": has_answer_heading,
+    }
     return TemplateDetection(
         QuestionTemplate(qtype),
         AnswerTemplate(atype),
         q_normalized,
         a_normalized,
         tuple(warnings),
+        question_evidence,
+        answer_evidence,
     )
