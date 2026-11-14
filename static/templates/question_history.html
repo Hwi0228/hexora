@@ -16,7 +16,7 @@
 </head>
 <body>
   <div class="app app-standard">
-    {% include "partials/sidebar.html" %}
+    {{ render_sidebar() }}
     <main class="history-main">
       {% set header_section = "PUBLIC QUESTION · HISTORY" %}
       {% set header_title = "문제 수정 이력" %}

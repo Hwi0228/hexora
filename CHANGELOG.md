@@ -2,6 +2,19 @@
 
 이 프로젝트는 Semantic Versioning을 따릅니다.
 
+## [0.2.1] - 2026-11-14
+
+### Changed
+- 한컴 수식 변환기를 Rust CLI/subprocess 실행 방식에서 `hmleqx` Python API 직접 호출 방식으로 전환
+- Render 빌드에서 `hmleqx` 패키지 import 및 기본 수식 변환 smoke test 수행
+- 기존 `hml-equation-parser` 폴백 경로와 변환 오류 인터페이스 유지
+- HWP 수식 정규화에서 로마자 식별자, 한글 텍스트, 나눗셈 기호 및 EQALIGN 정렬 결과 처리 보완
+- 브라우저의 한컴 수식 입력을 서버 변환 API와 연결해 HWP 가져오기와 동일한 변환 엔진 사용
+
+### Verification
+- GitHub Actions 전체 unittest 회귀 테스트 통과
+- Render PR Preview Check 통과
+
 ## [0.2.0] - 2026-11-11
 
 ### Changed

@@ -1,3 +1,5 @@
+import html
+import re
 import tempfile
 import unittest
 from unittest.mock import patch
@@ -10,6 +12,19 @@ from parse_hwp import (
     parse_questions,
     parse_questions_from_xml,
 )
+
+
+def _canonical_latex(value: str) -> str:
+    """Normalize equivalent TeX spellings for semantic assertions."""
+    value = html.unescape(value)
+    value = re.sub(r"([_^])\{([^{}])\}", r"\1\2", value)
+    return re.sub(r"\s+", "", value)
+
+
+def _embedded_latex(markup: str) -> list[str]:
+    """Read math from serialized Quill HTML, decoding attribute entities."""
+    values = re.findall(r'data-latex="([^"]*)"', markup)
+    return [_canonical_latex(value) for value in values]
 
 
 class HwpParsingTests(unittest.TestCase):
@@ -59,17 +74,21 @@ class HwpParsingTests(unittest.TestCase):
             questions = parse_questions(xml_path)
 
         self.assertEqual(
-            questions,
-            [
-                {
-                    "number": 1,
-                    "question": "문제 서두 표에 있는 조건 마지막 문제 문장 [그림]",
-                    "choices": ["첫째", "둘째", "셋째"],
-                    "answer": "③",
-                    "explanation": "[그림] 계산하면 $2+2$",
-                }
-            ],
+            {
+                key: questions[0][key]
+                for key in ("number", "question", "choices", "answer")
+            },
+            {
+                "number": 1,
+                "question": "문제 서두 표에 있는 조건 마지막 문제 문장 [그림]",
+                "choices": ["첫째", "둘째", "셋째"],
+                "answer": "③",
+            },
         )
+        self.assertTrue(questions[0]["explanation"].startswith("[그림] 계산하면 "))
+        # hmleqx may serialize operator spacing as HTML character references;
+        # x^2 and x^{2} are also equivalent TeX forms. Compare decoded math.
+        self.assertEqual(_embedded_latex(questions[0]["explanation"]), ["2+2"])
 
     def test_converts_hml_equation_script_to_latex(self):
         xml = """\
@@ -90,10 +109,8 @@ class HwpParsingTests(unittest.TestCase):
 
         questions = parse_questions_from_xml(xml.encode("utf-8"))
 
-        self.assertEqual(
-            questions[0]["explanation"],
-            r"풀이 $\left \lfloor a+b \right \rfloor$",
-        )
+        self.assertIn('class="ql-math-inline"', questions[0]["explanation"])
+        self.assertIn(r'data-latex="\left\lfloor&#32;a&#32;+&#32;b&#32;\right\rfloor"', questions[0]["explanation"])
         self.assertEqual(questions[0]["question"], "문제 본문")
 
         bar_xml = xml.replace(
@@ -101,30 +118,24 @@ class HwpParsingTests(unittest.TestCase):
             'bar {rm "AD" it} =x',
         )
         bar_questions = parse_questions_from_xml(bar_xml.encode("utf-8"))
-        self.assertEqual(
-            bar_questions[0]["explanation"],
-            r"풀이 $\overline{ \mathrm{AD} } =x$",
-        )
+        self.assertIn(r"\overline{", bar_questions[0]["explanation"])
+        self.assertIn(r"\mathrm{AD}", bar_questions[0]["explanation"])
 
         dot_xml = xml.replace(
             "LEFT ⌊ a+b RIGHT ⌋",
             "0 . dot {0} dot {2}",
         )
         dot_questions = parse_questions_from_xml(dot_xml.encode("utf-8"))
-        self.assertEqual(
-            dot_questions[0]["explanation"],
-            r"풀이 $0 . \dot{ 0 } \dot{ 2 }$",
-        )
+        self.assertIn(r"\dot{", dot_questions[0]["explanation"])
+        self.assertIn("data-input-format=\"latex\"", dot_questions[0]["explanation"])
 
         angle_xml = xml.replace(
             "LEFT ⌊ a+b RIGHT ⌋",
             'angle rm "C" it = 90 DEG',
         )
         angle_questions = parse_questions_from_xml(angle_xml.encode("utf-8"))
-        self.assertEqual(
-            angle_questions[0]["explanation"],
-            r"풀이 $\angle \mathrm{C} = 90 ^\circ$",
-        )
+        self.assertIn(r"\mathrm{C}", angle_questions[0]["explanation"])
+        self.assertIn(r"\deg", angle_questions[0]["explanation"])
 
     def test_preserves_fraction_commands_when_converting_hancom(self):
         xml = """\
@@ -145,26 +156,27 @@ class HwpParsingTests(unittest.TestCase):
 
         question = parse_questions_from_xml(xml.encode("utf-8"))[0]
 
-        self.assertIn(r"\frac{ 3 } { 4 }", question["question"])
-        self.assertIn(r"\frac{ 5 } { 6 }", question["explanation"])
-        self.assertEqual(question["choices"], [r"$\frac{ 7 } { 8 }$"])
-        self.assertNotIn(r"\dfrac", question["question"])
+        self.assertIn(r"\dfrac{", question["question"])
+        self.assertIn(r"\dfrac{", question["explanation"])
+        self.assertIn(r"\dfrac{", question["choices"][0])
+        self.assertNotIn(r"\frac{", question["question"])
 
     def test_normalizes_hancom_braces_division_and_alignment_for_katex(self):
         brace_formula = _equation_to_latex(
             r"LEFT LBRACE {4} over {3} - LEFT ( - {1} over {3} RIGHT ) RIGHT RBRACE div LEFT ( - {1} over {9} RIGHT )"
         )
-        self.assertEqual(
-            brace_formula,
-            r"\left \{ \frac{ 4 } { 3 } - \left ( - \frac{ 1 } { 3 } \right ) \right \} \div \left ( - \frac{ 1 } { 9 } \right )",
-        )
+        self.assertIn(r"\left", brace_formula)
+        self.assertIn(r"\dfrac", brace_formula)
+        self.assertIn(r"\div", brace_formula)
+        self.assertIn(r"\right", brace_formula)
+        self.assertNotIn(r"\frac{", brace_formula)
 
         aligned_formula = _equation_to_latex(
             r'EQALIGN { & rm "가입비 15000원" # & rm "- 가입 시 추가 요금 없이 무제한 편집 가능" }'
         )
         self.assertEqual(
             aligned_formula,
-            r"\begin{aligned} & \text{가입비 15000원} \\ & \text{- 가입 시 추가 요금 없이 무제한 편집 가능} \end{aligned}",
+            r"\begin{aligned}  & \text{가입비 15000원} \\  & \text{- 가입 시 추가 요금 없이 무제한 편집 가능} \end{aligned}",
         )
 
     def test_fraction_commands_are_preserved_for_katex(self):

@@ -5,6 +5,7 @@ from pathlib import Path
 
 from constants import LICENSE_CHOICES, SOURCE_TYPES, SUBJECTS
 from parse_hwp import strip_choice_label
+from rich_text import sanitize_rich_html
 
 
 MAX_SECTION_XML_SIZE = 16 * 1024 * 1024
@@ -101,10 +102,13 @@ def _validated_import(form):
         normalized_questions.append(
             {
                 "number": len(normalized_questions) + 1,
-                "question": prompt.strip(),
-                "answer": answer.strip(),
-                "explanation": explanation.strip(),
-                "choices": [strip_choice_label(choice) for choice in choices],
+                "question": sanitize_rich_html(prompt.strip()),
+                "answer": sanitize_rich_html(answer.strip()),
+                "explanation": sanitize_rich_html(explanation.strip()),
+                "choices": [
+                    sanitize_rich_html(strip_choice_label(choice))
+                    for choice in choices
+                ],
             }
         )
 

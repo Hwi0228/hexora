@@ -11,7 +11,7 @@
   <link rel="stylesheet" href="{{ url_for('static', filename='styles/pages/workbooks.css') }}">
 </head>
 <body class="workbooks-page"><div class="app app-standard">
-  {% include "partials/sidebar.html" %}
+  {{ render_sidebar() }}
   <main>
     {% set header_section = "WORKBOOKS / CATALOG" %}
     {% set header_title = "문제집" %}

@@ -4,7 +4,7 @@
   <title>{{ workbook.title }} | HEXORA 문제집</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='styles/shared.css') }}"><link rel="stylesheet" href="{{ url_for('static', filename='styles/tokens.css') }}"><link rel="stylesheet" href="{{ url_for('static', filename='styles/base.css') }}"><link rel="stylesheet" href="{{ url_for('static', filename='styles/layout.css') }}"><link rel="stylesheet" href="{{ url_for('static', filename='styles/components.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='styles/pages/workbooks.css') }}">
-</head><body class="workbooks-page workbook-detail-page"><div class="app app-standard">{% include "partials/sidebar.html" %}<main>
+</head><body class="workbooks-page workbook-detail-page"><div class="app app-standard">{{ render_sidebar() }}<main>
   {% set header_section = "WORKBOOKS / DETAIL" %}{% set header_title = workbook.title %}{% set header_description = "시중 교재의 경우 문제 내용 없이 출처 메타데이터와 위치만 관리합니다." %}{% include "partials/header.html" %}
   <section class="content-card">
     <p><span class="tag">{{ '시중 교재 · 메타데이터만' if workbook.kind == 'commercial' else '커뮤니티 문제집' }}</span></p>

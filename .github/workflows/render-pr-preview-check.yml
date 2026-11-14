@@ -1,0 +1,140 @@
+name: Render PR Preview Check
+
+on:
+  pull_request:
+    branches: [dev]
+    types: [opened, synchronize, reopened, ready_for_review]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: render-pr-preview-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  verify-pr-preview:
+    name: Verify Render Preview
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      RENDER_WORKSPACE_ID: tea-daiach5g1s2s738nm6d0
+      RENDER_PARENT_SERVICE_ID: srv-dbm7snlg1s2s73ccjmpg
+      RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
+      PR_NUMBER: ${{ github.event.pull_request.number }}
+      EXPECTED_COMMIT: ${{ github.event.pull_request.head.sha }}
+    steps:
+      - name: Install Render CLI
+        run: |
+          curl --fail-with-body --silent --show-error --location \
+            https://raw.githubusercontent.com/render-oss/cli/refs/heads/main/bin/install.sh \
+            --output /tmp/install-render-cli.sh
+          sudo sh /tmp/install-render-cli.sh
+          render --version
+
+      - name: Authenticate and select workspace
+        run: |
+          test -n "$RENDER_API_KEY" || {
+            echo "::error::Add RENDER_API_KEY to the repository Actions secrets."
+            exit 1
+          }
+          render whoami --output json
+          render workspace set "$RENDER_WORKSPACE_ID"
+
+      - name: Find this PR's Render Preview service
+        id: preview
+        run: |
+          set -euo pipefail
+
+          preview_name="hexora PR #$PR_NUMBER"
+          deadline=$((SECONDS + 1200))
+          preview_service_id=""
+
+          while (( SECONDS < deadline )); do
+            services="$(render services --include-previews --output json)"
+            preview_service_id="$(jq -r --arg name "$preview_name" --arg parent "$RENDER_PARENT_SERVICE_ID" '
+              .. | objects
+              | select(.name? == $name and .serviceDetails.parentServer.id? == $parent)
+              | .id // empty
+            ' <<<"$services" | sed -n '1p')"
+
+            if [[ -n "$preview_service_id" ]]; then
+              break
+            fi
+
+            echo "Render Preview service not created yet; checking again in 15 seconds."
+            sleep 15
+          done
+
+          if [[ -z "$preview_service_id" ]]; then
+            echo "::error::No Render Preview service found for PR #$PR_NUMBER within 20 minutes."
+            echo "::error::Confirm that Render PR Previews are enabled and this PR targets dev."
+            exit 1
+          fi
+
+          echo "Found Preview service: $preview_service_id"
+          echo "service_id=$preview_service_id" >> "$GITHUB_OUTPUT"
+
+      - name: Wait for the PR commit's Preview deployment
+        env:
+          PREVIEW_SERVICE_ID: ${{ steps.preview.outputs.service_id }}
+        run: |
+          set -euo pipefail
+
+          echo "Waiting for Preview deployment of commit: $EXPECTED_COMMIT"
+          deadline=$((SECONDS + 1200))
+          deploy_id=""
+
+          while (( SECONDS < deadline )); do
+            deploys="$(render deploys list "$PREVIEW_SERVICE_ID" --output json)"
+            deploy_id="$(jq -r --arg sha "$EXPECTED_COMMIT" '
+              .. | objects
+              | select(.commit.id? == $sha and .id? != null)
+              | .id
+            ' <<<"$deploys" | sed -n '1p')"
+
+            if [[ -n "$deploy_id" ]]; then
+              break
+            fi
+
+            echo "Preview deployment not listed yet; checking again in 15 seconds."
+            sleep 15
+          done
+
+          if [[ -z "$deploy_id" ]]; then
+            echo "::error::No Preview deployment found for commit $EXPECTED_COMMIT within 20 minutes."
+            exit 1
+          fi
+
+          echo "Found Preview deployment: $deploy_id"
+
+          while (( SECONDS < deadline )); do
+            deploys="$(render deploys list "$PREVIEW_SERVICE_ID" --output json)"
+            status="$(jq -r --arg id "$deploy_id" '
+              .. | objects
+              | select(.id? == $id)
+              | .status // empty
+            ' <<<"$deploys" | sed -n '1p')"
+
+            case "$status" in
+              live)
+                echo "Render Preview deployment succeeded: $deploy_id"
+                exit 0
+                ;;
+              *failed*|*canceled*|*cancelled*|deactivated)
+                echo "::error::Render Preview deployment finished unsuccessfully with status: $status"
+                exit 1
+                ;;
+              "")
+                echo "Preview deployment status not available yet; checking again in 15 seconds."
+                ;;
+              *)
+                echo "Render Preview deployment status: $status"
+                ;;
+            esac
+
+            sleep 15
+          done
+
+          echo "::error::Timed out waiting for Preview deployment $deploy_id to finish."
+          exit 1

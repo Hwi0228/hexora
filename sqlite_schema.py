@@ -168,6 +168,22 @@ CREATE TABLE IF NOT EXISTS question_links (
 """
 
 
+RIGHTS_REPORTS_SCHEMA = """
+CREATE TABLE IF NOT EXISTS rights_reports (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    category TEXT NOT NULL,
+    requested_action TEXT NOT NULL,
+    requester_role TEXT NOT NULL,
+    requester_name TEXT NOT NULL,
+    requester_email TEXT NOT NULL,
+    target_url TEXT NOT NULL,
+    details TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT '접수',
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+)
+"""
+
+
 QUESTION_REVISIONS_SCHEMA = """
 CREATE TABLE IF NOT EXISTS question_revisions (
     id INTEGER PRIMARY KEY AUTOINCREMENT,

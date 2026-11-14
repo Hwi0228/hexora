@@ -49,6 +49,8 @@ class HwpParserRouteTests(unittest.TestCase):
                 "display_name": "HWP 테스트",
                 "password": "long-test-password",
                 "password_confirm": "long-test-password",
+                "terms_agreed": "1",
+                "privacy_agreed": "1",
             },
         )
         self.assertEqual(response.status_code, 302)
@@ -167,7 +169,8 @@ class HwpParserRouteTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertIn("추출 결과 · 1문항".encode(), response.data)
         self.assertIn("문제 본문".encode(), response.data)
-        self.assertIn("더하면 $1+1$".encode(), response.data)
+        self.assertIn(b'class="ql-math-inline"', response.data)
+        self.assertRegex(response.data.decode("utf-8"), r'data-latex="1(?:&#32;|\s)*\+(?:&#32;|\s)*1"')
         self.assertIn("JSON 다운로드".encode(), response.data)
 
     def test_uploading_hwpx_uses_rhwp_parser(self):

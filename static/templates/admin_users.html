@@ -14,7 +14,7 @@
 </head>
 <body>
   <div class="app app-standard">
-    {% include "partials/sidebar.html" %}
+    {{ render_sidebar() }}
     <main class="admin-main">
       {% set header_section = "ADMINISTRATION" %}
       {% set header_title = "작성자별 문항 현황" %}

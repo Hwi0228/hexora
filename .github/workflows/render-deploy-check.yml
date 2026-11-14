@@ -1,0 +1,105 @@
+name: Render Deploy Check
+
+on:
+  push:
+    branches: [dev]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: render-deploy-check-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify-render-deploy:
+    name: Verify Render deployment
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      RENDER_SERVICE_ID: srv-dbm7snlg1s2s73ccjmpg
+      RENDER_WORKSPACE_ID: tea-daiach5g1s2s738nm6d0
+      RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
+    steps:
+      - name: Install Render CLI
+        run: |
+          curl --fail-with-body --silent --show-error --location \
+            https://raw.githubusercontent.com/render-oss/cli/refs/heads/main/bin/install.sh \
+            --output /tmp/install-render-cli.sh
+          sudo sh /tmp/install-render-cli.sh
+          render --version
+
+      - name: Authenticate and select workspace
+        run: |
+          test -n "$RENDER_API_KEY" || {
+            echo "::error::Add RENDER_API_KEY to the repository Actions secrets."
+            exit 1
+          }
+          render whoami --output json
+          render workspace set "$RENDER_WORKSPACE_ID"
+
+      - name: Wait for this commit's Render deployment
+        env:
+          EXPECTED_COMMIT: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+
+          echo "Waiting for Render to register commit: $EXPECTED_COMMIT"
+          deadline=$((SECONDS + 1200))
+          deploy_id=""
+
+          # Render's automatic deploy webhook can arrive shortly after this workflow starts.
+          while (( SECONDS < deadline )); do
+            deploys="$(render deploys list "$RENDER_SERVICE_ID" --output json)"
+            deploy_id="$(jq -r --arg sha "$EXPECTED_COMMIT" '
+              .. | objects
+              | select(.commit.id? == $sha and .id? != null)
+              | .id
+            ' <<<"$deploys" | sed -n '1p')"
+
+            if [[ -n "$deploy_id" ]]; then
+              break
+            fi
+
+            echo "Deployment not listed yet; checking again in 15 seconds."
+            sleep 15
+          done
+
+          if [[ -z "$deploy_id" ]]; then
+            echo "::error::No Render deployment found for commit $EXPECTED_COMMIT within 20 minutes."
+            exit 1
+          fi
+
+          echo "Found Render deployment: $deploy_id"
+
+          while (( SECONDS < deadline )); do
+            deploys="$(render deploys list "$RENDER_SERVICE_ID" --output json)"
+            status="$(jq -r --arg id "$deploy_id" '
+              .. | objects
+              | select(.id? == $id)
+              | .status // empty
+            ' <<<"$deploys" | sed -n '1p')"
+
+            case "$status" in
+              live)
+                echo "Render deployment succeeded: $deploy_id"
+                exit 0
+                ;;
+              *failed*|*canceled*|*cancelled*|deactivated)
+                echo "::error::Render deployment finished unsuccessfully with status: $status"
+                exit 1
+                ;;
+              "")
+                echo "Deployment status not available yet; checking again in 15 seconds."
+                ;;
+              *)
+                echo "Render deployment status: $status"
+                ;;
+            esac
+
+            sleep 15
+          done
+
+          echo "::error::Timed out waiting for Render deployment $deploy_id to finish."
+          exit 1

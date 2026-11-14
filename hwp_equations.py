@@ -42,6 +42,8 @@ def _replace_group_environment(
             continue
         body = expression[open_index + 1 : close_index].replace("#", r"\\")
         body = re.sub(r"\s*\\\\\s*", r" \\\\ ", body.strip())
+        if environment == "aligned":
+            body = re.sub(r"\s*&\s*", " & ", body).strip()
         replacement = rf"\begin{{{environment}}} {body} \end{{{environment}}}"
         expression = expression[: match.start()] + replacement + expression[close_index + 1 :]
         search_from = match.start() + len(replacement)
@@ -67,7 +69,12 @@ def normalize_katex_expression(expression: str) -> str:
         expression = re.sub(
             rf"(?<![\w\\]){token}(?!\w)", lambda _: command, expression
         )
-    expression = expression.replace("#", " ")
+    expression = expression.replace("#", " ").replace("÷", r"\div")
+    expression = re.sub(
+        r"\\mathrm\{\\text\{([^{}]*)\}\}",
+        lambda match: rf"\text{{{match.group(1)}}}",
+        expression,
+    )
     expression = re.sub(
         r"\\mathrm\{([^{}]*)\}",
         lambda match: (
