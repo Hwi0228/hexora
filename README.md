@@ -188,3 +188,8 @@ Render 서비스의 Custom Domains에 `hexora.kro.kr`을 등록하고 DNS를 연
 PR을 검토한 뒤 `master`에 병합하면 GitHub Actions가 `VERSION`의 변경 여부를 확인하고, 해당 버전의 `CHANGELOG.md` 항목을 릴리즈 노트로 사용해 `vX.Y.Z` 태그와 GitHub Release를 자동 생성합니다. PR 승인만으로는 릴리즈하지 않으며, 병합이 완료된 뒤에만 실행됩니다. 별도 PAT 없이 워크플로의 `GITHUB_TOKEN`을 사용합니다.
 
 앱 공통 사이드바 하단의 버전 표시는 실행 시 `VERSION` 파일에서 읽습니다. 따라서 `master` 병합 후 호스팅 서비스가 새 코드를 배포하면 사이트에도 동일한 버전이 표시됩니다.
+
+
+## 운영·품질 구현 노트
+
+P1 안정화 항목의 동작, 설정, 제한 사항은 [P1 구현 노트](docs/p1-implementation.md)를 참고하세요.
