@@ -100,7 +100,8 @@ class SuffixQuestionAdapter:
                     result.append(item)
                 parts, source = [], None
             else:
-                if source is None: source = block.position
+                if source is None:
+                    source = block.position
                 parts.append(block.text)
         return result
 
