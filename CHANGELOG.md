@@ -2,6 +2,39 @@
 
 이 프로젝트는 Semantic Versioning을 따릅니다.
 
+## [0.2.2] - Not Released
+
+### Added
+- 운영 환경에서 `FLASK_SECRET_KEY` 설정을 필수화하고 키 길이·복잡도 검증 추가
+- HTTPS 세션 쿠키, 보안 응답 헤더 및 Content Security Policy 기본값 강화
+- 최초 관리자 계정을 일반 회원가입과 분리한 명시적 부트스트랩 절차 추가
+- HWP/HWPX 업로드 크기와 ZIP/XML 파싱 자원 제한 강화
+- SQLite 온라인 백업 및 PostgreSQL 백업·복구 CLI와 무결성 검증 추가
+- 문서 구조 기반 HWP 템플릿 탐지기와 문항·정답 어댑터 구현
+- 문항·정답 조립기 및 최종 Validator를 기존 HWP 가져오기 흐름에 통합
+- 가져오기 저장 전 중복 문항 번호, 누락·범위 밖 정답, 고아 정답 등 구조 오류 검증
+- hmleqx의 분수·지수·중첩 분수·근호·극한·행렬 및 LaTeX 보존 회귀 테스트 추가
+- 자체 제작 HWPX smoke fixture로 Reader부터 문항 조립까지의 통합 경로 검증
+
+### Changed
+- HWP 가져오기가 문항·정답 영역을 독립적으로 탐지하고 구조 근거 및 모호성 정보를 사용하도록 개선
+- 구조 검증에 실패한 HWP 가져오기 결과는 저장되지 않도록 처리
+- PostgreSQL 백업·복구 도구 탐색 시 명시된 클라이언트 버전을 우선 사용하도록 개선
+
+### Security
+- 운영 환경의 비밀키 누락 또는 취약한 설정에서 애플리케이션 시작을 차단
+- 파일 업로드 및 HWPX 압축 해제·XML 처리 경계에 자원 제한 적용
+- 관리자 권한 자동 부여를 제거하고 명시적 초기 관리자 생성 절차 사용
+
+### Verification
+- GitHub Actions 전체 테스트 통과 (165개 테스트)
+- Render PR Preview Check 통과
+- SQLite/PostgreSQL 백업·복구 및 HWP 파서 회귀 테스트 포함
+
+### Known Limitations
+- 실제 한컴오피스에서 생성된 HWP/HWPX의 재배포 권한이 확인된 회귀 코퍼스는 아직 확보되지 않음. 현재는 자체 제작 HWPX smoke fixture만 포함
+- #31 데이터베이스 스키마 마이그레이션 체계는 사용자 결정에 따라 범위에서 제외했으며, 기존 DB 초기화 및 SQLite/PostgreSQL 선택 구조를 유지
+
 ## [0.2.1] - 2026-11-14
 
 ### Changed
