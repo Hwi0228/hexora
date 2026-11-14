@@ -6,7 +6,7 @@ import json
 import os
 import re
 import sys
-import xml.etree.ElementTree as ET
+from defusedxml import ElementTree as ET
 from functools import lru_cache
 from pathlib import Path
 from typing import Iterable
@@ -248,13 +248,37 @@ def _parse_row(row: ET.Element, number: int) -> dict[str, object]:
 
 
 def parse_questions(xml_path: Path) -> list[dict[str, object]]:
-    root = ET.parse(xml_path).getroot()
+    root = _parse_xml_root(xml_path.read_bytes())
     return _parse_root(root)
+
+
+MAX_SECTION_XML_SIZE = 16 * 1024 * 1024
+MAX_XML_NODES = 200_000
+MAX_XML_DEPTH = 128
+
+
+def _parse_xml_root(xml_content: bytes) -> ET.Element:
+    if not isinstance(xml_content, (bytes, bytearray)) or not xml_content:
+        raise ValueError("파싱할 XML 내용이 비어 있습니다.")
+    if len(xml_content) > MAX_SECTION_XML_SIZE:
+        raise ValueError("XML 크기가 허용 한도(16 MiB)를 초과합니다.")
+
+    root = ET.fromstring(xml_content)
+    stack = [(root, 1)]
+    node_count = 0
+    while stack:
+        node, depth = stack.pop()
+        node_count += 1
+        if node_count > MAX_XML_NODES:
+            raise ValueError("XML 요소 수가 허용 한도(200,000개)를 초과합니다.")
+        if depth > MAX_XML_DEPTH:
+            raise ValueError("XML 중첩 깊이가 허용 한도(128단계)를 초과합니다.")
+        stack.extend((child, depth + 1) for child in node)
+    return root
 
 
 def parse_questions_from_xml(xml_content: bytes) -> list[dict[str, object]]:
-    root = ET.fromstring(xml_content)
-    return _parse_root(root)
+    return _parse_root(_parse_xml_root(xml_content))
 
 
 def _parse_root(root: ET.Element) -> list[dict[str, object]]:

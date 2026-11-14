@@ -343,7 +343,7 @@ class HwpParserRouteTests(unittest.TestCase):
     def test_invalid_uploads_show_an_error(self):
         for filename, content, expected in (
             ("exam.hwp", b"not supported", "rhwp-python이 문서를 해석하지 못했습니다"),
-            ("exam.hwpx", b"not a zip", "rhwp-python이 문서를 해석하지 못했습니다"),
+            ("exam.hwpx", b"not a zip", "HWPX 파일이 올바른 ZIP 문서가 아닙니다"),
             ("exam.xml", b"<not-closed>", "no element found"),
         ):
             with self.subTest(filename=filename):
@@ -358,6 +358,20 @@ class HwpParserRouteTests(unittest.TestCase):
 
                 self.assertEqual(response.status_code, 200)
                 self.assertIn(expected.encode(), response.data)
+
+    def test_oversized_hwp_upload_returns_a_clear_limit_error(self):
+        from parse_rhwp import MAX_DOCUMENT_BYTES
+
+        response = self.client.post(
+            "/hwp",
+            data={
+                "_csrf_token": self.csrf_token(),
+                "document": (io.BytesIO(b"x" * (MAX_DOCUMENT_BYTES + 1)), "large.hwp"),
+            },
+            content_type="multipart/form-data",
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("12 MiB".encode(), response.data)
 
     def test_upload_requires_login_and_csrf(self):
         anonymous = app.test_client()

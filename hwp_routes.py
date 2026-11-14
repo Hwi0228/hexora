@@ -1,5 +1,6 @@
 import json
-import xml.etree.ElementTree as ET
+from defusedxml import ElementTree as ET
+from defusedxml.common import DefusedXmlException
 from pathlib import Path
 
 from flask import abort, g, redirect, render_template, request, url_for
@@ -130,11 +131,18 @@ def hwp_parser_page():
             error = "파싱할 HWP, HWPX 또는 section0.xml 파일을 선택해 주세요."
         else:
             try:
-                content = uploaded.read(MAX_DOCUMENT_BYTES + 1)
-                if len(content) > MAX_DOCUMENT_BYTES:
-                    raise ValueError("문서 크기가 허용 한도(12MB)를 초과합니다.")
-
                 extension = Path(uploaded.filename).suffix.lower()
+                file_limit = (
+                    MAX_SECTION_XML_SIZE if extension == ".xml"
+                    else MAX_DOCUMENT_BYTES
+                )
+                content = uploaded.read(file_limit + 1)
+                if len(content) > file_limit:
+                    limit_label = "16 MiB" if extension == ".xml" else "12 MiB"
+                    raise ValueError(
+                        f"문서 크기가 허용 한도({limit_label})를 초과합니다."
+                    )
+
                 if extension in {".hwp", ".hwpx"}:
                     questions = parse_questions_from_rhwp_bytes(
                         content,
@@ -151,7 +159,7 @@ def hwp_parser_page():
                     ensure_ascii=False,
                     indent=2,
                 )
-            except (ValueError, RuntimeError, ET.ParseError) as exc:
+            except (ValueError, RuntimeError, ET.ParseError, DefusedXmlException) as exc:
                 error = str(exc)
 
     return _render_page(questions=questions, result_json=result_json, error=error)

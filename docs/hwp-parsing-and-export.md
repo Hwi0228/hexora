@@ -141,3 +141,12 @@ version = hmleqx.version()
 
 4. **HTTP 파일 다운로드 라우트 (`export_exam_hwpx`)**:
    - `POST /exams/export` 요청 시 선택된 문항 ID 배열(최대 100개)과 시험지 제목을 받아 HWPX 패키지를 바이너리로 스트리밍 다운로드(`application/vnd.hancom.hwpx`)합니다.
+
+
+## 업로드 및 파싱 자원 제한
+
+- Flask 전체 요청 본문은 multipart 프레이밍을 포함해 18 MiB로 제한합니다. 초과 요청은 HTTP 413과 안내 메시지를 반환합니다.
+- HWP/HWPX 파일은 각각 12 MiB, 단독 HWPML XML은 16 MiB까지 허용합니다.
+- HWPX ZIP은 내부 엔트리 1,024개, 압축 해제 총량 64 MiB, 단일 엔트리 16 MiB, XML 엔트리 128개로 제한합니다. 경로 이탈, 심볼릭 링크, 암호화 엔트리, 비정상 압축률을 거부합니다.
+- HWPX 내부 XML과 단독 XML은 defusedxml로 파싱하며 XML 파일별 요소 수 200,000개와 중첩 깊이 128단계를 제한합니다.
+- 파싱 결과 문항은 최대 500개입니다. 이 제한을 넘으면 미리보기/저장 단계로 전달하지 않습니다.

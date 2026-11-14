@@ -4,6 +4,13 @@ import ctypes
 import html
 import importlib.util
 import re
+import stat
+import zipfile
+from io import BytesIO
+from pathlib import PurePosixPath
+
+from defusedxml import ElementTree as SafeET
+from defusedxml.common import DefusedXmlException
 from pathlib import Path
 from collections import OrderedDict
 from typing import Any, Iterable
@@ -19,6 +26,79 @@ from rhwp_question_parser import (
 
 
 MAX_DOCUMENT_BYTES = 12 * 1024 * 1024
+MAX_PARSED_QUESTIONS = 500
+MAX_HWPX_ENTRIES = 1024
+MAX_HWPX_UNCOMPRESSED_BYTES = 64 * 1024 * 1024
+MAX_HWPX_MEMBER_BYTES = 16 * 1024 * 1024
+MAX_HWPX_XML_FILES = 128
+MAX_HWPX_XML_NODES = 200_000
+MAX_HWPX_XML_DEPTH = 128
+
+
+def _validate_hwpx_archive(content: bytes) -> None:
+    """Reject malformed or resource-exhausting HWPX ZIP packages before parsing."""
+    try:
+        archive = zipfile.ZipFile(BytesIO(content))
+    except (zipfile.BadZipFile, OSError) as exc:
+        raise ValueError("HWPX 파일이 올바른 ZIP 문서가 아닙니다.") from exc
+
+    with archive:
+        entries = archive.infolist()
+        if not entries or len(entries) > MAX_HWPX_ENTRIES:
+            raise ValueError("HWPX 내부 파일 개수가 허용 한도(1,024개)를 벗어났습니다.")
+
+        total_uncompressed = 0
+        xml_entries = 0
+        for info in entries:
+            normalized_name = info.filename.replace("\\", "/")
+            member_path = PurePosixPath(normalized_name)
+            mode = info.external_attr >> 16
+            if (
+                member_path.is_absolute()
+                or ".." in member_path.parts
+                or "\x00" in info.filename
+                or stat.S_ISLNK(mode)
+            ):
+                raise ValueError("HWPX 내부에 허용되지 않는 파일 경로가 있습니다.")
+            if info.flag_bits & 0x1:
+                raise ValueError("암호화된 HWPX 내부 파일은 처리할 수 없습니다.")
+            if info.file_size > MAX_HWPX_MEMBER_BYTES:
+                raise ValueError("HWPX 내부 단일 파일이 허용 한도(16 MiB)를 초과합니다.")
+            total_uncompressed += info.file_size
+            if total_uncompressed > MAX_HWPX_UNCOMPRESSED_BYTES:
+                raise ValueError("HWPX 압축 해제 총량이 허용 한도(64 MiB)를 초과합니다.")
+            if (
+                info.file_size > 1024 * 1024
+                and info.file_size / max(info.compress_size, 1) > 200
+            ):
+                raise ValueError("HWPX 내부 파일의 압축률이 비정상적으로 높습니다.")
+
+            if info.filename.lower().endswith((".xml", ".rdf")):
+                xml_entries += 1
+                if xml_entries > MAX_HWPX_XML_FILES:
+                    raise ValueError("HWPX XML 파일 개수가 허용 한도(128개)를 초과합니다.")
+                try:
+                    xml_bytes = archive.read(info)
+                    root = SafeET.fromstring(xml_bytes)
+                except (
+                    DefusedXmlException, SafeET.ParseError, RuntimeError,
+                    zipfile.BadZipFile, OSError,
+                ) as exc:
+                    raise ValueError("HWPX 내부 XML이 안전하지 않거나 손상되었습니다.") from exc
+
+                stack = [(root, 1)]
+                node_count = 0
+                while stack:
+                    node, depth = stack.pop()
+                    node_count += 1
+                    if node_count > MAX_HWPX_XML_NODES:
+                        raise ValueError("HWPX XML 요소 수가 허용 한도(200,000개)를 초과합니다.")
+                    if depth > MAX_HWPX_XML_DEPTH:
+                        raise ValueError("HWPX XML 중첩 깊이가 허용 한도(128단계)를 초과합니다.")
+                    stack.extend((child, depth + 1) for child in node)
+
+        if xml_entries == 0:
+            raise ValueError("HWPX 문서에서 XML 콘텐츠를 찾지 못했습니다.")
 
 
 def _preload_bundled_freetype() -> None:
@@ -195,9 +275,13 @@ def parse_questions_from_ir(ir: Any) -> list[dict[str, Any]]:
                 questions.append(parsed)
 
     if questions:
+        if len(questions) > MAX_PARSED_QUESTIONS:
+            raise ValueError("가져온 문항 수가 허용 한도(500개)를 초과했습니다.")
         return questions
 
     questions = parse_numbered_document_sections(_paragraphs_from_document(ir))
+    if len(questions) > MAX_PARSED_QUESTIONS:
+        raise ValueError("가져온 문항 수가 허용 한도(500개)를 초과했습니다.")
     if not questions:
         raise ValueError(
             "문항을 찾지 못했습니다. 문항 번호(예: 1.)로 시작하는 문단이나 "
@@ -213,7 +297,9 @@ def parse_questions_from_rhwp_bytes(
     if not content:
         raise ValueError("업로드한 문서가 비어 있습니다.")
     if len(content) > MAX_DOCUMENT_BYTES:
-        raise ValueError("문서 크기가 허용 한도(12MB)를 초과합니다.")
+        raise ValueError("문서 크기가 허용 한도(12 MiB)를 초과합니다.")
+    if Path(filename).suffix.lower() == ".hwpx":
+        _validate_hwpx_archive(content)
 
     if importlib.util.find_spec("rhwp") is None:
         raise RuntimeError(

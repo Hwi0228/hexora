@@ -83,6 +83,9 @@ def _secret_key(app):
 
 def create_app():
     app = Flask(__name__, template_folder="static/templates")
+    # Allow the 16 MiB XML limit plus multipart framing; individual formats
+    # are checked against their own stricter limits in the upload route.
+    app.config["MAX_CONTENT_LENGTH"] = 18 * 1024 * 1024
     app.jinja_env.filters["render_rich_html"] = lambda value: Markup(render_rich_html(value))
     app.jinja_env.globals["render_sidebar"] = render_sidebar
     database_type = os.environ.get("DATABASE_TYPE", "sqlite").strip().lower()
@@ -140,6 +143,14 @@ def create_app():
             "privacy_contact": app.config["HEXORA_PRIVACY_CONTACT"],
             "privacy_officer": app.config["HEXORA_PRIVACY_OFFICER"],
         }
+
+    @app.errorhandler(413)
+    def request_too_large(_error):
+        return (
+            "요청 크기가 허용 한도(18 MiB)를 초과했습니다. "
+            "문서 파일 크기와 업로드 형식을 확인해 주세요.",
+            413,
+        )
 
     @app.after_request
     def add_security_headers(response):
