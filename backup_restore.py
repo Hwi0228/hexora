@@ -372,6 +372,8 @@ def restore_backup(
                     "--no-acl",
                     "--exit-on-error",
                     "--single-transaction",
+                    "--dbname",
+                    environment["PGDATABASE"],
                     str(dump_path),
                 ],
                 environment,

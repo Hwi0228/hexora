@@ -47,7 +47,7 @@ class DatabaseBackupRestoreTests(unittest.TestCase):
         output = create_backup("sqlite", self.database, output=self.root / "backup.zip", schema_version=0)
         manifest, payload = inspect_backup(output)
         self.assertEqual(manifest["database_type"], "sqlite")
-        self.assertEqual(manifest["schema_version"], 1)
+        self.assertEqual(manifest["schema_version"], 0)
         self.assertEqual(len(manifest["sha256"]), 64)
         self.assertEqual(
             manifest["database_summary"]["counts"],
@@ -61,7 +61,7 @@ class DatabaseBackupRestoreTests(unittest.TestCase):
             self.assertEqual(connection.execute("SELECT COUNT(*) FROM question_revisions").fetchone()[0], 1)
 
     def test_sqlite_restore_requires_confirmation_and_replaces_target_atomically(self):
-        output = create_backup("sqlite", self.database, output=self.root / "backup.zip", schema_version=1)
+        output = create_backup("sqlite", self.database, output=self.root / "backup.zip", schema_version=0)
         target = self.root / "target.sqlite3"
         with sqlite3.connect(target) as connection:
             connection.execute("CREATE TABLE old_data (value TEXT)")
@@ -93,7 +93,7 @@ class DatabaseBackupRestoreTests(unittest.TestCase):
         with self.assertRaisesRegex(BackupError, "DB 종류"):
             restore_backup(output, "postgresql", "postgresql://u:p@localhost/db", confirm_overwrite=True)
         with self.assertRaisesRegex(BackupError, "스키마 버전"):
-            restore_backup(output, "sqlite", self.root / "target.sqlite3", confirm_overwrite=True, supported_schema_version=1)
+            restore_backup(output, "sqlite", self.root / "target.sqlite3", confirm_overwrite=True, supported_schema_version=0)
 
     def test_postgres_url_credentials_are_passed_via_environment_not_arguments(self):
         environment = _postgres_environment(
