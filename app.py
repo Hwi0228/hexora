@@ -3,6 +3,7 @@ import secrets
 from pathlib import Path
 
 from flask import Flask
+from werkzeug.middleware.proxy_fix import ProxyFix
 from markupsafe import Markup
 
 from auth import register_auth_routes
@@ -103,9 +104,17 @@ def create_app():
     app.config["SECRET_KEY"] = os.environ.get("FLASK_SECRET_KEY")
     app.config["SESSION_COOKIE_HTTPONLY"] = True
     app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
+    # Production must never send session cookies over an unencrypted connection.
+    # The explicit flag remains available to opt in during local HTTPS development.
     app.config["SESSION_COOKIE_SECURE"] = (
-        os.environ.get("FLASK_SESSION_COOKIE_SECURE", "").lower() == "true"
+        _is_production_environment()
+        or os.environ.get("FLASK_SESSION_COOKIE_SECURE", "").strip().lower()
+        in {"1", "true", "yes"}
     )
+    if _is_production_environment():
+        # Render terminates TLS at one trusted reverse proxy and forwards the
+        # original scheme through X-Forwarded-Proto.
+        app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1)
     if not app.config["SECRET_KEY"]:
         app.config["SECRET_KEY"] = _secret_key(app)
 
@@ -129,6 +138,39 @@ def create_app():
             "privacy_contact": app.config["HEXORA_PRIVACY_CONTACT"],
             "privacy_officer": app.config["HEXORA_PRIVACY_OFFICER"],
         }
+
+    @app.after_request
+    def add_security_headers(response):
+        response.headers.setdefault("X-Content-Type-Options", "nosniff")
+        response.headers.setdefault("X-Frame-Options", "DENY")
+        response.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
+        response.headers.setdefault(
+            "Permissions-Policy",
+            "camera=(), microphone=(), geolocation=(), payment=()",
+        )
+        response.headers.setdefault(
+            "Content-Security-Policy",
+            "; ".join(
+                (
+                    "default-src 'self'",
+                    "base-uri 'self'",
+                    "object-src 'none'",
+                    "frame-ancestors 'none'",
+                    "form-action 'self'",
+                    "img-src 'self' data: blob:",
+                    "font-src 'self' data: https://cdn.jsdelivr.net",
+                    "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net",
+                    "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net",
+                    "connect-src 'self'",
+                )
+            ),
+        )
+        if _is_production_environment():
+            response.headers.setdefault(
+                "Strict-Transport-Security",
+                "max-age=31536000; includeSubDomains",
+            )
+        return response
 
     register_auth_routes(app)
     register_dashboard_routes(app)
