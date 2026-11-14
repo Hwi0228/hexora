@@ -2,6 +2,8 @@
 
 import json
 import re
+
+from latex_to_hancom import convert_latex_to_hancom
 from html.parser import HTMLParser
 
 
@@ -17,6 +19,16 @@ class _RichTextLines(HTMLParser):
             self.parts.append("\n")
 
     def handle_starttag(self, tag, attrs):
+        attributes = dict(attrs)
+        classes = set((attributes.get("class") or "").split())
+        if "ql-math-inline" in classes:
+            self.parts.append("$" + (attributes.get("data-latex") or "") + "$")
+            return
+        if "ql-math-block" in classes:
+            self._line_break()
+            self.parts.append("$" + (attributes.get("data-latex") or "") + "$")
+            self._line_break()
+            return
         if tag == "br":
             self._line_break()
         elif tag in self.BLOCK_TAGS:
@@ -75,6 +87,34 @@ def _question_paragraphs(questions, title, include_answers):
             "page_break": False,
         })
 
+    def rich_runs(value, *, char_style="17"):
+        runs = []
+        source = str(value or "")
+        pattern = re.compile(r"(\$\$[\s\S]+?\$\$|\$[^$\n]+\$)")
+        cursor = 0
+        for match in pattern.finditer(source):
+            if match.start() > cursor:
+                runs.append({"text": source[cursor:match.start()], "char_style": char_style})
+            token = match.group(0)
+            display_mode = token.startswith("$")
+            latex = token[2:-2] if display_mode else token[1:-1]
+            runs.append({
+                "equation_script": convert_latex_to_hancom(latex),
+                "display_mode": display_mode,
+                "char_style": char_style,
+            })
+            cursor = match.end()
+        if cursor < len(source):
+            runs.append({"text": source[cursor:], "char_style": char_style})
+        return runs
+
+    def add_rich_line(value, *, char_style="17", para_style="19"):
+        runs = rich_runs(value, char_style=char_style)
+        if any("equation_script" in run for run in runs):
+            add_runs(runs, para_style=para_style)
+        else:
+            add(value, char_style=char_style, para_style=para_style)
+
     # Branded exam-sheet masthead and student information fields.
     add("HEXORA", char_style="21", para_style="39")
     add("MATHEMATICS  ·  ASSESSMENT", char_style="24", para_style="58")
@@ -92,7 +132,7 @@ def _question_paragraphs(questions, title, include_answers):
         if passage_lines:
             add("〈지문〉", char_style="23")
             for line in passage_lines:
-                add(line)
+                add_rich_line(line)
 
         prompt_lines = rich_text_to_lines(question.get("prompt"))
         point_label = ""
@@ -103,15 +143,15 @@ def _question_paragraphs(questions, title, include_answers):
             pass
 
         first_line = prompt_lines.pop(0) if prompt_lines else ""
-        add(f"{first_line}{point_label}", char_style="17")
+        add_rich_line(f"{first_line}{point_label}", char_style="17")
         for line in prompt_lines:
-            add(line)
+            add_rich_line(line)
 
         example_lines = rich_text_to_lines(question.get("examples"))
         if example_lines:
             add("〈보기〉", char_style="23")
             for line in example_lines:
-                add(line)
+                add_rich_line(line)
 
         try:
             choices = question.get("choices") or []
@@ -127,7 +167,7 @@ def _question_paragraphs(questions, title, include_answers):
             label = choice_labels[index] if index < len(choice_labels) else f"{index + 1}."
             lines = rich_text_to_lines(_choice_text(choice))
             for line_index, line in enumerate(lines):
-                add(f"{label} {line}" if line_index == 0 else f"   {line}")
+                add_rich_line(f"{label} {line}" if line_index == 0 else f"   {line}")
 
         add("")
 
@@ -143,13 +183,15 @@ def _question_paragraphs(questions, title, include_answers):
             answer_lines = rich_text_to_lines(question.get("answer"))
             explanation_lines = rich_text_to_lines(question.get("explanation"))
             answer = " ".join(answer_lines) if answer_lines else "미기재"
-            add_runs([
-                {"text": f"{number:02d}", "char_style": "60"},
-                {"text": f"  정답: {answer}", "char_style": "17"},
-            ])
+            add_runs(
+                [
+                    {"text": f"{number:02d}", "char_style": "60"},
+                    {"text": "  정답: ", "char_style": "17"},
+                ] + rich_runs(answer, char_style="17")
+            )
             if explanation_lines:
                 add("해설:", char_style="23")
                 for line in explanation_lines:
-                    add(line)
+                    add_rich_line(line)
 
     return paragraphs
