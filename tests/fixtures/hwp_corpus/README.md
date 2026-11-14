@@ -2,7 +2,7 @@
 
 ## Fixture policy
 
-- Fixtures authored in this directory are original HEXORA test material and may be redistributed under CC0-1.0.
+- The generated fixture contains only original HEXORA test text and no third-party exam content. The repository currently has no declared root-level license, so this fixture is not separately labeled CC0 or offered for redistribution outside the repository.
 - Third-party exam papers, school worksheets, publisher material, and user uploads are not copied here unless redistribution permission is documented.
 - Every future external fixture must include its source, license, redistribution permission, and a reviewed golden result.
 
