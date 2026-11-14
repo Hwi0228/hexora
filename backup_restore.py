@@ -37,10 +37,87 @@ def _sqlite_integrity_check(path: Path) -> None:
     try:
         with sqlite3.connect(str(path)) as connection:
             result = connection.execute("PRAGMA integrity_check").fetchone()[0]
+            foreign_key_errors = connection.execute("PRAGMA foreign_key_check").fetchall()
     except sqlite3.DatabaseError as exc:
         raise BackupError("SQLite 백업 파일을 열 수 없거나 손상되었습니다.") from exc
     if result != "ok":
         raise BackupError(f"SQLite 무결성 검사에 실패했습니다: {result}")
+    if foreign_key_errors:
+        raise BackupError(
+            f"SQLite 외래 키 참조 무결성 검사에 실패했습니다: {len(foreign_key_errors)}건"
+        )
+
+
+def _sqlite_summary(path: Path) -> dict:
+    _sqlite_integrity_check(path)
+    with sqlite3.connect(str(path)) as connection:
+        tables = {
+            row[0] for row in connection.execute(
+                "SELECT name FROM sqlite_master WHERE type='table'"
+            )
+        }
+        counts = {}
+        for table in ("users", "questions", "question_revisions"):
+            if table in tables:
+                # Table names come only from this fixed allowlist.
+                counts[table] = int(
+                    connection.execute(f'SELECT COUNT(*) FROM "{table}"').fetchone()[0]
+                )
+    return {"counts": counts, "foreign_key_violations": 0}
+
+
+def _postgres_summary(database_url: str) -> dict:
+    try:
+        import psycopg
+    except ImportError as exc:
+        raise BackupError("PostgreSQL 검증에는 psycopg가 필요합니다.") from exc
+    try:
+        with psycopg.connect(database_url) as connection:
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    "SELECT table_name FROM information_schema.tables "
+                    "WHERE table_schema = 'public' AND table_type = 'BASE TABLE'"
+                )
+                tables = {row[0] for row in cursor.fetchall()}
+                counts = {}
+                for table in ("users", "questions", "question_revisions"):
+                    if table in tables:
+                        cursor.execute(f'SELECT COUNT(*) FROM "{table}"')
+                        counts[table] = int(cursor.fetchone()[0])
+                cursor.execute(
+                    "SELECT COUNT(*) FROM pg_constraint "
+                    "WHERE contype = 'f' AND connamespace = 'public'::regnamespace "
+                    "AND NOT convalidated"
+                )
+                unvalidated_constraints = int(cursor.fetchone()[0])
+    except Exception as exc:
+        raise BackupError(f"PostgreSQL 데이터 검증에 실패했습니다: {exc}") from exc
+    return {
+        "counts": counts,
+        "foreign_key_violations": 0,
+        "unvalidated_foreign_keys": unvalidated_constraints,
+    }
+
+
+def _database_summary(database_type: str, target) -> dict:
+    if database_type == "sqlite":
+        return _sqlite_summary(Path(target))
+    if database_type == "postgresql":
+        return _postgres_summary(str(target))
+    raise BackupError("지원하지 않는 데이터베이스 유형입니다.")
+
+
+def _verify_restored_summary(database_type: str, target, expected: dict) -> dict:
+    actual = _database_summary(database_type, target)
+    if actual.get("counts", {}) != expected.get("counts", {}):
+        raise BackupError(
+            "복구 후 핵심 테이블의 레코드 수가 백업 manifest와 일치하지 않습니다."
+        )
+    if actual.get("foreign_key_violations", 0):
+        raise BackupError("복구 후 외래 키 참조 무결성 검사에 실패했습니다.")
+    if actual.get("unvalidated_foreign_keys", 0):
+        raise BackupError("PostgreSQL에 검증되지 않은 외래 키 제약조건이 있습니다.")
+    return actual
 
 
 def _postgres_environment(database_url: str) -> dict[str, str]:
@@ -153,6 +230,11 @@ def create_backup(
             )
             _validate_postgres_dump(payload, environment)
 
+        database_summary = (
+            _sqlite_summary(payload)
+            if database_type == "sqlite"
+            else _postgres_summary(str(source))
+        )
         manifest = {
             "format_version": FORMAT_VERSION,
             "database_type": database_type,
@@ -160,6 +242,7 @@ def create_backup(
             "created_at": datetime.now(timezone.utc).isoformat(),
             "payload": payload_name,
             "sha256": _sha256(payload),
+            "database_summary": database_summary,
         }
         temporary_archive = destination.with_name(destination.name + ".tmp")
         try:
@@ -297,4 +380,9 @@ def restore_backup(
     else:
         raise ValueError("지원하지 않는 데이터베이스 유형입니다.")
 
+    _verify_restored_summary(
+        database_type,
+        target,
+        manifest.get("database_summary", {}),
+    )
     return manifest

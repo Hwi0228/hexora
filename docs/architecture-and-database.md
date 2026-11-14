@@ -345,7 +345,7 @@ HEXORA는 수동 백업/복구 CLI를 제공합니다. 자동 주기 백업은 �
 flask --app app db-backup --output /secure/backups/hexora-backup.zip
 ```
 
-백업 ZIP에는 SQLite 파일 또는 PostgreSQL custom-format dump와 manifest가 포함됩니다. manifest에는 DB 종류, 스키마 버전, UTC 생성 시각, payload SHA-256 체크섬이 기록됩니다. 백업 생성 직후 SQLite integrity_check 또는 pg_restore 목록 검증을 수행합니다. 파일 권한은 가능한 환경에서 소유자 전용(0600)으로 설정합니다.
+백업 ZIP에는 SQLite 파일 또는 PostgreSQL custom-format dump와 manifest가 포함됩니다. manifest에는 DB 종류, 애플리케이션이 수동 관리하는 호환성 버전(현재 0), UTC 생성 시각, payload SHA-256 체크섬, users/questions/question_revisions 레코드 수가 기록됩니다. 이 호환성 표식은 마이그레이션 체계가 아니며 DB 초기화 방식을 변경하지 않습니다. 백업 생성 직후 SQLite integrity_check·foreign_key_check 또는 pg_restore 목록 검증과 PostgreSQL 핵심 테이블 카운트 확인을 수행합니다. 파일 권한은 가능한 환경에서 소유자 전용(0600)으로 설정합니다.
 
 ### 복구
 
@@ -353,7 +353,7 @@ flask --app app db-backup --output /secure/backups/hexora-backup.zip
 flask --app app db-restore --backup /secure/backups/hexora-backup.zip --confirm-overwrite
 ```
 
-복구 전에 ZIP 구성, CRC, SHA-256, DB 종류, 스키마 버전을 검증합니다. DB 종류가 다르거나 현재 앱이 지원하는 버전보다 새로운 백업은 거부합니다. 기존 데이터를 바꿀 수 있으므로 `--confirm-overwrite`가 필수입니다.
+복구 전에 ZIP 구성, CRC, SHA-256, DB 종류, 호환성 버전을 검증합니다. 복구 후 핵심 테이블 레코드 수와 외래 키 참조 무결성을 다시 확인합니다. DB 종류가 다르거나 현재 앱이 지원하는 호환성 버전보다 새로운 백업은 거부합니다. 기존 데이터를 바꿀 수 있으므로 `--confirm-overwrite`가 필수입니다.
 
 - SQLite: 임시 파일로 복원한 뒤 integrity_check를 통과하면 원자적으로 대상 파일을 교체합니다. WAL/SHM 파일이 남아 있으면 복구를 거부하므로 서비스를 중지하고 연결을 닫은 뒤 실행합니다.
 - PostgreSQL: PostgreSQL client의 `pg_dump`/`pg_restore`가 필요합니다. custom-format 백업을 검증하고 `--single-transaction --clean --if-exists`로 백업에 포함된 객체를 복원합니다. 연결 비밀번호는 명령행 인수가 아니라 자식 프로세스 환경으로 전달합니다.

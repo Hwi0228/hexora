@@ -27,26 +27,37 @@ class DatabaseBackupRestoreTests(unittest.TestCase):
             )
             connection.execute("INSERT INTO sample(value) VALUES ('보존 데이터')")
             connection.execute(
-                "CREATE TABLE schema_migrations (version INTEGER PRIMARY KEY, name TEXT, applied_at TEXT)"
+                "CREATE TABLE users (id INTEGER PRIMARY KEY, email TEXT UNIQUE NOT NULL)"
             )
+            connection.execute("INSERT INTO users(email) VALUES ('student@example.test')")
             connection.execute(
-                "INSERT INTO schema_migrations(version, name, applied_at) VALUES (1, 'baseline', CURRENT_TIMESTAMP)"
+                "CREATE TABLE questions (id INTEGER PRIMARY KEY, title TEXT NOT NULL)"
             )
+            connection.execute("INSERT INTO questions(title) VALUES ('sample question')")
+            connection.execute(
+                "CREATE TABLE question_revisions (id INTEGER PRIMARY KEY, question_id INTEGER NOT NULL REFERENCES questions(id))"
+            )
+            connection.execute("INSERT INTO question_revisions(question_id) VALUES (1)")
 
     def tearDown(self):
         self.temporary.cleanup()
 
     def test_sqlite_backup_contains_metadata_checksum_and_valid_database(self):
-        output = create_backup("sqlite", self.database, output=self.root / "backup.zip", schema_version=1)
+        output = create_backup("sqlite", self.database, output=self.root / "backup.zip", schema_version=0)
         manifest, payload = inspect_backup(output)
         self.assertEqual(manifest["database_type"], "sqlite")
         self.assertEqual(manifest["schema_version"], 1)
         self.assertEqual(len(manifest["sha256"]), 64)
+        self.assertEqual(
+            manifest["database_summary"]["counts"],
+            {"users": 1, "questions": 1, "question_revisions": 1},
+        )
         with tempfile.NamedTemporaryFile(suffix=".sqlite3") as stream:
             stream.write(payload)
             stream.flush()
             with sqlite3.connect(stream.name) as connection:
                 self.assertEqual(connection.execute("SELECT value FROM sample").fetchone()[0], "보존 데이터")
+            self.assertEqual(connection.execute("SELECT COUNT(*) FROM question_revisions").fetchone()[0], 1)
 
     def test_sqlite_restore_requires_confirmation_and_replaces_target_atomically(self):
         output = create_backup("sqlite", self.database, output=self.root / "backup.zip", schema_version=1)
@@ -57,7 +68,7 @@ class DatabaseBackupRestoreTests(unittest.TestCase):
 
         with self.assertRaisesRegex(BackupError, "confirm-overwrite"):
             restore_backup(output, "sqlite", target)
-        restore_backup(output, "sqlite", target, confirm_overwrite=True, supported_schema_version=1)
+        restore_backup(output, "sqlite", target, confirm_overwrite=True, supported_schema_version=0)
         with sqlite3.connect(target) as connection:
             self.assertEqual(connection.execute("SELECT value FROM sample").fetchone()[0], "보존 데이터")
             self.assertIsNone(connection.execute(
@@ -112,6 +123,7 @@ class DatabaseBackupRestoreTests(unittest.TestCase):
         manifest, payload = inspect_backup(output)
         self.assertEqual(manifest["database_type"], "postgresql")
         self.assertEqual(payload, b"custom-format-dump")
+        self.assertEqual(manifest["database_summary"]["counts"], {})
         restore_backup(
             output,
             "postgresql",

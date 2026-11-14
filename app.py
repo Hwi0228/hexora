@@ -286,10 +286,9 @@ def create_app():
 
         backend = current_app.config["DATABASE_TYPE"]
         connection = get_db()
-        version_row = connection.execute(
-            "SELECT MAX(version) AS version FROM schema_migrations"
-        ).fetchone()
-        schema_version = int(version_row["version"] or 0)
+        # This is a compatibility marker, not a schema-migration system.
+        # Keep it at zero while the application has no explicit schema versioning.
+        schema_version = 0
         source = (
             current_app.config["DATABASE"]
             if backend == "sqlite"
@@ -316,15 +315,13 @@ def create_app():
     def db_restore(backup_path, confirm_overwrite):
         """Validate a backup and restore it to the configured database."""
         from backup_restore import restore_backup
-        from schema_migrations import SCHEMA_MIGRATIONS
-
         backend = current_app.config["DATABASE_TYPE"]
         target = (
             current_app.config["DATABASE"]
             if backend == "sqlite"
             else current_app.config["DATABASE_URL"]
         )
-        supported_version = max(item.version for item in SCHEMA_MIGRATIONS)
+        supported_version = 0
         try:
             restore_backup(
                 backup_path,
