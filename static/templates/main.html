@@ -81,16 +81,46 @@
           <button class="detail-button" type="submit">코드 검색</button>
         </form>
         <label class="select-all"><input id="select-all-questions" type="checkbox" aria-label="현재 목록 전체 선택"> 전체 선택{% if questions %} <span class="result-count">{{ "{:,}".format(questions | length) }}</span>{% endif %}</label>
-        <select class="select-control" aria-label="정렬">
-          <option>출처순</option>
-        </select>
         {% if can_manage_questions %}<a class="detail-button" href="{{ url_for('new_question') }}">문제 등록</a>{% endif %}
       </header>
+      <form class="advanced-search" id="advanced-question-search" method="get" action="{{ url_for('main') }}">
+        <input type="hidden" name="subject" value="{{ selected_subject }}">
+        {% if selected_folder_uuid %}<input type="hidden" name="folder" value="{{ selected_folder_uuid }}">{% endif %}
+        {% if selected_user_uuid != current_user.uuid %}<input type="hidden" name="user_uuid" value="{{ selected_user_uuid }}">{% endif %}
+        <div class="advanced-search-primary">
+          <label class="search-query">문항 검색
+            <input type="search" name="q" maxlength="120" value="{{ filters.q }}" placeholder="제목, 지문, 문제 내용, 정답, 해설 검색">
+          </label>
+          <label>정렬
+            <select name="sort">
+              <option value="latest"{% if filters.sort == 'latest' %} selected{% endif %}>최신 등록순</option>
+              <option value="modified"{% if filters.sort == 'modified' %} selected{% endif %}>최근 수정순</option>
+              <option value="relevance"{% if filters.sort == 'relevance' %} selected{% endif %}>검색 관련도순</option>
+            </select>
+          </label>
+          <button class="detail-button primary" type="submit">검색</button>
+        </div>
+        <details class="advanced-search-options"{% if filters.curriculum or filters.course or filters.grade or filters.question_type or filters.source_type or filters.year or filters.license or filters.achievement_standard %} open{% endif %}>
+          <summary>상세 필터</summary>
+          <div class="advanced-search-grid">
+            <label>교육과정<select name="curriculum"><option value="">전체</option>{% for value in filter_options.curricula %}<option value="{{ value }}"{% if filters.curriculum == value %} selected{% endif %}>{{ value }}</option>{% endfor %}</select></label>
+            <label>교과<select name="course"><option value="">전체</option>{% for value in filter_options.courses %}<option value="{{ value }}"{% if filters.course == value %} selected{% endif %}>{{ value }}</option>{% endfor %}</select></label>
+            <label>학년<select name="grade"><option value="">전체</option>{% for value in filter_options.grades %}<option value="{{ value }}"{% if filters.grade == value %} selected{% endif %}>{{ value }}</option>{% endfor %}</select></label>
+            <label>문항 유형<select name="question_type"><option value="">전체</option>{% for value in filter_options.question_types %}<option value="{{ value }}"{% if filters.question_type == value %} selected{% endif %}>{{ value }}</option>{% endfor %}</select></label>
+            <label>출처 유형<select name="source_type"><option value="">전체</option>{% for value in filter_options.source_types %}<option value="{{ value }}"{% if filters.source_type == value %} selected{% endif %}>{{ value }}</option>{% endfor %}</select></label>
+            <label>연도<input type="number" name="year" min="1" max="2200" value="{{ filters.year }}" placeholder="예: 2025"></label>
+            <label>라이선스<select name="license"><option value="">전체</option>{% for value, label in filter_options.licenses.items() %}<option value="{{ value }}"{% if filters.license == value %} selected{% endif %}>{{ label }}</option>{% endfor %}</select></label>
+            <label>성취기준<input type="search" name="achievement_standard" maxlength="120" value="{{ filters.achievement_standard }}" placeholder="성취기준 코드 또는 내용"></label>
+          </div>
+          <div class="advanced-search-actions"><button class="detail-button" type="submit">필터 적용</button><a class="detail-button" href="{{ url_for('main', subject=selected_subject, folder=selected_folder_uuid, user_uuid=selected_user_uuid if selected_user_uuid != current_user.uuid else None) }}">초기화</a></div>
+        </details>
+      </form>
       <div class="result-area">
         {% if current_user.role == 'admin' %}<a class="detail-button" href="{{ url_for('admin_users') }}">작성자별 문항 현황</a>{% endif %}
         {% if selected_user_uuid != current_user.uuid %}<p class="folder-notice">{{ selected_user.display_name }}님 계정의 문제 조회 중</p>{% endif %}
         {% if added %}<p class="success-message" role="status">문제를 등록했습니다.</p>{% endif %}
         {% if selected_folder_name %}<p class="success-message">{{ selected_folder_name }} 폴더의 문제</p>{% endif %}
+        <p class="result-summary" role="status">검색 결과 {{ result_count }}개</p>
         <div class="question-grid">
           {% for question in questions %}
           <article class="question-card" id="question-{{ question.id }}">

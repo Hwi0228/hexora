@@ -1,7 +1,8 @@
 
 from flask import abort, g, redirect, render_template, request, url_for
 
-from constants import NAV_ITEMS, SUBJECTS
+from constants import NAV_ITEMS, SUBJECTS, LICENSE_CHOICES, SOURCE_TYPES, GRADE_OPTIONS
+from question_constants import QUESTION_TYPES, COURSE_OPTIONS, SUBJECT_COURSE_OPTIONS
 from question_ids import format_question_number, parse_question_number
 from question_presentation import prepare_question_for_display
 from question_repository import _question_row
@@ -63,6 +64,10 @@ def get_question_page_data():
             FROM question_revisions
             GROUP BY question_id
         ) AS revisions ON revisions.question_id = questions.id
+        LEFT JOIN (
+            SELECT question_id, MAX(created_at) AS last_modified
+            FROM question_revisions GROUP BY question_id
+        ) AS revision_dates ON revision_dates.question_id = questions.id
         WHERE questions.subject = ? AND questions.deleted_at IS NULL
     """
     parameters = [g.user["uuid"], selected_subject]
@@ -86,7 +91,79 @@ def get_question_page_data():
         parameters.extend(
             [selected_folder_uuid, selected_user_uuid, selected_user_uuid]
         )
-    query += " ORDER BY questions.id DESC"
+    filter_values = {
+        "q": request.args.get("q", "").strip()[:120],
+        "curriculum": request.args.get("curriculum", "").strip(),
+        "course": request.args.get("course", "").strip(),
+        "grade": request.args.get("grade", "").strip(),
+        "question_type": request.args.get("question_type", "").strip(),
+        "source_type": request.args.get("source_type", "").strip(),
+        "year": request.args.get("year", "").strip(),
+        "license": request.args.get("license", "").strip(),
+        "achievement_standard": request.args.get("achievement_standard", "").strip()[:120],
+        "sort": request.args.get("sort", "latest").strip(),
+    }
+    exact_filters = (
+        ("curriculum", "questions.curriculum", set(COURSE_OPTIONS)),
+        ("course", "questions.course", None),
+        ("grade", "questions.grade", set(GRADE_OPTIONS)),
+        ("question_type", "questions.question_type", set(QUESTION_TYPES)),
+        ("source_type", "questions.source_type", set(SOURCE_TYPES)),
+        ("license", "questions.license", set(LICENSE_CHOICES)),
+    )
+    for key, column, allowed_values in exact_filters:
+        value = filter_values[key]
+        if value and (allowed_values is None or value in allowed_values):
+            query += f" AND {column} = ?"
+            parameters.append(value)
+        elif value:
+            filter_values[key] = ""
+
+    if filter_values["year"]:
+        try:
+            year = int(filter_values["year"])
+            if not 1 <= year <= 2200:
+                raise ValueError
+        except ValueError:
+            filter_values["year"] = ""
+        else:
+            query += " AND questions.year = ?"
+            parameters.append(year)
+
+    if filter_values["achievement_standard"]:
+        query += " AND LOWER(COALESCE(questions.achievement_standard, '')) LIKE ?"
+        parameters.append(f"%{filter_values['achievement_standard'].lower()}%")
+
+    if filter_values["q"]:
+        query += """
+          AND (
+            LOWER(COALESCE(questions.title, '')) LIKE ? OR
+            LOWER(COALESCE(questions.passage, '')) LIKE ? OR
+            LOWER(COALESCE(questions.prompt, '')) LIKE ? OR
+            LOWER(COALESCE(questions.examples, '')) LIKE ? OR
+            LOWER(COALESCE(questions.answer, '')) LIKE ? OR
+            LOWER(COALESCE(questions.explanation, '')) LIKE ?
+          )
+        """
+        pattern = f"%{filter_values['q'].lower()}%"
+        parameters.extend([pattern] * 6)
+
+    if filter_values["sort"] not in {"latest", "modified", "relevance"}:
+        filter_values["sort"] = "latest"
+    if filter_values["sort"] == "modified":
+        query += " ORDER BY COALESCE(revision_dates.last_modified, questions.created_at) DESC, questions.id DESC"
+    elif filter_values["sort"] == "relevance" and filter_values["q"]:
+        pattern = f"%{filter_values['q'].lower()}%"
+        query += """
+          ORDER BY CASE
+            WHEN LOWER(COALESCE(questions.title, '')) = ? THEN 0
+            WHEN LOWER(COALESCE(questions.title, '')) LIKE ? THEN 1
+            WHEN LOWER(COALESCE(questions.prompt, '')) LIKE ? THEN 2
+            ELSE 3 END, questions.id DESC
+        """
+        parameters.extend([filter_values["q"].lower(), pattern, pattern])
+    else:
+        query += " ORDER BY questions.id DESC"
     rows = get_db().execute(query, parameters).fetchall()
     questions = []
     for row in rows:
@@ -124,6 +201,18 @@ def get_question_page_data():
         "can_manage_questions": True,
         "can_manage_folders": selected_user_uuid == g.user["uuid"],
         "selected_user_uuid": selected_user_uuid,
+        "filters": filter_values,
+        "filter_options": {
+            "curricula": list(COURSE_OPTIONS),
+            "courses": sorted(set(SUBJECT_COURSE_OPTIONS.get(selected_subject, [])) | {
+                course for courses in COURSE_OPTIONS.values() for course in courses
+            }),
+            "grades": list(GRADE_OPTIONS),
+            "question_types": list(QUESTION_TYPES),
+            "source_types": list(SOURCE_TYPES),
+            "licenses": LICENSE_CHOICES,
+        },
+        "result_count": len(questions),
     }
 
 
