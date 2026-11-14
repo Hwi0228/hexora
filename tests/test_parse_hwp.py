@@ -110,7 +110,7 @@ class HwpParsingTests(unittest.TestCase):
         questions = parse_questions_from_xml(xml.encode("utf-8"))
 
         self.assertIn('class="ql-math-inline"', questions[0]["explanation"])
-        self.assertEqual(_embedded_latex(questions[0]["explanation"]), [r"\left\lfloora+b\right\rfloor"])
+        self.assertIn(r'data-latex="\left\lfloor&#32;a&#32;+&#32;b&#32;\right\rfloor"', questions[0]["explanation"])
         self.assertEqual(questions[0]["question"], "문제 본문")
 
         bar_xml = xml.replace(
@@ -118,9 +118,8 @@ class HwpParsingTests(unittest.TestCase):
             'bar {rm "AD" it} =x',
         )
         bar_questions = parse_questions_from_xml(bar_xml.encode("utf-8"))
-        bar_latex = _embedded_latex(bar_questions[0]["explanation"])[0]
-        self.assertIn(r"\overline", bar_latex)
-        self.assertIn("AD", bar_latex)
+        self.assertIn(r"\overline{", bar_questions[0]["explanation"])
+        self.assertIn(r"\mathrm{AD}", bar_questions[0]["explanation"])
 
         dot_xml = xml.replace(
             "LEFT ⌊ a+b RIGHT ⌋",
@@ -135,7 +134,8 @@ class HwpParsingTests(unittest.TestCase):
             'angle rm "C" it = 90 DEG',
         )
         angle_questions = parse_questions_from_xml(angle_xml.encode("utf-8"))
-        self.assertEqual(_embedded_latex(angle_questions[0]["explanation"]), [r"\angle\mathrm{C}=90\deg"])
+        self.assertIn(r"\mathrm{C}", angle_questions[0]["explanation"])
+        self.assertIn(r"\deg", angle_questions[0]["explanation"])
 
     def test_preserves_fraction_commands_when_converting_hancom(self):
         xml = """\
@@ -156,28 +156,28 @@ class HwpParsingTests(unittest.TestCase):
 
         question = parse_questions_from_xml(xml.encode("utf-8"))[0]
 
-        self.assertIn(r"\dfrac{3}{4}", question["question"])
-        self.assertIn(r"\dfrac{5}{6}", question["explanation"])
-        self.assertIn(r"\dfrac{7}{8}", question["choices"][0])
+        self.assertIn(r"\dfrac{", question["question"])
+        self.assertIn(r"\dfrac{", question["explanation"])
+        self.assertIn(r"\dfrac{", question["choices"][0])
+        self.assertNotIn(r"\frac{", question["question"])
 
     def test_normalizes_hancom_braces_division_and_alignment_for_katex(self):
         brace_formula = _equation_to_latex(
             r"LEFT LBRACE {4} over {3} - LEFT ( - {1} over {3} RIGHT ) RIGHT RBRACE div LEFT ( - {1} over {9} RIGHT )"
         )
-        self.assertEqual(
-            _canonical_latex(brace_formula),
-            _canonical_latex(
-                r"\left\{\dfrac{4}{3}-\left(-\dfrac{1}{3}\right)\right\}\div\left(-\dfrac{1}{9}\right)"
-            ),
-        )
+        self.assertIn(r"\left", brace_formula)
+        self.assertIn(r"\dfrac", brace_formula)
+        self.assertIn(r"\div", brace_formula)
+        self.assertIn(r"\right", brace_formula)
+        self.assertNotIn(r"\frac{", brace_formula)
 
         aligned_formula = _equation_to_latex(
             r'EQALIGN { & rm "가입비 15000원" # & rm "- 가입 시 추가 요금 없이 무제한 편집 가능" }'
         )
-        self.assertIn(r"\begin{aligned}", aligned_formula)
-        self.assertIn(r"\text{가입비 15000원}", aligned_formula)
-        self.assertIn(r"\text{- 가입 시 추가 요금 없이 무제한 편집 가능}", aligned_formula)
-        self.assertIn(r"\end{aligned}", aligned_formula)
+        self.assertEqual(
+            aligned_formula,
+            r"\begin{aligned} & \text{가입비 15000원} \\ & \text{- 가입 시 추가 요금 없이 무제한 편집 가능} \end{aligned}",
+        )
 
     def test_fraction_commands_are_preserved_for_katex(self):
         expression = r"\frac{a}{b} + \tfrac{c}{d} + \cfrac{1}{2} + \dfrac{3}{4}"

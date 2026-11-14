@@ -13,7 +13,7 @@ flowchart TD
     PushPR[Git Push / PR 생성] --> TriggerTests[tests.yml 실행]
     TriggerTests --> CheckoutCode[소스코드 체크아웃]
     CheckoutCode --> SetupPy[Python 3.11 가상환경 설정]
-    SetupPy --> RunBuild[build.sh 실행<br/>pip install & Rust hmleq 빌드]
+    SetupPy --> RunBuild[build.sh 실행<br/>pip install & hmleqx API 검증]
     RunBuild --> RunTests[unittestdiscover 실행<br/>11개 단위 테스트 세트]
 
     RunTests -->|테스트 통과| PRMerge{master 브랜치 병합}
@@ -46,7 +46,7 @@ HEXORA는 standard Python `unittest` 프레임워크 기반의 회귀 테스트 
 | `tests/test_hwp_routes.py` | `/hwp` 업로드 라우트 및 `/exams/export` 다운로드 엔드포인트 검증 |
 | `tests/test_parse_hwp.py` | 레거시 HWPML XML 파서, 수식/선택지 정규화 검증 |
 | `tests/test_rhwp_parser.py` | `rhwp-python` IR 파서 및 문단형 시험지(`1.`, `1)` 등) 폴백 파싱 |
-| `tests/test_hmleq_converter.py` | `hmleq` CLI 수식 변환 및 Python 패키지 폴백 검증 |
+| `tests/test_hmleq_converter.py` | `hmleqx` Python API 호출, 변환 결과 및 오류 처리 검증 |
 | `tests/test_curriculum_data.py` | 학년/과목별 개정 교육과정 성취기준 데이터 매핑 검증 |
 | `tests/test_versioning.py` | `VERSION` 파일 단일 원천 검증 |
 
@@ -64,7 +64,7 @@ python -m unittest discover -s tests -v
 HEXORA 공개 서비스(https://hexora.kro.kr)는 PaaS 플랫폼인 Render에 배포되어 운용됩니다.
 
 ### 3.1 빌드 스크립트 (`build.sh`)
-Render의 Build Command로 지정되며, Python 의존성 및 Rust `hmleq` 수식 변환기를 자동 컴파일 및 설치합니다.
+Render의 Build Command로 지정되며, Python 의존성을 설치하고 `hmleqx` Python API의 import 및 기본 변환을 검증합니다.
 
 ```bash
 #!/usr/bin/env bash
@@ -74,10 +74,15 @@ set -euo pipefail
 python -m pip install --upgrade pip
 python -m pip install -r requirements.txt
 
-# 2. Rust toolchain 확인 및 hmleq 설치
-if command -v cargo >/dev/null 2>&1; then
-  cargo install hml-equation-parser-cli || true
-fi
+# 2. hmleqx Python API 확인
+python - <<'PY'
+import hmleqx
+
+result = hmleqx.to_latex("1 over 2")
+if not isinstance(result, str) or not result.strip():
+    raise RuntimeError("hmleqx conversion smoke test failed")
+print(f"hmleqx {hmleqx.version()} is ready")
+PY
 ```
 
 ### 3.2 프로세스 실행 지침 (`Procfile`)
@@ -112,7 +117,7 @@ name: Tests
 on:
   push:
   pull_request:
-    branches: [master]
+    branches: [master, dev]
 jobs:
   unittest:
     runs-on: ubuntu-latest

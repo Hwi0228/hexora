@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import os
 import re
-from pathlib import Path
 
 from hmleq_converter import HmleqUnavailable
 from hwp_equations import normalize_katex_expression
@@ -28,14 +27,14 @@ def equation_to_latex(script: str, *, legacy_converter, primary_converter) -> st
     script = re.sub(r"(?<!\w)cdots(?!\w)", "CDOTS", script)
     script = re.sub(r"(?<!\w)EQALIGN(?!\w)", "eqalign", script)
     script = re.sub(r"(?<!\w)angle(?!\w)", "ANGLE", script)
-    # HWP uses "it" to close a roman-style quoted identifier. Explicit braces
-    # keep hmleqx's rm scope from swallowing the following relation/degree.
+    script = re.sub(r"(?<!\w)triangle(?!\w)", "TRIANGLE", script)
+    # HWP closes a roman-style quoted identifier with "it". Explicit braces
+    # keep hmleqx's rm scope from consuming the following relation or degree.
     script = re.sub(
         r'(?<!\w)rm\s+"([^"]*)"\s+it\b',
         lambda match: "{rm " + match.group(1) + "}",
         script,
     )
-    script = re.sub(r"(?<!\w)triangle(?!\w)", "TRIANGLE", script)
     search_from = 0
     while True:
         match = GROUPED_COMMAND.search(script, search_from)
@@ -67,12 +66,8 @@ def equation_to_latex(script: str, *, legacy_converter, primary_converter) -> st
         try:
             converted = primary_converter(script)
         except HmleqUnavailable:
-            # Local parsing remains available before Rust is installed. Render's
-            # build marker makes a missing production binary a hard failure.
-            if (
-                os.environ.get("HMLEQ_REQUIRED") == "1"
-                or Path(__file__).with_name(".render-require-hmleq").exists()
-            ):
+            # Allow local fallback, but let deployments opt into strict enforcement.
+            if os.environ.get("HMLEQ_REQUIRED") == "1":
                 raise
             converted = legacy_converter(script).strip()
     converted = re.sub(
