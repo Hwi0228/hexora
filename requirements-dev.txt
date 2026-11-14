@@ -1,0 +1,4 @@
+# Tooling only; never installed in the Render runtime.
+coverage==7.8.2
+pip-tools==7.4.1
+ruff==0.11.13

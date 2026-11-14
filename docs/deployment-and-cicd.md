@@ -72,7 +72,7 @@ set -euo pipefail
 
 # 1. Python 패키지 설치
 python -m pip install --upgrade pip
-python -m pip install -r requirements.txt
+python -m pip install -r requirements.lock
 
 # 2. hmleqx Python API 확인
 python - <<'PY'

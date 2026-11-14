@@ -77,7 +77,7 @@ git switch pr-13
 py -3.11 -m venv .venv
 .\.venv\Scripts\Activate.ps1
 python -m pip install --upgrade pip
-python -m pip install -r requirements.txt
+python -m pip install -r requirements.lock
 ```
 
 개발용 세션 키를 별도로 지정하려면 다음 명령으로 무작위 키를 생성할 수 있습니다. 운영 환경에서는 생성한 값을 Render의 `FLASK_SECRET_KEY` 환경 변수에 등록하고, 저장소나 로그에 남기지 마세요.
@@ -132,7 +132,7 @@ python app.py
 ## 의존성 및 실행
 
 ```powershell
-python -m pip install -r requirements.txt
+python -m pip install -r requirements.lock
 python app.py
 ```
 
