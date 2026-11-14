@@ -49,7 +49,7 @@ class AdminBootstrapCommandTests(unittest.TestCase):
 
     def invoke_bootstrap(self, email="owner@example.com"):
         return app.test_cli_runner().invoke(
-            [
+            args=[
                 "create-admin",
                 "--email", email,
                 "--display-name", "HEXORA 운영자",
