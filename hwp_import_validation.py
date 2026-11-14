@@ -33,6 +33,13 @@ def _validated_import(form):
         ]
         return None, None, messages or ["문서 구조 검증에 실패했습니다."], None
 
+    warning_issues = [
+        issue for issue in (engine_validation.get("issues", []) if isinstance(engine_validation, dict) else [])
+        if isinstance(issue, dict) and issue.get("severity") == "warning"
+    ]
+    if warning_issues and form.get("warnings_acknowledged") != "1":
+        return None, None, ["검토 경고를 모두 확인한 뒤 등록을 진행해 주세요."], None
+
     if not isinstance(questions, list) or not 1 <= len(questions) <= MAX_IMPORTED_QUESTIONS:
         return None, None, errors, "등록할 문항이 없거나 허용 개수(500개)를 초과했습니다."
 
@@ -128,18 +135,49 @@ def _validated_import(form):
                         f"{source_number}번 정답에 존재하지 않는 선택지 표식이 포함되어 있습니다."
                     )
 
-        normalized_questions.append(
-            {
-                "number": len(normalized_questions) + 1,
-                "question": sanitize_rich_html(prompt.strip()),
-                "answer": sanitize_rich_html(answer.strip()),
-                "explanation": sanitize_rich_html(explanation.strip()),
+        source_number = str(
+            question.get("source_number", question.get("number", len(normalized_questions) + 1))
+        ).strip()
+        if not source_number or len(source_number) > 50:
+            errors.append("원본 문항 번호는 1~50자로 입력해 주세요.")
+            break
+        normalized = {
+            "number": len(normalized_questions) + 1,
+            "source_number": source_number,
+            "question": sanitize_rich_html(prompt.strip()),
+            "answer": sanitize_rich_html(answer.strip()),
+            "explanation": sanitize_rich_html(explanation.strip()),
+            "choices": [
+                sanitize_rich_html(strip_choice_label(choice))
+                for choice in choices
+            ],
+        }
+        original = question.get("original")
+        if isinstance(original, dict):
+            original_choices = original.get("choices", [])
+            if not isinstance(original_choices, list):
+                original_choices = []
+            normalized["original"] = {
+                "source_number": str(original.get("source_number", source_number))[:50],
+                "question": sanitize_rich_html(str(original.get("question", ""))[:10000]),
                 "choices": [
-                    sanitize_rich_html(strip_choice_label(choice))
-                    for choice in choices
+                    sanitize_rich_html(str(choice)[:2000])
+                    for choice in original_choices[:20]
                 ],
+                "answer": sanitize_rich_html(str(original.get("answer", ""))[:2000]),
+                "explanation": sanitize_rich_html(str(original.get("explanation", ""))[:10000]),
             }
-        )
+        corrected_fields = question.get("corrected_fields", [])
+        if isinstance(corrected_fields, list):
+            allowed_corrections = {
+                "source_number", "question", "choices", "answer",
+                "explanation", "question_boundary",
+            }
+            normalized["corrected_fields"] = [
+                field for field in corrected_fields
+                if isinstance(field, str) and field in allowed_corrections
+            ]
+        normalized_questions.append(normalized)
 
     if errors:
         return normalized_questions or None, None, errors, None

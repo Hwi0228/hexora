@@ -59,6 +59,13 @@
           <button class="button" id="download-json" type="button">JSON 다운로드</button>
         </div>
         {% if error %}<div class="error" role="alert">{{ error }}</div>{% endif %}
+        {% if warnings %}
+        <div class="warning import-warning" role="alert">
+          <strong>검토가 필요한 항목 {{ warnings|length }}개</strong>
+          <ul>{% for warning in warnings %}<li>{{ warning }}</li>{% endfor %}</ul>
+          <label><input type="checkbox" name="warnings_acknowledged" value="1" required> 위 경고를 확인했으며, 등록할 문항 내용을 직접 검토했습니다.</label>
+        </div>
+        {% endif %}
         <form class="import-form" method="post" action="{{ url_for('hwp_parser_page') }}">
           <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
           <input type="hidden" name="action" value="save">
@@ -105,19 +112,49 @@
             </div>
           </div>
           {% for question in questions %}
-          <article class="question">
-            <h3><label class="question-select"><input type="checkbox" name="selected_questions" value="{{ loop.index0 }}"{% if not form_data or loop.index0|string in form_data.getlist('selected_questions') %} checked{% endif %} aria-label="{{ question.number }}번 문항 DB 등록"><span>{{ question.number }}번 문항</span></label></h3>
-            <div class="math-content"><span class="label">문제</span><br>{{ question.question|render_rich_html }}</div>
-            {% if question.choices %}
-            <p class="label">선택지</p>
-            <ol class="choices imported-choices">
-              {% for choice in question.choices %}<li>{{ '①②③④⑤'[loop.index0] if loop.index0 < 5 else loop.index ~ '.' }} <span class="math-content">{{ choice|render_rich_html }}</span></li>{% endfor %}
-            </ol>
-            {% endif %}
-            <div class="math-content"><span class="label">정답</span><br>{{ question.answer|render_rich_html if question.answer else "문서에 정답이 포함되어 있지 않습니다." }}</div>
-            {% if question.explanation %}<details><summary>해설 보기</summary><div class="math-content">{{ question.explanation|render_rich_html }}</div></details>{% else %}<p class="hint">해설 미포함</p>{% endif %}
+          <div id="import-question-list">
+          {% for question in questions %}
+          <article class="question import-question-card" data-import-question>
+            <h3>
+              <label class="question-select">
+                <input type="checkbox" name="selected_questions" value="{{ loop.index0 }}"{% if not form_data or loop.index0|string in form_data.getlist('selected_questions') %} checked{% endif %} aria-label="{{ question.number }}번 문항 DB 등록">
+                <span>{{ question.number }}번 문항</span>
+              </label>
+              <span class="import-correction-status" data-correction-status>원본</span>
+            </h3>
+            <div class="import-edit-grid">
+              <label class="metadata-field">원본 문항 번호
+                <input type="text" maxlength="50" data-import-field="source_number" value="{{ question.source_number or question.number }}">
+              </label>
+              <label class="metadata-field import-edit-wide">문제 내용
+                <div class="math-content import-editable" contenteditable="true" role="textbox" aria-multiline="true" data-import-field="question">{{ question.question|render_rich_html }}</div>
+              </label>
+              <div class="metadata-field import-edit-wide">
+                <span>선택지 · 각 항목을 별도로 수정</span>
+                <div class="import-choice-list" data-import-field="choices">
+                  {% for choice in question.choices %}
+                  <div class="import-choice math-content" contenteditable="true" role="textbox" aria-multiline="true" data-import-choice>{{ choice|render_rich_html }}</div>
+                  {% endfor %}
+                </div>
+              </div>
+              <label class="metadata-field import-edit-wide">정답
+                <div class="math-content import-editable" contenteditable="true" role="textbox" aria-multiline="true" data-import-field="answer">{{ question.answer|render_rich_html }}</div>
+              </label>
+              <label class="metadata-field import-edit-wide">해설
+                <div class="math-content import-editable" contenteditable="true" role="textbox" aria-multiline="true" data-import-field="explanation">{{ question.explanation|render_rich_html }}</div>
+              </label>
+            </div>
+            <div class="import-edit-actions">
+              <button class="button" type="button" data-split-question>커서 위치에서 문항 분리</button>
+              <button class="button" type="button" data-merge-next>다음 문항과 병합</button>
+              <details class="import-original-details">
+                <summary>원본 값 확인</summary>
+                <pre data-import-original></pre>
+              </details>
+            </div>
           </article>
           {% endfor %}
+          </div>
           <button class="button primary" type="submit">선택 문항 DB에 등록</button>
         </form>
         <textarea id="json-result" class="json-output" aria-label="파싱 결과 JSON" readonly>{{ result_json }}</textarea>
@@ -127,5 +164,6 @@
   </div>
   <script defer src="{{ url_for('static', filename='scripts/katex-render.js') }}"></script>
   <script defer src="{{ url_for('static', filename='scripts/hwp-import.js') }}"></script>
+  <script defer src="{{ url_for('static', filename='scripts/hwp-import-review.js') }}"></script>
 </body>
 </html>

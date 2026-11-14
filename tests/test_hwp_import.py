@@ -69,6 +69,64 @@ class HwpImportValidationTests(unittest.TestCase):
         self.assertIn('data-latex="x^2"', questions[0]["answer"])
         self.assertIn('data-input-format="hancom"', questions[0]["answer"])
 
+    def test_manual_corrections_keep_original_values_and_source_number(self):
+        form = MultiDict([
+            ("questions_json", json.dumps({"questions": [{
+                "number": 1,
+                "source_number": "4-b",
+                "question": "수정한 문제",
+                "choices": ["수정 선택지"],
+                "answer": "②",
+                "explanation": "수정 해설",
+                "original": {
+                    "source_number": "4",
+                    "question": "원본 문제",
+                    "choices": ["원본 선택지"],
+                    "answer": "①",
+                    "explanation": "원본 해설",
+                },
+                "corrected_fields": ["question", "choices", "answer", "question_boundary"],
+            }]}, ensure_ascii=False)),
+            ("subject", "수학"), ("grade", "고1"), ("unit", "테스트 단원"),
+            ("source", "업로드 문서"), ("license", "ORIGINAL"),
+            ("source_type", "기타"), ("selected_questions", "0"),
+        ])
+        questions, selection, errors, error = _validated_import(form)
+        self.assertIsNone(error)
+        self.assertEqual(errors, [])
+        self.assertEqual(questions[0]["source_number"], "4-b")
+        self.assertEqual(questions[0]["original"]["question"], "원본 문제")
+        self.assertIn("question_boundary", questions[0]["corrected_fields"])
+
+    def test_structural_warnings_require_explicit_review_acknowledgement(self):
+        payload = {
+            "questions": [{
+                "number": 1, "source_number": "1", "question": "문제",
+                "choices": [], "answer": "", "explanation": "",
+            }],
+            "validation": {
+                "valid": True,
+                "issues": [{
+                    "code": "LOW_CONFIDENCE",
+                    "message": "문항 경계를 확인해 주세요.",
+                    "severity": "warning",
+                }],
+            },
+        }
+        base = [
+            ("questions_json", json.dumps(payload, ensure_ascii=False)),
+            ("subject", "수학"), ("grade", "고1"), ("unit", "테스트 단원"),
+            ("source", "업로드 문서"), ("license", "ORIGINAL"),
+            ("source_type", "기타"), ("selected_questions", "0"),
+        ]
+        questions, selection, errors, error = _validated_import(MultiDict(base))
+        self.assertIsNone(questions)
+        self.assertIn("경고", " ".join(errors))
+        acknowledged = MultiDict(base + [("warnings_acknowledged", "1")])
+        questions, selection, errors, error = _validated_import(acknowledged)
+        self.assertIsNone(error)
+        self.assertEqual(errors, [])
+
     def test_structural_validation_failure_is_rejected_before_persistence(self):
         form = MultiDict([
             ("questions_json", json.dumps({
