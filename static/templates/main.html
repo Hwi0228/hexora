@@ -191,7 +191,11 @@
             </details>
           </article>
           {% else %}
+          {% if filters.q or filters.curriculum or filters.course or filters.grade or filters.question_type or filters.source_type or filters.year or filters.license or filters.achievement_standard %}
           <p class="empty-state">조건에 맞는 문항이 없습니다.</p>
+          {% else %}
+          <p class="empty-state">표시할 문제가 없습니다.</p>
+          {% endif %}
           {% endfor %}
         </div>
       </div>
