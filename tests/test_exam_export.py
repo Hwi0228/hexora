@@ -192,6 +192,14 @@ class ExamExportRouteTests(unittest.TestCase):
             for equation in equations
         ))
 
+    def test_unsupported_latex_commands_reject_the_export_explicitly(self):
+        question_id = self.add_question(
+            r"<p>지원하지 않는 명령 $\\notARealMathCommand{x}$</p>",
+            "1",
+        )
+        response = self.export([question_id])
+        self.assertEqual(response.status_code, 422)
+
     def test_teacher_export_can_include_answer_and_explanation(self):
         question_id = self.add_question("<p>교사용 문항</p>", "④")
         response = self.export([question_id], include_answers=True)

@@ -89,7 +89,7 @@ class QuestionSearchBackendParityTests(unittest.TestCase):
 
                 create_question("미분 기본 문항")
                 create_question(
-                    "미분 응용 문항",
+                    "다항식 응용 문항",
                     grade="고1",
                     course="대수",
                     curriculum="2022 개정 교육과정",
