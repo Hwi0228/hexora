@@ -47,20 +47,29 @@ def _is_document_header(paragraph: str, next_paragraph: str = "") -> bool:
     return False
 
 
+def _inline_math_html_to_latex(text: str) -> str:
+    """Replace serialized Quill math embeds with their source LaTeX."""
+    text = re.sub(
+        r'<(?:span|div)\b[^>]*\bdata-latex=["\']([^"\']*)["\'][^>]*>.*?</(?:span|div)>',
+        lambda match: "$" + html.unescape(match.group(1)) + "$",
+        text,
+        flags=re.DOTALL,
+    )
+    return html.unescape(text)
+
+
+
 _HTML_ENTITY = re.compile(r"&(?:#[0-9]+|#x[0-9a-f]+|[a-z][a-z0-9]+);", re.IGNORECASE)
 
-
 def _canonical(text: str) -> str:
-    """HTML entity 및 LaTeX 공백 차이를 제거해 문단의 의미상 접두사를 비교한다."""
-    text = html.unescape(text)
+    """서식과 인라인 수식 Embed 표현 차이를 제거해 중복 문단을 비교한다."""
+    text = html.unescape(_inline_math_html_to_latex(text))
     return re.sub(r"\s+", "", text).replace("$", "").replace(r"\(", "").replace(r"\)", "")
 
-
 def _strip_canonical_prefix(text: str, prefix: str) -> str:
-    """정규화된 접두사를 원문 HTML에서 제거하되 entity 표기는 보존한다."""
     if not prefix:
         return text
-
+    text = _inline_math_html_to_latex(text)
     consumed = 0
     index = 0
     while index < len(text) and consumed < len(prefix):
@@ -73,7 +82,6 @@ def _strip_canonical_prefix(text: str, prefix: str) -> str:
                 if consumed >= len(prefix):
                     break
         index = end
-
     while index < len(text):
         entity = _HTML_ENTITY.match(text, index)
         end = entity.end() if entity else index + 1
@@ -83,6 +91,7 @@ def _strip_canonical_prefix(text: str, prefix: str) -> str:
             continue
         break
     return text[index:]
+
 
 def _split_choices(text: str) -> list[str]:
     starts = list(CHOICE_PATTERN.finditer(text))

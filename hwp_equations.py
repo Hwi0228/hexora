@@ -67,7 +67,7 @@ def normalize_katex_expression(expression: str) -> str:
         expression = re.sub(
             rf"(?<![\w\\]){token}(?!\w)", lambda _: command, expression
         )
-    expression = expression.replace("#", " ")
+    expression = expression.replace("#", " ").replace("÷", r"\div").replace("÷", r"\div")
     expression = re.sub(
         r"\\mathrm\{([^{}]*)\}",
         lambda match: (
