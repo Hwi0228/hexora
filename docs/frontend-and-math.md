@@ -87,18 +87,14 @@ document.addEventListener("DOMContentLoaded", function () {
 
 ---
 
-## 4. 브라우저 한컴 수식 변환기 (`hancom-equation.js`)
+## 4. 한컴 수식 변환 (`hmleqx` API)
 
-서버 API 통신 없이도 문제 작성 화면에서 한글 문서의 수식 스크립트를 즉시 LaTeX 구문으로 변환할 수 있도록 클라이언트 측 JavaScript 한컴 수식 변환 엔진을 내장하고 있습니다.
+문항 작성 화면의 한컴 수식 입력은 브라우저에서 별도 JavaScript 파서로 변환하지 않습니다. 편집기에서 입력한 스크립트를 `POST /api/math/hancom-to-latex`로 전송하고, 서버가 PyPI 패키지 `hmleqx`의 `to_latex()`를 호출해 LaTeX로 변환합니다.
 
-### 4.1 변환 처리 규칙 예시
+- 브라우저: 입력 검증, API 요청, 변환 오류 표시, KaTeX 미리보기
+- 서버: 입력 길이 검증 및 `hmleqx.to_latex(script)` 실행
+- 요청 헤더: 로그인 세션과 CSRF 토큰 포함
+- 요청 본문: `{"script": "{a} over {b}"}`
+- 응답 본문: `{"latex": "\\frac{a}{b}"}`
 
-| 한컴 수식 스크립트 | 변환된 LaTeX 구문 | KaTeX 렌더링 결과 |
-| --- | --- | --- |
-| `{a} over {b}` | `\frac{a}{b}` | $\frac{a}{b}$ |
-| `root {3} {x + 1}` | `\sqrt[3]{x + 1}` | $\sqrt[3]{x + 1}$ |
-| `sum _{k=1} ^{n} {k}` | `\sum_{k=1}^{n}{k}` | $\sum_{k=1}^{n}{k}$ |
-| `lim _{x -> 0} {f(x)}` | `\lim_{x \to 0}{f(x)}` | $\lim_{x \to 0}{f(x)}$ |
-| `alpha + beta = gamma` | `\alpha + \beta = \gamma` | $\alpha + \beta = \gamma$ |
-
-- 수식 편집 창의 `[한컴 수식 -> LaTeX 변환]` 탭을 통해 파싱된 문항 수식의 손쉬운 교정이 가능합니다.
+이 구조는 브라우저와 HWP 가져오기 경로가 동일한 `hmleqx` 변환 엔진을 사용하게 하며, 별도의 브라우저용 변환 규칙이 서로 달라지는 문제를 방지합니다.

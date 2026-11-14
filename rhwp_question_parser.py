@@ -58,9 +58,12 @@ def _inline_math_html_to_latex(text: str) -> str:
     return html.unescape(text)
 
 
+
+_HTML_ENTITY = re.compile(r"&(?:#[0-9]+|#x[0-9a-f]+|[a-z][a-z0-9]+);", re.IGNORECASE)
+
 def _canonical(text: str) -> str:
     """서식과 인라인 수식 Embed 표현 차이를 제거해 중복 문단을 비교한다."""
-    text = _inline_math_html_to_latex(text)
+    text = html.unescape(_inline_math_html_to_latex(text))
     return re.sub(r"\s+", "", text).replace("$", "").replace(r"\(", "").replace(r"\)", "")
 
 def _strip_canonical_prefix(text: str, prefix: str) -> str:
@@ -70,12 +73,23 @@ def _strip_canonical_prefix(text: str, prefix: str) -> str:
     consumed = 0
     index = 0
     while index < len(text) and consumed < len(prefix):
-        character = text[index]
-        if not character.isspace() and character != "$":
-            consumed += 1
-        index += 1
-    while index < len(text) and (text[index].isspace() or text[index] == "$"):
-        index += 1
+        entity = _HTML_ENTITY.match(text, index)
+        end = entity.end() if entity else index + 1
+        decoded = html.unescape(text[index:end])
+        for character in decoded:
+            if not character.isspace() and character != "$":
+                consumed += 1
+                if consumed >= len(prefix):
+                    break
+        index = end
+    while index < len(text):
+        entity = _HTML_ENTITY.match(text, index)
+        end = entity.end() if entity else index + 1
+        decoded = html.unescape(text[index:end])
+        if decoded and all(character.isspace() or character == "$" for character in decoded):
+            index = end
+            continue
+        break
     return text[index:]
 
 

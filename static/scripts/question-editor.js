@@ -122,7 +122,7 @@ const editorConfig = configNode
         (mathInputMode.value === "hancom" ? hancomInput : mathInput).focus();
       });
 
-      mathDialogForm.addEventListener("submit", (event) => {
+      mathDialogForm.addEventListener("submit", async (event) => {
         event.preventDefault();
         const inputFormat = mathInputMode.value;
         const source = (inputFormat === "hancom" ? hancomInput : mathInput).value.trim();
@@ -138,16 +138,30 @@ const editorConfig = configNode
         let latex = source;
         if (inputFormat === "hancom") {
           conversionError.hidden = true;
+          const submitButton = mathDialogForm.querySelector('button[type="submit"]');
+          submitButton.disabled = true;
           try {
-            latex = window.EasyConvertEquation.hwpEquationToLaTeX(source);
+            const response = await fetch(editorConfig.hancomConversionUrl || "/api/math/hancom-to-latex", {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                "X-CSRF-Token": form.querySelector('input[name="_csrf_token"]')?.value || ""
+              },
+              body: JSON.stringify({ script: source })
+            });
+            const payload = await response.json().catch(() => ({}));
+            if (!response.ok) {
+              throw new Error(payload.error || "한컴 수식 변환에 실패했습니다.");
+            }
+            latex = String(payload.latex || "").trim();
+            if (!latex) throw new Error("수식 변환 결과가 비어 있습니다.");
           } catch (error) {
-            const invalidRootOrder = /^sqrt\s*\{[^}]+\}\s+of\b/i.test(source);
-            conversionError.textContent = invalidRootOrder
-              ? "'sqrt {3} of {5}' 형식은 사용할 수 없습니다. 다섯제곱근을 뜻한다면 'root 5 of {3}'처럼 입력해 주세요."
-              : (error.message || "수식 문법을 확인해 주세요.");
+            conversionError.textContent = error.message || "수식 변환 중 오류가 발생했습니다.";
             conversionError.hidden = false;
             hancomInput.focus();
             return;
+          } finally {
+            submitButton.disabled = false;
           }
         }
         if (!latex) {

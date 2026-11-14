@@ -7,7 +7,7 @@ import uuid
 from pathlib import Path
 
 from app import app
-from hmleq_converter import _executable
+from hmleq_converter import hmleqx
 
 
 class QuestionRegistrationTests(unittest.TestCase):
@@ -529,7 +529,7 @@ class QuestionRegistrationTests(unittest.TestCase):
         too_long = self.client.post("/questions/math/convert-hancom", json={"expression": "x" * 5001}, headers={"X-CSRF-Token": csrf})
         self.assertEqual(too_long.status_code, 400)
 
-    @unittest.skipUnless(_executable(), "hmleq CLI is installed by build.sh")
+    @unittest.skipUnless(hmleqx is not None, "hmleqx package is installed by build.sh")
     def test_real_hmleq_math_input_can_be_saved_and_rendered(self):
         self.client.get("/questions/new")
         with self.client.session_transaction() as user_session:
@@ -1128,7 +1128,11 @@ class EditorFrontendRegressionTests(unittest.TestCase):
         ).read_text(encoding="utf-8")
         self.assertIn('<option value="hancom">한컴 한/글 수식</option>', template)
         self.assertIn('id="math-hancom-input"', template)
-        self.assertIn("window.EasyConvertEquation.hwpEquationToLaTeX(source)", self.editor_script)
+        self.assertIn("fetch(editorConfig.hancomConversionUrl", self.editor_script)
+        self.assertIn('"X-CSRF-Token"', self.editor_script)
+        self.assertNotIn("EasyConvertEquation", self.editor_script)
+        self.assertIn('"hancomConversionUrl": url_for("hancom_to_latex")', template)
+        self.assertNotIn("hancom-equation.js", template)
 
     def test_quill_math_remains_atomic_and_supports_clipboard_roundtrips(self):
         template = (Path(__file__).resolve().parents[1] / "static/templates/question_form.html").read_text(encoding="utf-8")

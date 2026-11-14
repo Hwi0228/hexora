@@ -20,7 +20,7 @@ jobs:
         with:
           python-version: "3.11"
           cache: pip
-      - name: Install dependencies and hmleq
+      - name: Install dependencies and verify hmleqx
         run: bash build.sh
       - name: Run unit tests
         run: python -m unittest discover -s tests -v
