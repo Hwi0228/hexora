@@ -119,7 +119,7 @@ class HwpParsingTests(unittest.TestCase):
         )
         bar_questions = parse_questions_from_xml(bar_xml.encode("utf-8"))
         self.assertIn(r"\overline{", bar_questions[0]["explanation"])
-        self.assertIn(r"\text{AD", bar_questions[0]["explanation"])
+        self.assertIn(r"\mathrm{AD}", bar_questions[0]["explanation"])
 
         dot_xml = xml.replace(
             "LEFT ⌊ a+b RIGHT ⌋",
@@ -167,7 +167,7 @@ class HwpParsingTests(unittest.TestCase):
         )
         self.assertIn(r"\left", brace_formula)
         self.assertIn(r"\dfrac", brace_formula)
-        self.assertIn("÷", brace_formula)
+        self.assertIn(r"\div", brace_formula)
         self.assertIn(r"\right", brace_formula)
         self.assertNotIn(r"\frac{", brace_formula)
 
