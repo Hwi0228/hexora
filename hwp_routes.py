@@ -11,6 +11,11 @@ from database import get_db
 from parse_hwp import parse_questions_from_xml
 from parse_rhwp import MAX_DOCUMENT_BYTES, parse_questions_from_rhwp_bytes
 from hwp_import_validation import MAX_IMPORTED_QUESTIONS, MAX_SECTION_XML_SIZE, _get_section_xml, _validated_import
+from hwp_engine.adapters import default_registry
+from hwp_engine.assembly import assemble_document
+from hwp_engine.core import HwpCoreExtractor
+from hwp_engine.detection import detect_templates
+from hwp_engine.models import QuestionTemplate
 from exam_export_routes import export_exam_hwpx, register_exam_export_routes
 
 
@@ -144,21 +149,55 @@ def hwp_parser_page():
                     )
 
                 if extension in {".hwp", ".hwpx"}:
-                    questions = parse_questions_from_rhwp_bytes(
-                        content,
-                        filename=Path(uploaded.filename).name,
-                    )
+                    filename = Path(uploaded.filename).name
+                    document_ir = None
+                    try:
+                        document_ir = HwpCoreExtractor().extract_bytes(
+                            content, filename=filename
+                        )
+                    except (ValueError, RuntimeError):
+                        # Preserve the established parser as a compatibility fallback
+                        # when the structural reader cannot open a legacy document.
+                        document_ir = None
+
+                    detection = detect_templates(document_ir) if document_ir else None
+                    if (
+                        detection is not None
+                        and detection.question_template != QuestionTemplate.UNKNOWN
+                    ):
+                        assembled = assemble_document(
+                            document_ir, default_registry(), detection=detection
+                        )
+                        payload = assembled.as_payload()
+                        questions = payload["questions"]
+                        result_json = json.dumps(
+                            payload, ensure_ascii=False, indent=2
+                        )
+                        validation_errors = [
+                            issue.message for issue in assembled.issues
+                            if issue.severity == "error"
+                        ]
+                        if validation_errors:
+                            error = (
+                                "문항·정답 구조 검증이 필요합니다: "
+                                + " / ".join(validation_errors)
+                            )
+                    else:
+                        questions = parse_questions_from_rhwp_bytes(
+                            content, filename=filename
+                        )
                 elif extension == ".xml":
                     xml_content = _get_section_xml(uploaded.filename, content)
                     questions = parse_questions_from_xml(xml_content)
                 else:
                     raise ValueError("HWP, HWPX 또는 HWPML section0.xml 파일만 업로드할 수 있습니다.")
 
-                result_json = json.dumps(
-                    {"questions": questions},
-                    ensure_ascii=False,
-                    indent=2,
-                )
+                if result_json is None:
+                    result_json = json.dumps(
+                        {"questions": questions},
+                        ensure_ascii=False,
+                        indent=2,
+                    )
             except (ValueError, RuntimeError, ET.ParseError, DefusedXmlException) as exc:
                 error = str(exc)
 

@@ -1,6 +1,7 @@
 """Validation helpers for imported HWP question payloads."""
 
 import json
+import re
 from pathlib import Path
 
 from constants import LICENSE_CHOICES, SOURCE_TYPES, SUBJECTS
@@ -19,6 +20,18 @@ def _validated_import(form):
     except (TypeError, ValueError):
         return None, None, errors, "파싱 결과가 올바르지 않습니다. 파일을 다시 업로드해 주세요."
     questions = payload.get("questions") if isinstance(payload, dict) else payload
+
+    # Structural-engine results carry server-generated validation findings.
+    # Never persist an import whose assembled question/answer structure failed.
+    engine_validation = payload.get("validation") if isinstance(payload, dict) else None
+    if isinstance(engine_validation, dict) and engine_validation.get("valid") is False:
+        issues = engine_validation.get("issues", [])
+        messages = [
+            str(issue.get("message", "문서 구조 검증에 실패했습니다."))
+            for issue in issues
+            if isinstance(issue, dict) and issue.get("severity", "error") == "error"
+        ]
+        return None, None, messages or ["문서 구조 검증에 실패했습니다."], None
 
     if not isinstance(questions, list) or not 1 <= len(questions) <= MAX_IMPORTED_QUESTIONS:
         return None, None, errors, "등록할 문항이 없거나 허용 개수(500개)를 초과했습니다."
@@ -74,6 +87,7 @@ def _validated_import(form):
         errors.append("DB에 등록할 문항을 하나 이상 선택해 주세요.")
 
     normalized_questions = []
+    seen_source_numbers = set()
     for question in questions:
         if not isinstance(question, dict):
             errors.append("파싱 결과의 문항 형식이 올바르지 않습니다.")
@@ -99,6 +113,21 @@ def _validated_import(form):
         ):
             errors.append("문항 내용, 정답, 해설 또는 선택지의 형식이 올바르지 않습니다.")
             break
+        if engine_validation is not None:
+            source_number = str(question.get("source_number", question.get("number", ""))).strip()
+            if source_number in seen_source_numbers:
+                errors.append(f"{source_number}번 문항 번호가 중복되었습니다.")
+            seen_source_numbers.add(source_number)
+            if choices and answer:
+                choice_labels = "①②③④⑤⑥⑦⑧⑨⑩"
+                valid_labels = set(choice_labels[:len(choices)])
+                answer_labels = set(re.findall(r"[①②③④⑤⑥⑦⑧⑨⑩]", answer))
+                invalid_labels = answer_labels - valid_labels
+                if invalid_labels:
+                    errors.append(
+                        f"{source_number}번 정답에 존재하지 않는 선택지 표식이 포함되어 있습니다."
+                    )
+
         normalized_questions.append(
             {
                 "number": len(normalized_questions) + 1,
