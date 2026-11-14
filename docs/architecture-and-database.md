@@ -342,3 +342,29 @@ CREATE INDEX IF NOT EXISTS idx_qlinks_rq ON question_links(related_question_id);
 이후 스키마 변경은 `schema_migrations.py`의 `SchemaMigration`에 순차 버전으로 추가합니다. SQLite와 PostgreSQL DDL은 각각 `sqlite_statements`, `postgresql_statements`에 기록합니다. 각 버전은 쓰기 잠금 안에서 실행되고, 모든 문장이 성공한 뒤에만 적용 버전이 기록됩니다. 실패하면 해당 버전의 트랜잭션을 롤백합니다. 애플리케이션이 DB보다 낮은 버전을 지원하는 경우 시작 시 명시적으로 실패합니다.
 
 현재 버전 1은 기존 스키마를 채택하는 기준점이며, 향후 변경은 버전 2부터 추가합니다.
+
+
+## 백업 및 복구 운영 절차
+
+HEXORA는 수동 백업/복구 CLI를 제공합니다. 자동 주기 백업은 기본으로 생성하지 않으며, 운영자가 Render Cron Job 등 별도 스케줄러와 안전한 저장소를 선택해 실행할 수 있습니다.
+
+### 백업 생성
+
+```bash
+flask --app app db-backup --output /secure/backups/hexora-backup.zip
+```
+
+백업 ZIP에는 SQLite 파일 또는 PostgreSQL custom-format dump와 manifest가 포함됩니다. manifest에는 DB 종류, 스키마 버전, UTC 생성 시각, payload SHA-256 체크섬이 기록됩니다. 백업 생성 직후 SQLite integrity_check 또는 pg_restore 목록 검증을 수행합니다. 파일 권한은 가능한 환경에서 소유자 전용(0600)으로 설정합니다.
+
+### 복구
+
+```bash
+flask --app app db-restore --backup /secure/backups/hexora-backup.zip --confirm-overwrite
+```
+
+복구 전에 ZIP 구성, CRC, SHA-256, DB 종류, 스키마 버전을 검증합니다. DB 종류가 다르거나 현재 앱이 지원하는 버전보다 새로운 백업은 거부합니다. 기존 데이터를 바꿀 수 있으므로 `--confirm-overwrite`가 필수입니다.
+
+- SQLite: 임시 파일로 복원한 뒤 integrity_check를 통과하면 원자적으로 대상 파일을 교체합니다. WAL/SHM 파일이 남아 있으면 복구를 거부하므로 서비스를 중지하고 연결을 닫은 뒤 실행합니다.
+- PostgreSQL: PostgreSQL client의 `pg_dump`/`pg_restore`가 필요합니다. custom-format 백업을 검증하고 `--single-transaction --clean --if-exists`로 백업에 포함된 객체를 복원합니다. 연결 비밀번호는 명령행 인수가 아니라 자식 프로세스 환경으로 전달합니다.
+
+백업 파일은 DB와 별도 위치에 보관하고 접근 권한을 제한해야 합니다. 자동 백업을 구성한다면 암호화된 원격 저장소, 보존 기간, 최소 권한, 복구 훈련을 별도로 설정하세요. PostgreSQL의 실서비스 복구는 대상 DB를 점검할 수 있는 유지보수 시간에 수행합니다.

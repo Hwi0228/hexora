@@ -3,7 +3,7 @@ import click
 import secrets
 from pathlib import Path
 
-from flask import Flask
+from flask import Flask, current_app
 from werkzeug.security import generate_password_hash
 from werkzeug.middleware.proxy_fix import ProxyFix
 from markupsafe import Markup
@@ -276,6 +276,66 @@ def create_app():
             raise
 
         click.echo(action)
+
+    @app.cli.command("db-backup")
+    @click.option("--output", type=click.Path(path_type=Path), default=None)
+    def db_backup(output):
+        """Create a verified SQLite or PostgreSQL backup archive."""
+        from backup_restore import create_backup
+        from database import get_db
+
+        backend = current_app.config["DATABASE_TYPE"]
+        connection = get_db()
+        version_row = connection.execute(
+            "SELECT MAX(version) AS version FROM schema_migrations"
+        ).fetchone()
+        schema_version = int(version_row["version"] or 0)
+        source = (
+            current_app.config["DATABASE"]
+            if backend == "sqlite"
+            else current_app.config["DATABASE_URL"]
+        )
+        try:
+            destination = create_backup(
+                backend,
+                source,
+                output=output,
+                schema_version=schema_version,
+            )
+        except (OSError, RuntimeError, ValueError) as exc:
+            raise click.ClickException(str(exc)) from exc
+        click.echo(f"백업이 생성되고 검증되었습니다: {destination}")
+
+    @app.cli.command("db-restore")
+    @click.option("--backup", "backup_path", required=True, type=click.Path(path_type=Path, exists=True, dir_okay=False))
+    @click.option(
+        "--confirm-overwrite",
+        is_flag=True,
+        help="대상 DB의 기존 데이터를 덮어쓰는 작업임을 확인합니다.",
+    )
+    def db_restore(backup_path, confirm_overwrite):
+        """Validate a backup and restore it to the configured database."""
+        from backup_restore import restore_backup
+        from schema_migrations import SCHEMA_MIGRATIONS
+
+        backend = current_app.config["DATABASE_TYPE"]
+        target = (
+            current_app.config["DATABASE"]
+            if backend == "sqlite"
+            else current_app.config["DATABASE_URL"]
+        )
+        supported_version = max(item.version for item in SCHEMA_MIGRATIONS)
+        try:
+            restore_backup(
+                backup_path,
+                backend,
+                target,
+                confirm_overwrite=confirm_overwrite,
+                supported_schema_version=supported_version,
+            )
+        except (OSError, RuntimeError, ValueError) as exc:
+            raise click.ClickException(str(exc)) from exc
+        click.echo("백업 검증 및 복구가 완료되었습니다.")
 
     return app
 
