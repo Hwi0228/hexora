@@ -77,6 +77,12 @@ class HwpImportValidationTests(unittest.TestCase):
         ).read_text(encoding="utf-8")
         self.assertNotIn("processing-log", template)
         self.assertNotIn("process-feedback", template)
+        script = (
+            Path(__file__).resolve().parents[1]
+            / "static" / "scripts" / "hwp-import-review.js"
+        ).read_text(encoding="utf-8")
+        self.assertIn('list.addEventListener("paste"', script)
+        self.assertIn('list.addEventListener("drop"', script)
 
     def test_manual_corrections_keep_original_values_and_source_number(self):
         form = MultiDict([

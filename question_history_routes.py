@@ -26,7 +26,11 @@ class _RevisionTextExtractor(HTMLParser):
     def handle_starttag(self, tag, attrs):
         attributes = dict(attrs)
         classes = set((attributes.get("class") or "").split())
-        if "ql-math-inline" in classes or "ql-math-block" in classes:
+        if "ql-math-block" in classes:
+            self.parts.append("$" + (attributes.get("data-latex") or "") + "$")
+            self.parts.append("\n")
+            return
+        if "ql-math-inline" in classes:
             self.parts.append("$" + (attributes.get("data-latex") or "") + "$")
             return
         if tag in self.BLOCK_TAGS:

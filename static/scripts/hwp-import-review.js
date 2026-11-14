@@ -193,22 +193,29 @@
     if (merge) mergeWithNext(merge.closest("[data-import-question]"));
   });
 
-  list.querySelectorAll('[contenteditable="true"]').forEach((editor) => {
-    editor.addEventListener("paste", (event) => {
-      event.preventDefault();
-      const plainText = event.clipboardData?.getData("text/plain") || "";
-      const selection = window.getSelection();
-      if (!selection || !selection.rangeCount) return;
-      const range = selection.getRangeAt(0);
-      range.deleteContents();
-      const textNode = document.createTextNode(plainText);
-      range.insertNode(textNode);
-      range.setStartAfter(textNode);
-      range.collapse(true);
-      selection.removeAllRanges();
-      selection.addRange(range);
-      syncPayload();
-    });
+  function insertPlainText(event) {
+    const target = event.target instanceof Element ? event.target : event.target?.parentElement;
+    const editor = target?.closest('[contenteditable="true"]');
+    if (!editor || !list.contains(editor)) return;
+    event.preventDefault();
+    const plainText = event.clipboardData?.getData("text/plain") || "";
+    const selection = window.getSelection();
+    if (!selection || !selection.rangeCount) return;
+    const range = selection.getRangeAt(0);
+    range.deleteContents();
+    const textNode = document.createTextNode(plainText);
+    range.insertNode(textNode);
+    range.setStartAfter(textNode);
+    range.collapse(true);
+    selection.removeAllRanges();
+    selection.addRange(range);
+    syncPayload();
+  }
+
+  list.addEventListener("paste", insertPlainText);
+  list.addEventListener("drop", (event) => {
+    const target = event.target instanceof Element ? event.target : event.target?.parentElement;
+    if (target?.closest('[contenteditable="true"]')) event.preventDefault();
   });
 
   form.addEventListener("input", syncPayload);
