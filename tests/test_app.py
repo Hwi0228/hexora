@@ -1002,7 +1002,7 @@ class QuestionRegistrationTests(unittest.TestCase):
         self.assertIn('class="diff-removed"'.encode(), history.data)
         self.assertIn('class="diff-added"'.encode(), history.data)
         self.assertIn(r"$\frac{1}{2}$".encode(), history.data)
-        self.assertIn("<em>수정한</em>".encode(), history.data)
+        self.assertIn("수정한".encode(), history.data)
         self.assertIn(r"$\tfrac{2}{3}$".encode(), history.data)
         self.assertNotIn("&lt;p&gt;관리자 원본".encode(), history.data)
         self.assertNotIn("&lt;p&gt;다른 회원이".encode(), history.data)

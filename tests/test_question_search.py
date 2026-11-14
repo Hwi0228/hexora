@@ -97,7 +97,46 @@ class QuestionSearchBackendParityTests(unittest.TestCase):
                     year="2025",
                     achievement_standard="[10수학01-01] 다항식의 연산을 할 수 있다.",
                     prompt="<p>다항식의 연산</p>",
+                    license="CC-BY-4.0",
                 )
+
+                with application.app_context():
+                    stored = get_db().execute(
+                        """
+                        SELECT curriculum, course, grade, source_type, year,
+                               license, achievement_standard
+                        FROM questions WHERE title = ?
+                        """,
+                        ("미분 기본 문항",),
+                    ).fetchone()
+                    self.assertIsNotNone(stored)
+                    self.assertEqual(stored["curriculum"], "2015 개정 교육과정")
+                    self.assertEqual(stored["course"], "수학Ⅱ")
+                    self.assertEqual(stored["grade"], "고2")
+                    self.assertEqual(stored["source_type"], "학교 시험")
+                    self.assertEqual(int(stored["year"]), 2024)
+                    self.assertEqual(stored["license"], "ORIGINAL")
+                    self.assertIn("12수학Ⅱ02-01", stored["achievement_standard"])
+
+                individual_filters = {
+                    "q": "미분",
+                    "curriculum": "2015 개정 교육과정",
+                    "course": "수학Ⅱ",
+                    "grade": "고2",
+                    "source_type": "학교 시험",
+                    "year": "2024",
+                    "license": "ORIGINAL",
+                    "achievement_standard": "12수학Ⅱ02-01",
+                }
+                for key, value in individual_filters.items():
+                    response = client.get(
+                        "/questions?" + urlencode({"subject": "수학", key: value})
+                    )
+                    self.assertIn(
+                        "검색 결과 1개".encode(),
+                        response.data,
+                        msg=f"single filter failed: {key}={value}",
+                    )
 
                 query = urlencode({
                     "subject": "수학",
