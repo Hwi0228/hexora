@@ -23,7 +23,6 @@ from postgres_backend import (
     _translate_qmark_placeholders,
 )
 from postgres_schema import POSTGRES_SCHEMA_STATEMENTS, initialize_postgres_database
-from schema_migrations import apply_schema_migrations
 
 
 def begin_write_transaction(connection, lock_table=None):
@@ -69,7 +68,6 @@ def get_db():
             connection = PostgresConnection(raw_connection)
             try:
                 initialize_postgres_database(connection)
-                apply_schema_migrations(connection, "postgresql")
             except Exception:
                 connection.close()
                 raise
@@ -82,7 +80,6 @@ def get_db():
             try:
                 initialize_database(connection)
                 connection.execute("PRAGMA foreign_keys = ON")
-                apply_schema_migrations(connection, "sqlite")
             except Exception:
                 connection.close()
                 raise

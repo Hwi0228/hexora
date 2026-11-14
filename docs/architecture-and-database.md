@@ -335,15 +335,6 @@ CREATE INDEX IF NOT EXISTS idx_qlinks_rq ON question_links(related_question_id);
 ```
 
 
-## 스키마 마이그레이션
-
-현재 SQLite/PostgreSQL 초기화기는 기존 설치의 현재 스키마를 보존하며, `schema_migrations` 테이블은 그 상태를 버전 1(`baseline_existing_schema`)로 등록합니다. 기존 테이블을 다시 생성하거나 사용자 데이터를 복사하지 않습니다.
-
-이후 스키마 변경은 `schema_migrations.py`의 `SchemaMigration`에 순차 버전으로 추가합니다. SQLite와 PostgreSQL DDL은 각각 `sqlite_statements`, `postgresql_statements`에 기록합니다. 각 버전은 쓰기 잠금 안에서 실행되고, 모든 문장이 성공한 뒤에만 적용 버전이 기록됩니다. 실패하면 해당 버전의 트랜잭션을 롤백합니다. 애플리케이션이 DB보다 낮은 버전을 지원하는 경우 시작 시 명시적으로 실패합니다.
-
-현재 버전 1은 기존 스키마를 채택하는 기준점이며, 향후 변경은 버전 2부터 추가합니다.
-
-
 ## 백업 및 복구 운영 절차
 
 HEXORA는 수동 백업/복구 CLI를 제공합니다. 자동 주기 백업은 기본으로 생성하지 않으며, 운영자가 Render Cron Job 등 별도 스케줄러와 안전한 저장소를 선택해 실행할 수 있습니다.
