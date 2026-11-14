@@ -77,6 +77,8 @@ class AssemblyResult:
                 "question_scores": self.detection.question_scores,
                 "answer_scores": self.detection.answer_scores,
                 "warnings": list(self.detection.warnings),
+                "question_evidence": self.detection.question_evidence,
+                "answer_evidence": self.detection.answer_evidence,
             },
         }
 

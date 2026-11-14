@@ -73,8 +73,10 @@ class NumberedAnswerAdapter:
             match = _NUMBERED.match(block.text)
             if match:
                 if current is not None:
-                    answer, *rest = current
-                    result[current[0]] = (answer, "\n".join(explanation).strip() or rest[0])
+                    result[current[0]] = (
+                        current[1],
+                        "\n".join([current[2], *explanation]).strip(),
+                    )
                 number = _norm_number(match.group(1) or match.group(2))
                 tail = match.group(3).strip()
                 parsed = _extract_inline_answer(tail)
