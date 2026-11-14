@@ -15,7 +15,7 @@
 </head>
 <body>
   <div class="app app-standard">
-    {% include "partials/sidebar.html" %}
+    {{ render_sidebar() }}
     <main class="hwp-main">
       {% set header_section = "DOCUMENT IMPORT" %}
       {% set header_title = "HWP 문항 파싱" %}

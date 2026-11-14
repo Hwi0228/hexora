@@ -53,11 +53,14 @@ except Exception as exc:
     raise
 
 print(f"rhwp-python import OK: {getattr(rhwp, '__file__', 'unknown path')}")
+PY
 
+# Verify the hmleqx Python API in the deploy artifact.
+python - <<'PY'
 import hmleqx
+
 smoke_result = hmleqx.to_latex("1 over 2")
 if not isinstance(smoke_result, str) or not smoke_result.strip():
     raise RuntimeError("hmleqx smoke test returned an empty result")
 print(f"hmleqx import and conversion OK: {hmleqx.version()}")
 PY
-

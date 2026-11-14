@@ -57,3 +57,101 @@ main>.site-header{width:min(100%,1000px);margin-right:auto;margin-left:auto}.app
 @media(max-width:760px) {
   .app-standard .app-version { display: none; }
 }
+
+/* Shared rendering styles for rich text authored in the question editor. */
+.math-content {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  word-break: normal;
+}
+.math-content p { margin: 0 0 0.55em; }
+.math-content p:last-child { margin-bottom: 0; }
+.math-content strong, .math-content b { font-weight: 750; }
+.math-content em, .math-content i { font-style: italic; }
+.math-content u { text-decoration: underline; text-underline-offset: 2px; }
+.math-content s, .math-content del { text-decoration: line-through; }
+.math-content sub { vertical-align: sub; font-size: .75em; }
+.math-content sup { vertical-align: super; font-size: .75em; }
+.math-content h1, .math-content h2, .math-content h3 {
+  margin: .8em 0 .4em;
+  color: var(--hexora-ink);
+  font-weight: 750;
+  line-height: 1.45;
+}
+.math-content h1 { font-size: 1.45em; }
+.math-content h2 { font-size: 1.25em; }
+.math-content h3 { font-size: 1.1em; }
+.math-content ul, .math-content ol {
+  margin: .45em 0;
+  padding-left: 1.8em;
+}
+.math-content li { padding-left: .15em; }
+.math-content blockquote {
+  margin: .75em 0;
+  padding: .65em .9em;
+  border-left: 3px solid #8AA9C5;
+  border-radius: 0 7px 7px 0;
+  background: #F5F8FB;
+  color: #526477;
+}
+.math-content blockquote p:last-child { margin-bottom: 0; }
+.math-content a { color: var(--hexora-primary); text-decoration: underline; text-underline-offset: 2px; }
+.math-content code {
+  padding: .1em .35em;
+  border-radius: 4px;
+  background: #F1F4F7;
+  color: #40566C;
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: .92em;
+}
+.math-content pre {
+  max-width: 100%;
+  overflow-x: auto;
+  padding: .75em .9em;
+  border-radius: 7px;
+  background: #F5F7F9;
+  line-height: 1.55;
+}
+.math-content pre code { padding: 0; background: transparent; }
+.math-content .ql-align-center { text-align: center; }
+.math-content .ql-align-right { text-align: right; }
+.math-content .ql-align-justify { text-align: justify; }
+.math-content .ql-indent-1 { padding-left: 3em; }
+.math-content .ql-indent-2 { padding-left: 6em; }
+.math-content .ql-indent-3 { padding-left: 9em; }
+.math-content .ql-indent-4 { padding-left: 12em; }
+.math-content .ql-size-small { font-size: .82em; }
+.math-content .ql-size-large { font-size: 1.35em; }
+.math-content .ql-size-huge { font-size: 1.75em; }
+.math-content .ql-font-serif { font-family: Georgia, "Noto Serif KR", serif; }
+.math-content .ql-font-monospace { font-family: ui-monospace, SFMono-Regular, Consolas, monospace; }
+.math-content .ql-direction-rtl { direction: rtl; text-align: inherit; }
+
+/* Compact legal and policy links in the shared sidebar. */
+.sidebar-legal-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 10px;
+  margin-top: 10px;
+  padding: 10px 3px 0;
+  border-top: 1px solid #EEF1F4;
+  line-height: 1.5;
+}
+.sidebar-legal-links a {
+  color: #8996A4;
+  font-size: 9px;
+  font-weight: 550;
+  text-decoration: none;
+  transition: color .15s ease;
+}
+.sidebar-legal-links a:hover {
+  color: var(--hexora-primary);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+@media(max-width:1120px) {
+  .app-question-bank .sidebar-legal-links { display: none; }
+}
+@media(max-width:760px) {
+  .app-standard .sidebar-legal-links { display: none; }
+}

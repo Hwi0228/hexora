@@ -18,7 +18,7 @@
   </head>
 <body>
   <div class="app app-standard">
-    {% include "partials/sidebar.html" %}
+    {{ render_sidebar() }}
     <main>
       {% set header_section = "QUESTION WIKI / EDITOR" %}
       {% set header_title = "문항 수정" if mode == "edit" else "문항 작성" %}

@@ -1,3 +1,5 @@
+import html
+import re
 import tempfile
 import unittest
 from unittest.mock import patch
@@ -10,6 +12,19 @@ from parse_hwp import (
     parse_questions,
     parse_questions_from_xml,
 )
+
+
+def _canonical_latex(value: str) -> str:
+    """Normalize equivalent TeX spellings for semantic assertions."""
+    value = html.unescape(value)
+    value = re.sub(r"([_^])\{([^{}])\}", r"\1\2", value)
+    return re.sub(r"\s+", "", value)
+
+
+def _embedded_latex(markup: str) -> list[str]:
+    """Read math from serialized Quill HTML, decoding attribute entities."""
+    values = re.findall(r'data-latex="([^"]*)"', markup)
+    return [_canonical_latex(value) for value in values]
 
 
 class HwpParsingTests(unittest.TestCase):
@@ -59,17 +74,21 @@ class HwpParsingTests(unittest.TestCase):
             questions = parse_questions(xml_path)
 
         self.assertEqual(
-            questions,
-            [
-                {
-                    "number": 1,
-                    "question": "문제 서두 표에 있는 조건 마지막 문제 문장 [그림]",
-                    "choices": ["첫째", "둘째", "셋째"],
-                    "answer": "③",
-                    "explanation": '[그림] 계산하면 <span class="ql-math-inline" data-latex="2&#32;+&#32;2" data-input-format="latex" data-input-source="2&#32;+&#32;2" data-math-object="inline"></span>',
-                }
-            ],
+            {
+                key: questions[0][key]
+                for key in ("number", "question", "choices", "answer")
+            },
+            {
+                "number": 1,
+                "question": "문제 서두 표에 있는 조건 마지막 문제 문장 [그림]",
+                "choices": ["첫째", "둘째", "셋째"],
+                "answer": "③",
+            },
         )
+        self.assertTrue(questions[0]["explanation"].startswith("[그림] 계산하면 "))
+        # hmleqx may serialize operator spacing as HTML character references;
+        # x^2 and x^{2} are also equivalent TeX forms. Compare decoded math.
+        self.assertEqual(_embedded_latex(questions[0]["explanation"]), ["2+2"])
 
     def test_converts_hml_equation_script_to_latex(self):
         xml = """\
@@ -155,10 +174,10 @@ class HwpParsingTests(unittest.TestCase):
         aligned_formula = _equation_to_latex(
             r'EQALIGN { & rm "가입비 15000원" # & rm "- 가입 시 추가 요금 없이 무제한 편집 가능" }'
         )
-        self.assertIn(r"\begin{aligned}", aligned_formula)
-        self.assertIn(r"\text{가입비 15000원}", aligned_formula)
-        self.assertIn(r"\text{- 가입 시 추가 요금 없이 무제한 편집 가능}", aligned_formula)
-        self.assertIn(r"\end{aligned}", aligned_formula)
+        self.assertEqual(
+            aligned_formula,
+            r"\begin{aligned} & \text{가입비 15000원} \\ & \text{- 가입 시 추가 요금 없이 무제한 편집 가능} \end{aligned}",
+        )
 
     def test_fraction_commands_are_preserved_for_katex(self):
         expression = r"\frac{a}{b} + \tfrac{c}{d} + \cfrac{1}{2} + \dfrac{3}{4}"

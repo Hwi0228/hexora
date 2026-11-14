@@ -28,6 +28,13 @@ def equation_to_latex(script: str, *, legacy_converter, primary_converter) -> st
     script = re.sub(r"(?<!\w)EQALIGN(?!\w)", "eqalign", script)
     script = re.sub(r"(?<!\w)angle(?!\w)", "ANGLE", script)
     script = re.sub(r"(?<!\w)triangle(?!\w)", "TRIANGLE", script)
+    # HWP closes a roman-style quoted identifier with "it". Explicit braces
+    # keep hmleqx's rm scope from consuming the following relation or degree.
+    script = re.sub(
+        r'(?<!\w)rm\s+"([^"]*)"\s+it\b',
+        lambda match: "{rm " + match.group(1) + "}",
+        script,
+    )
     search_from = 0
     while True:
         match = GROUPED_COMMAND.search(script, search_from)
@@ -59,8 +66,9 @@ def equation_to_latex(script: str, *, legacy_converter, primary_converter) -> st
         try:
             converted = primary_converter(script)
         except HmleqUnavailable:
-            # Keep the established local parser as a fallback when hmleqx is
-            # absent in a developer environment. Render verifies hmleqx at build time.
+            # Allow local fallback, but let deployments opt into strict enforcement.
+            if os.environ.get("HMLEQ_REQUIRED") == "1":
+                raise
             converted = legacy_converter(script).strip()
     converted = re.sub(
         r'\brm\s+"([^"]*)"(?:\s+it\b)?',

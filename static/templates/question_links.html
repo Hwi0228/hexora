@@ -3,7 +3,7 @@
   <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>출처와 관련 문항 | HEXORA</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='styles/shared.css') }}"><link rel="stylesheet" href="{{ url_for('static', filename='styles/tokens.css') }}"><link rel="stylesheet" href="{{ url_for('static', filename='styles/base.css') }}"><link rel="stylesheet" href="{{ url_for('static', filename='styles/layout.css') }}"><link rel="stylesheet" href="{{ url_for('static', filename='styles/components.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='styles/pages/workbooks.css') }}">
-</head><body class="workbooks-page question-links-page"><div class="app app-standard">{% include "partials/sidebar.html" %}<main>
+</head><body class="workbooks-page question-links-page"><div class="app app-standard">{{ render_sidebar() }}<main>
   {% set header_section = "QUESTION RELATIONSHIPS" %}{% set header_title = "출처와 관련 문항" %}{% set header_description = "HEXORA 문항 {{ question_number }}의 출처 또는 변형 관계를 연결합니다." %}{% include "partials/header.html" %}
   <section class="content-card"><h2>{{ question.title or question.subject ~ ' · ' ~ question.unit }}</h2><p>{{ question.grade }} · {{ question.subject }} · {{ question.unit }}</p><p><a href="{{ url_for('main', subject=question.subject) }}#question-{{ question.id }}">문제 DB에서 문항 보기</a> · <a href="{{ url_for('edit_question', question_id=question.id) }}">문항 편집</a></p></section>
   <section class="content-card"><h2>이 문항의 출처·기준</h2>

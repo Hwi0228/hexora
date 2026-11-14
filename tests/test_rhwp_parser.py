@@ -1,3 +1,5 @@
+import html
+import re
 import unittest
 from types import SimpleNamespace
 
@@ -10,6 +12,17 @@ def provenance(index, char_start=None):
 
 def paragraph(text, index):
     return SimpleNamespace(kind="paragraph", text=text, prov=provenance(index))
+
+
+def _canonical_latex(value: str) -> str:
+    value = html.unescape(value)
+    value = re.sub(r"([_^])\{([^{}])\}", r"\1\2", value)
+    return re.sub(r"\s+", "", value)
+
+
+def _embedded_latex(markup: str) -> list[str]:
+    values = re.findall(r'data-latex="([^"]*)"', markup)
+    return [_canonical_latex(value) for value in values]
 
 
 class RhwpQuestionParserTests(unittest.TestCase):
@@ -256,5 +269,6 @@ class RhwpFlexibleDocumentTests(unittest.TestCase):
         question = parse_questions_from_ir(ir)[0]
 
         self.assertIn('class="ql-math-inline"', question["question"])
-        self.assertIn('data-latex="x^{2}"', question["question"])
+        # The parser canonicalizes a simple superscript as x^{2}; compare TeX meaning.
+        self.assertEqual(_embedded_latex(question["question"]), ["x^2"])
         self.assertIn("[그림: 좌표평면]", question["question"])
