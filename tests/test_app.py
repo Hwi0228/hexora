@@ -881,7 +881,7 @@ class QuestionRegistrationTests(unittest.TestCase):
                     "--email", "legacy-admin@example.com",
                     "--display-name", "기존 관리자",
                 ],
-                input="LegacyAdminPassword123!\\nLegacyAdminPassword123!\\n",
+                input="LegacyAdminPassword123!\nLegacyAdminPassword123!\n",
             )
             self.assertEqual(bootstrap.exit_code, 0, bootstrap.output)
 

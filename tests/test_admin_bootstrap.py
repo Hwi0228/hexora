@@ -54,7 +54,7 @@ class AdminBootstrapCommandTests(unittest.TestCase):
                 "--email", email,
                 "--display-name", "HEXORA 운영자",
             ],
-            input="SecureAdminPassword123!\\nSecureAdminPassword123!\\n",
+            input="SecureAdminPassword123!\nSecureAdminPassword123!\n",
         )
 
     def test_public_first_signup_never_receives_admin_role(self):

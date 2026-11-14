@@ -114,7 +114,7 @@ class LegalAndRightsReportTests(unittest.TestCase):
                 "--email", "legal-admin@example.com",
                 "--display-name", "법무 관리자",
             ],
-            input="LegalAdminPass123!\\nLegalAdminPass123!\\n",
+            input="LegalAdminPass123!\nLegalAdminPass123!\n",
         )
         self.assertEqual(bootstrap.exit_code, 0, bootstrap.output)
 
