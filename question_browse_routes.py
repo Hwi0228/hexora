@@ -1,5 +1,5 @@
 
-from flask import abort, g, redirect, render_template, request, url_for
+from flask import abort, current_app, g, redirect, render_template, request, url_for
 
 from constants import NAV_ITEMS, SUBJECTS, LICENSE_CHOICES, SOURCE_TYPES, GRADE_OPTIONS
 from question_constants import QUESTION_TYPES, COURSE_OPTIONS, SUBJECT_COURSE_OPTIONS
