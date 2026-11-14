@@ -26,18 +26,15 @@ class _RevisionTextExtractor(HTMLParser):
     def handle_starttag(self, tag, attrs):
         attributes = dict(attrs)
         classes = set((attributes.get("class") or "").split())
-        if "ql-math-inline" in classes:
-            self.parts.append("$" + (attributes.get("data-latex") or "") + "$")
-            return
-        if "ql-math-block" in classes:
+        if "ql-math-inline" in classes or "ql-math-block" in classes:
             self.parts.append("$" + (attributes.get("data-latex") or "") + "$")
             return
         if tag in self.BLOCK_TAGS:
-            self.parts.append("\\n")
+            self.parts.append("\n")
 
     def handle_endtag(self, tag):
         if tag in self.BLOCK_TAGS:
-            self.parts.append("\\n")
+            self.parts.append("\n")
 
     def handle_data(self, data):
         self.parts.append(data)
@@ -49,9 +46,9 @@ def _plain_revision_text(value):
     parser = _RevisionTextExtractor()
     parser.feed(str(value))
     parser.close()
-    text = "".join(parser.parts).replace("\\r\\n", "\\n").replace("\\r", "\\n")
-    text = re.sub(r"[ \\t]+", " ", text)
-    text = re.sub(r" *\\n *", "\\n", text)
+    text = "".join(parser.parts).replace("\r\n", "\n").replace("\r", "\n")
+    text = re.sub(r"[ \t]+", " ", text)
+    text = re.sub(r" *\n *", "\n", text)
     return text.strip()
 
 
@@ -71,14 +68,12 @@ def _render_diff_side(before, after, side):
             css_class = "diff-added"
         if not value:
             continue
-        safe_value = escape(value, quote=False).replace("\\n", "<br>")
+        safe_value = escape(value, quote=False).replace("\n", "<br>")
         if changed:
             parts.append(f'<{wrapper} class="{css_class}">{safe_value}</{wrapper}>')
         else:
             parts.append(safe_value)
     return "".join(parts)
-
-
 def question_history(question_id):
     question = _question_row(question_id)
     connection = get_db()

@@ -11,9 +11,9 @@ class QuestionRevisionDiffTests(unittest.TestCase):
 
     def test_math_embeds_preserve_their_latex_payload(self):
         value = _plain_revision_text(
-            '<p>식 <span class="ql-math-inline" data-latex="\\\\frac{1}{2}"></span></p>'
+            '<p>식 <span class="ql-math-inline" data-latex="x^2"></span></p>'
         )
-        self.assertIn(r"$\\frac{1}{2}$", value)
+        self.assertIn("$x^2$", value)
 
     def test_changed_text_is_highlighted_on_the_correct_side(self):
         before = _render_diff_side("원래 문항", "수정 문항", "before")

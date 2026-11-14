@@ -80,6 +80,7 @@ class PublicWriteRateLimitTests(unittest.TestCase):
         with app.test_request_context(
             "/login", method="POST",
             headers={"X-Forwarded-For": "203.0.113.99"},
+            environ_base={"REMOTE_ADDR": "127.0.0.1"},
         ):
             self.assertEqual(request.remote_addr, "127.0.0.1")
 
