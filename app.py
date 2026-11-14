@@ -17,9 +17,56 @@ from rich_text import render_rich_html
 from sidebar import render_sidebar
 
 
+def _is_production_environment():
+    """Detect production deployments without relying on Flask's removed FLASK_ENV."""
+    configured_environment = (
+        os.environ.get("HEXORA_ENV")
+        or os.environ.get("APP_ENV")
+        or os.environ.get("FLASK_ENV")
+        or ""
+    ).strip().lower()
+    render_environment = os.environ.get("RENDER", "").strip().lower() in {
+        "1", "true", "yes",
+    }
+    return configured_environment in {"production", "prod"} or render_environment
+
+
+def _validate_secret_key(value):
+    """Reject short or obviously low-diversity session signing keys."""
+    if not isinstance(value, str) or len(value) < 32:
+        raise RuntimeError(
+            "FLASK_SECRET_KEY must contain at least 32 characters. "
+            "Generate a random key and store it as an environment variable."
+        )
+
+    frequencies = {}
+    for character in value:
+        frequencies[character] = frequencies.get(character, 0) + 1
+    import math
+
+    entropy_per_character = -sum(
+        (count / len(value)) * math.log2(count / len(value))
+        for count in frequencies.values()
+    )
+    if len(frequencies) < 12 or entropy_per_character < 3.5:
+        raise RuntimeError(
+            "FLASK_SECRET_KEY does not meet the minimum character-diversity "
+            "requirement. Use a cryptographically random key."
+        )
+    return value
+
+
 def _secret_key(app):
-    if app.config["SECRET_KEY"]:
-        return app.config["SECRET_KEY"]
+    configured_key = app.config.get("SECRET_KEY")
+    if configured_key:
+        return _validate_secret_key(configured_key)
+
+    if _is_production_environment():
+        raise RuntimeError(
+            "FLASK_SECRET_KEY is required in production. "
+            "Set a persistent, cryptographically random environment variable."
+        )
+
     key_path = Path(app.instance_path) / ".secret_key"
     key_path.parent.mkdir(parents=True, exist_ok=True)
     if not key_path.exists():
@@ -28,7 +75,7 @@ def _secret_key(app):
                 key_file.write(secrets.token_hex(32))
         except FileExistsError:
             pass
-    return key_path.read_text(encoding="ascii").strip()
+    return _validate_secret_key(key_path.read_text(encoding="ascii").strip())
 
 
 def create_app():
