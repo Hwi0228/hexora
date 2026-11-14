@@ -130,22 +130,30 @@ def get_question_page_data():
             query += " AND questions.year = ?"
             parameters.append(year)
 
+    like_operator = (
+        "ILIKE"
+        if current_app.config.get("DATABASE_TYPE") in {"postgres", "postgresql"}
+        else "LIKE"
+    )
     if filter_values["achievement_standard"]:
-        query += " AND LOWER(COALESCE(questions.achievement_standard, '')) LIKE ?"
-        parameters.append(f"%{filter_values['achievement_standard'].lower()}%")
+        query += (
+            " AND COALESCE(questions.achievement_standard, '') "
+            f"{like_operator} ?"
+        )
+        parameters.append(f"%{filter_values['achievement_standard']}%")
 
     if filter_values["q"]:
-        query += """
+        query += f"""
           AND (
-            LOWER(COALESCE(questions.title, '')) LIKE ? OR
-            LOWER(COALESCE(questions.passage, '')) LIKE ? OR
-            LOWER(COALESCE(questions.prompt, '')) LIKE ? OR
-            LOWER(COALESCE(questions.examples, '')) LIKE ? OR
-            LOWER(COALESCE(questions.answer, '')) LIKE ? OR
-            LOWER(COALESCE(questions.explanation, '')) LIKE ?
+            COALESCE(questions.title, '') {like_operator} ? OR
+            COALESCE(questions.passage, '') {like_operator} ? OR
+            COALESCE(questions.prompt, '') {like_operator} ? OR
+            COALESCE(questions.examples, '') {like_operator} ? OR
+            COALESCE(questions.answer, '') {like_operator} ? OR
+            COALESCE(questions.explanation, '') {like_operator} ?
           )
         """
-        pattern = f"%{filter_values['q'].lower()}%"
+        pattern = f"%{filter_values['q']}%"
         parameters.extend([pattern] * 6)
 
     if filter_values["sort"] not in {"latest", "modified", "relevance"}:
