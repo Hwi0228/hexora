@@ -103,26 +103,29 @@ class QuestionAdapterTests(unittest.TestCase):
             p("1. 다음 중 옳은 것은?", 1),
             p("① 가 ② 나", 2),
             p("주관식", 3),
-            p("다음 값을 구하시오.", 4),
-            p("02", 5),
-            p("정답 및 해설", 6),
-            p("01 ②", 7),
-            p("주관식 정답", 8),
-            p("02 24", 9),
+            p("2. 값을 구하시오.", 4),
+            p("3. 다음 중 바른 것은?", 5),
+            p("① 다 ② 라", 6),
+            p("정답 및 해설", 7),
+            p("01 ② 03 ③", 8),
+            p("주관식 정답", 9),
+            p("02 24", 10),
         ))
         result = assemble_document(doc, self.registry)
         self.assertEqual(result.detection.question_template, QuestionTemplate.MIXED)
         self.assertEqual(result.detection.answer_template, AnswerTemplate.MIXED)
-        self.assertEqual(result.questions[0].answer, "②")
-        self.assertEqual(result.questions[1].answer, "24")
+        self.assertEqual([q.answer for q in result.questions], ["②", "24", "③"])
 
     def test_validator_rejects_missing_out_of_range_and_orphan_answers(self):
         doc = DocumentIR("hwpx", (
             p("1. 다음 중 옳은 것은?", 0),
             p("① 가 ② 나", 1),
-            p("정답 및 해설", 2),
-            p("1. (답) ⑤", 3),
-            p("9. (답) ①", 4),
+            p("2. 다음 중 바른 것은?", 2),
+            p("① 다 ② 라", 3),
+            p("정답 및 해설", 4),
+            p("1. (답) ⑤", 5),
+            p("2. (답) ①", 6),
+            p("9. (답) ①", 7),
         ))
         result = assemble_document(doc, self.registry)
         codes = {issue.code for issue in result.issues}

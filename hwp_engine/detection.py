@@ -110,7 +110,7 @@ def detect_templates(document: DocumentIR) -> TemplateDetection:
     if suffix_count:
         q_scores[QuestionTemplate.SUFFIX_NUMBERED.value] += suffix_count
     if has_subjective_heading and choice_count:
-        q_scores[QuestionTemplate.MIXED.value] += max(2, prefix_count, suffix_count)
+        q_scores[QuestionTemplate.MIXED.value] += max(2, prefix_count, suffix_count) + 1
 
     # Inline answer markers may occur in the question area, not only after a
     # global answer heading.
@@ -120,7 +120,7 @@ def detect_templates(document: DocumentIR) -> TemplateDetection:
 
     answer_blob = " ".join(answer_text)
     packed_matches = list(_PACKED.finditer(answer_blob))
-    if len(packed_matches) >= 2:
+    if len(packed_matches) >= 1:
         a_scores[AnswerTemplate.PACKED_KEY.value] += len(packed_matches)
 
     numbered_entries = sum(bool(_NUMBERED_ANSWER.match(text)) for text in answer_text)
