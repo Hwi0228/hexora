@@ -22,6 +22,10 @@ class QuestionRegistrationTests(unittest.TestCase):
         self.client = app.test_client()
         self.register(self.client, "admin@example.com", "관리자")
         self.admin_uuid = self.get_user_uuid("admin@example.com")
+        with sqlite3.connect(self.database) as connection:
+            connection.execute(
+                "UPDATE users SET role = 'admin' WHERE uuid = ?", (self.admin_uuid,)
+            )
 
     def tearDown(self):
         self.temp_directory.cleanup()
@@ -283,7 +287,7 @@ class QuestionRegistrationTests(unittest.TestCase):
         self.assertEqual(snapshot["title"], "미분계수 문항")
         self.assertEqual(snapshot["license"], "CC-BY-4.0")
 
-    def test_first_account_is_admin_and_login_required(self):
+    def test_bootstrapped_admin_and_login_required(self):
         response = self.client.get("/")
         self.assertEqual(response.status_code, 200)
         self.assertIn("관리자".encode(), response.data)

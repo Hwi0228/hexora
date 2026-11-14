@@ -21,6 +21,10 @@ class AdminDatabaseResetTests(unittest.TestCase):
         self.admin = app.test_client()
         self.register(self.admin, "reset-admin@example.com", "초기화 관리자")
         self.admin_uuid = self.user_uuid("reset-admin@example.com")
+        with sqlite3.connect(app.config["DATABASE"]) as connection:
+            connection.execute(
+                "UPDATE users SET role = 'admin' WHERE uuid = ?", (self.admin_uuid,)
+            )
 
         self.member = app.test_client()
         self.register(self.member, "reset-member@example.com", "일반 사용자")

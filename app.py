@@ -1,8 +1,10 @@
 import os
+import click
 import secrets
 from pathlib import Path
 
 from flask import Flask
+from werkzeug.security import generate_password_hash
 from werkzeug.middleware.proxy_fix import ProxyFix
 from markupsafe import Markup
 
@@ -180,6 +182,90 @@ def create_app():
     register_hwp_routes(app)
     register_legal_routes(app)
     register_admin_database_routes(app)
+
+    @app.cli.command("create-admin")
+    @click.option("--email", prompt=True, help="최초 관리자 계정 이메일")
+    @click.option("--display-name", prompt=True, help="관리자 표시 이름")
+    @click.password_option(confirmation_prompt=True)
+    def create_admin(email, display_name, password):
+        """명시적으로 최초 관리자 계정을 생성하거나 기존 계정을 승격합니다."""
+        normalized_email = email.strip().lower()
+        display_name = display_name.strip()
+        if (
+            len(normalized_email) > 254
+            or "@" not in normalized_email
+            or "." not in normalized_email.rsplit("@", 1)[-1]
+        ):
+            raise click.ClickException("올바른 이메일 주소를 입력해 주세요.")
+        if not display_name or len(display_name) > 80:
+            raise click.ClickException("표시 이름은 1~80자로 입력해 주세요.")
+        if len(password) < 12 or len(password) > 256:
+            raise click.ClickException("관리자 비밀번호는 12~256자로 입력해 주세요.")
+
+        from database import begin_write_transaction, get_db
+
+        connection = get_db()
+        try:
+            begin_write_transaction(connection, lock_table="users")
+            admin_exists = connection.execute(
+                "SELECT 1 FROM users WHERE role = 'admin' LIMIT 1"
+            ).fetchone()
+            if admin_exists:
+                connection.rollback()
+                raise click.ClickException(
+                    "관리자 계정이 이미 존재합니다. 추가 부트스트랩은 허용되지 않습니다."
+                )
+
+            existing = connection.execute(
+                "SELECT uuid FROM users WHERE email = ?", (normalized_email,)
+            ).fetchone()
+            if existing:
+                user_uuid = existing["uuid"]
+                connection.execute(
+                    """
+                    UPDATE users
+                    SET display_name = ?, password_hash = ?, role = 'admin'
+                    WHERE uuid = ?
+                    """,
+                    (display_name, generate_password_hash(password), user_uuid),
+                )
+                action = "기존 계정을 관리자 계정으로 승격했습니다."
+            else:
+                import uuid
+
+                user_uuid = str(uuid.uuid4())
+                connection.execute(
+                    """
+                    INSERT INTO users (uuid, email, display_name, password_hash, role)
+                    VALUES (?, ?, ?, ?, 'admin')
+                    """,
+                    (
+                        user_uuid,
+                        normalized_email,
+                        display_name,
+                        generate_password_hash(password),
+                    ),
+                )
+                action = "최초 관리자 계정을 생성했습니다."
+
+            # Preserve legacy unowned content when the first administrator is bootstrapped.
+            connection.execute(
+                "UPDATE folders SET user_uuid = ? WHERE user_uuid IS NULL",
+                (user_uuid,),
+            )
+            connection.execute(
+                "UPDATE questions SET user_uuid = ? WHERE user_uuid IS NULL",
+                (user_uuid,),
+            )
+            connection.commit()
+        except click.ClickException:
+            raise
+        except Exception:
+            connection.rollback()
+            raise
+
+        click.echo(action)
+
     return app
 
 
