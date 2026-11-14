@@ -102,7 +102,6 @@ class DatabaseBackendParityIntegrationTests(unittest.TestCase):
         import tempfile
         import uuid
         from pathlib import Path
-        from flask import Flask
         from database import close_db, get_db
 
         backends = [("sqlite", None)]
