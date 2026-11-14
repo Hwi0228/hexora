@@ -134,7 +134,7 @@ class HwpParsingTests(unittest.TestCase):
             'angle rm "C" it = 90 DEG',
         )
         angle_questions = parse_questions_from_xml(angle_xml.encode("utf-8"))
-        self.assertIn(r"\text{C}", angle_questions[0]["explanation"])
+        self.assertIn(r"\mathrm{C}", angle_questions[0]["explanation"])
         self.assertIn(r"\deg", angle_questions[0]["explanation"])
 
     def test_preserves_fraction_commands_when_converting_hancom(self):
