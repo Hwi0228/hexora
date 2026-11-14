@@ -28,6 +28,7 @@ jobs:
           --health-retries 5
     env:
       HEXORA_TEST_POSTGRES_URL: postgresql://postgres:postgres@localhost:5432/hexora_test
+      HEXORA_POSTGRES_CLIENT_VERSION: "16"
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -36,6 +37,10 @@ jobs:
         with:
           python-version: "3.11"
           cache: pip
+      - name: Install matching PostgreSQL client
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client-16
       - name: Install dependencies and verify hmleqx
         run: bash build.sh
       - name: Run unit tests

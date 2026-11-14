@@ -114,7 +114,9 @@ def detect_templates(document: DocumentIR) -> TemplateDetection:
 
     # Inline answer markers may occur in the question area, not only after a
     # global answer heading.
-    inline_count = sum(len(_INLINE.findall(text)) for text in question_text + answer_text)
+    # (답) is also used by numbered answer sheets; only count inline markers
+    # in the question region so A-NUMBERED is not mistaken for A-INLINE.
+    inline_count = sum(len(_INLINE.findall(text)) for text in question_text)
     if inline_count:
         a_scores[AnswerTemplate.INLINE.value] += inline_count
 

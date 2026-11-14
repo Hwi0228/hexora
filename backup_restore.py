@@ -145,6 +145,18 @@ def _postgres_environment(database_url: str) -> dict[str, str]:
     return environment
 
 
+def _find_postgres_tool(name: str) -> str | None:
+    preferred_major = os.environ.get("HEXORA_POSTGRES_CLIENT_VERSION", "").strip()
+    if preferred_major:
+        preferred = shutil.which(f"{name}-{preferred_major}")
+        if preferred:
+            return preferred
+        bundled = Path(f"/usr/lib/postgresql/{preferred_major}/bin") / name
+        if bundled.is_file():
+            return str(bundled)
+    return shutil.which(name)
+
+
 def _run_postgres_tool(command: list[str], environment: dict[str, str], timeout: int):
     try:
         result = subprocess.run(
@@ -168,7 +180,7 @@ def _run_postgres_tool(command: list[str], environment: dict[str, str], timeout:
 
 
 def _validate_postgres_dump(path: Path, environment: dict[str, str]) -> None:
-    executable = shutil.which("pg_restore")
+    executable = _find_postgres_tool("pg_restore")
     if not executable:
         raise BackupError("pg_restore를 찾지 못했습니다. PostgreSQL client 도구를 설치해 주세요.")
     _run_postgres_tool([executable, "--list", str(path)], environment, timeout=60)
@@ -213,7 +225,7 @@ def create_backup(
             _sqlite_integrity_check(payload)
         else:
             environment = _postgres_environment(str(source))
-            executable = shutil.which("pg_dump")
+            executable = _find_postgres_tool("pg_dump")
             if not executable:
                 raise BackupError("pg_dump를 찾지 못했습니다. PostgreSQL client 도구를 설치해 주세요.")
             _run_postgres_tool(
