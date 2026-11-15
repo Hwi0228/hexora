@@ -20,6 +20,7 @@ def _ensure_credentials_table():
         )
         """
     )
+    get_db().commit()
 
 
 def _fernet():
