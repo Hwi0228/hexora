@@ -423,6 +423,14 @@ const editorConfig = configNode
     let standardsRequestId = 0;
     const subjectSelect = form.querySelector('[name="subject"]');
     const subjectCourseOptions = editorConfig.subjectCourseOptions || {};
+    const csatSubjectCourseOptions = {
+      "국어": ["국어", "화법과 작문", "언어와 매체"],
+      "수학": ["수학", "확률과 통계", "미적분", "기하"],
+      "영어": ["영어"],
+      "사회": ["한국사", "생활과 윤리", "윤리와 사상", "한국지리", "세계지리", "동아시아사", "세계사", "경제", "정치와 법", "사회·문화"],
+      "과학": ["물리학Ⅰ", "화학Ⅰ", "생명과학Ⅰ", "지구과학Ⅰ", "물리학Ⅱ", "화학Ⅱ", "생명과학Ⅱ", "지구과학Ⅱ"],
+      "기타": ["제2외국어/한문"]
+    };
     const storedStandard = editorConfig.storedStandard || "";
     // Older drafts may contain multiple lines; keep the first value when opening them.
     const selectedStandard = {
@@ -513,9 +521,11 @@ const editorConfig = configNode
     }
 
     function rebuildCourses() {
-      const options = subjectCourseOptions[subjectSelect.value] || [];
+      const options = gradeSelect.value === "수능"
+        ? (csatSubjectCourseOptions[subjectSelect.value] || [])
+        : (subjectCourseOptions[subjectSelect.value] || []);
       const previous = course.value || preferredCourse;
-      setSelectOptions(course, options, "교과 선택", previous);
+      setSelectOptions(course, options, gradeSelect.value === "수능" ? "수능 과목 선택" : "교과 선택", previous);
     }
 
     async function loadStandards() {
