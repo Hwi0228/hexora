@@ -45,7 +45,10 @@ def get_user_groq_api_key(user_uuid):
     if row is None:
         return None
 
-    cipher = _fernet()
+    try:
+        cipher = _fernet()
+    except RuntimeError as exc:
+        raise GroqSegmentationError(str(exc)) from None
     if cipher is None:
         raise GroqSegmentationError(
             "저장된 API 키를 복호화할 수 없습니다. 서버의 GROQ_KEY_ENCRYPTION_KEY 설정을 확인해 주세요."
