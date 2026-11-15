@@ -17,6 +17,9 @@
   };
 
   function update() {
+    const previousSelection = new Map(
+      [...preview.querySelectorAll(".preview-select")].map((input) => [input.value, input.checked])
+    );
     rows.forEach((row) => {
       const boundary = row.querySelector(".question-boundary");
       const number = row.querySelector(".question-number");
@@ -60,7 +63,7 @@
       checkbox.type = "checkbox";
       checkbox.className = "preview-select";
       checkbox.value = String(index);
-      checkbox.checked = true;
+      checkbox.checked = previousSelection.has(String(index)) ? previousSelection.get(String(index)) : true;
       label.append(checkbox, document.createTextNode(" " + item.number + "번 문항 등록"));
       const body = document.createElement("p");
       body.textContent = item.question || "(선택한 구역에 텍스트가 없습니다.)";
@@ -86,7 +89,6 @@
   });
 
   form.addEventListener("submit", (event) => {
-    update();
     const questions = form._segmentedQuestions || [];
     const selected = [...preview.querySelectorAll(".preview-select:checked")]
       .map((input) => Number(input.value));
