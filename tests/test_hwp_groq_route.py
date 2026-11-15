@@ -103,5 +103,38 @@ class GroqHwpRouteTests(unittest.TestCase):
         self.assertIn(b'class="question-boundary" checked', response.data)
 
 
+    def test_personal_api_key_is_used_for_groq_analysis(self):
+        document = DocumentIR(
+            "hwpx",
+            (DocumentBlock(BlockKind.PARAGRAPH, SourcePosition(paragraph=0), "1. 첫 문항"),),
+        )
+        with patch("hwp_routes.HwpCoreExtractor") as extractor:
+            extractor.return_value.extract_bytes.return_value = document
+            with patch("hwp_routes.get_user_groq_api_key", return_value="user-specific-key") as key_lookup:
+                with patch(
+                    "hwp_routes.suggest_question_boundaries",
+                    return_value={
+                        "provider": "groq",
+                        "model": "test-model",
+                        "segments": [{"number": "1", "start_block": 0, "confidence": 0.9, "note": ""}],
+                        "answer_start_block": None,
+                        "warning": "",
+                    },
+                ) as suggest:
+                    response = self.client.post(
+                        "/hwp",
+                        data={
+                            "_csrf_token": self.csrf_token(),
+                            "action": "segment",
+                            "document": (io.BytesIO(b"test document"), "sample.hwpx"),
+                        },
+                        content_type="multipart/form-data",
+                    )
+
+        self.assertEqual(response.status_code, 200)
+        key_lookup.assert_called_once()
+        self.assertEqual(suggest.call_args.kwargs["api_key"], "user-specific-key")
+
+
 if __name__ == "__main__":
     unittest.main()
