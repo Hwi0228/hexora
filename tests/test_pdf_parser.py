@@ -76,7 +76,7 @@ class PdfQuestionParserTests(unittest.TestCase):
     def test_decodes_hyhwp_eq_latin_digits_and_operators(self):
         from pdf_hwp_equation import decode_hyhwp_equation_text
 
-        encoded = "\\ue0ea\\ue044\\ue0fc\\ue045\\ue047\\ue03d"
+        encoded = "".join(chr(cp) for cp in (0xE0EA, 0xE044, 0xE0FC, 0xE045, 0xE047, 0xE03D))
         self.assertEqual(
             decode_hyhwp_equation_text(encoded, "ABCDEF+HyhwpEQ"),
             "f(x)=0",
@@ -85,7 +85,7 @@ class PdfQuestionParserTests(unittest.TestCase):
     def test_decodes_hyhwp_eq_greek_and_structural_glyphs(self):
         from pdf_hwp_equation import decode_hyhwp_equation_text
 
-        encoded = "\\ue088\\ue09d\\ue0ac \\ue05c\\ue06d\\ue06e"
+        encoded = "".join(chr(cp) for cp in (0xE088, 0xE09D, 0xE0AC, 0x20, 0xE05C, 0xE06D, 0xE06E))
         self.assertEqual(
             decode_hyhwp_equation_text(encoded, "HyhwpEQ"),
             "Δα\\pi \\sqrt\\over\\vec",
@@ -94,7 +94,7 @@ class PdfQuestionParserTests(unittest.TestCase):
     def test_does_not_decode_pua_from_unrelated_fonts(self):
         from pdf_hwp_equation import decode_hyhwp_equation_text
 
-        encoded = "\\ue0ea\\ue044\\ue0fc"
+        encoded = "".join(chr(cp) for cp in (0xE0EA, 0xE044, 0xE0FC))
         self.assertEqual(
             decode_hyhwp_equation_text(encoded, "ABCDEF+ArialMT"),
             encoded,
@@ -103,10 +103,10 @@ class PdfQuestionParserTests(unittest.TestCase):
     def test_preserves_unknown_hyhwp_eq_private_use_glyphs(self):
         from pdf_hwp_equation import decode_hyhwp_equation_text
 
-        encoded = "\\ue0ea\\ue123\\ue044"
+        encoded = "".join(chr(cp) for cp in (0xE0EA, 0xE123, 0xE044))
         self.assertEqual(
             decode_hyhwp_equation_text(encoded, "HyhwpEQ"),
-            "f\\ue123(",
+            "f" + chr(0xE123) + "(",
         )
 
     def test_extracts_pdf_lines_in_visual_order_and_decodes_equation_spans(self):
@@ -122,8 +122,8 @@ class PdfQuestionParserTests(unittest.TestCase):
                                 {
                                     "bbox": (0, 10, 100, 20),
                                     "spans": [
-                                        {"bbox": (30, 10, 40, 20), "text": "\\ue0fc", "font": "HyhwpEQ"},
-                                        {"bbox": (10, 10, 20, 20), "text": "\\ue0ea", "font": "HyhwpEQ"},
+                                        {"bbox": (30, 10, 40, 20), "text": chr(0xE0FC), "font": "HyhwpEQ"},
+                                        {"bbox": (10, 10, 20, 20), "text": chr(0xE0EA), "font": "HyhwpEQ"},
                                     ],
                                 },
                                 {
