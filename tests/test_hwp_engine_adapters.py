@@ -134,6 +134,23 @@ class QuestionAdapterTests(unittest.TestCase):
         self.assertEqual(obj["latex"], r"\dfrac{a}{b}")
         self.assertIsNone(obj["conversion_error"])
 
+    def test_formula_after_answer_heading_is_not_attached_to_question(self):
+        from unittest.mock import patch
+
+        formula = DocumentBlock(
+            BlockKind.FORMULA, SourcePosition(paragraph=2, character=0),
+            "answer formula", {"original_script": "answer formula"},
+        )
+        doc = DocumentIR("hwpx", (
+            p("1. 다음 식을 계산하시오.", 0),
+            p("정답 및 해설", 1),
+            formula,
+            p("1. (답) 1", 3),
+        ))
+        with patch("hwp_engine.assembly._equation_to_latex", return_value="x"):
+            result = assemble_document(doc, self.registry)
+        self.assertEqual(result.as_payload()["questions"][0]["math_objects"], [])
+
     def test_formula_conversion_failure_keeps_original_script_visible(self):
         from unittest.mock import patch
 

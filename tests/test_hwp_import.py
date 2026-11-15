@@ -123,6 +123,44 @@ class HwpImportValidationTests(unittest.TestCase):
         self.assertEqual(questions[0]["math_objects"][0]["original_script"], "a over b")
         self.assertEqual(questions[0]["math_objects"][0]["latex"], r"\\dfrac{a}{b}")
 
+    def test_multiple_questions_can_be_corrected_and_selected_together(self):
+        payload = {
+            "questions": [
+                {
+                    "number": 1, "source_number": "1", "question": "수정 문제 1",
+                    "choices": ["수정 보기 1"], "answer": "①", "explanation": "수정 해설 1",
+                    "original": {
+                        "source_number": "1", "question": "원본 문제 1",
+                        "choices": ["원본 보기 1"], "answer": "②", "explanation": "원본 해설 1",
+                    },
+                    "corrected_fields": ["question", "choices", "answer", "explanation"],
+                },
+                {
+                    "number": 2, "source_number": "2-b", "question": "수정 문제 2",
+                    "choices": [], "answer": "42", "explanation": "",
+                    "original": {
+                        "source_number": "2", "question": "원본 문제 2",
+                        "choices": [], "answer": "", "explanation": "",
+                    },
+                    "corrected_fields": ["source_number", "question", "answer", "question_boundary"],
+                },
+            ],
+        }
+        form = MultiDict([
+            ("questions_json", json.dumps(payload, ensure_ascii=False)),
+            ("subject", "수학"), ("grade", "고1"), ("unit", "테스트 단원"),
+            ("source", "업로드 문서"), ("license", "ORIGINAL"),
+            ("source_type", "기타"), ("selected_questions", "0"),
+            ("selected_questions", "1"),
+        ])
+        questions, selection, errors, error = _validated_import(form)
+        self.assertIsNone(error)
+        self.assertEqual(errors, [])
+        self.assertEqual(selection[1], [0, 1])
+        self.assertEqual(questions[0]["original"]["question"], "원본 문제 1")
+        self.assertEqual(questions[1]["original"]["question"], "원본 문제 2")
+        self.assertIn("question_boundary", questions[1]["corrected_fields"])
+
     def test_manual_corrections_keep_original_values_and_source_number(self):
         form = MultiDict([
             ("questions_json", json.dumps({"questions": [{
