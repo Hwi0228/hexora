@@ -16,6 +16,17 @@
   <link rel="stylesheet" href="{{ url_for('static', filename='styles/pages/question-editor.css') }}">
 
   <style>
+.app.workspace-fullscreen{position:fixed!important;inset:0!important;z-index:9999!important;width:100vw!important;height:100dvh!important;max-width:none!important;margin:0!important;padding:0!important;overflow:hidden!important;background:var(--background,#f4f7fa)!important}
+.app.workspace-fullscreen> :not(main){display:none!important}
+.app.workspace-fullscreen main{display:block!important;position:absolute!important;inset:0!important;width:100%!important;height:100dvh!important;max-width:none!important;margin:0!important;padding:0!important;overflow:hidden!important}
+.app.workspace-fullscreen main> :not(.editor-layout){display:none!important}
+.app.workspace-fullscreen .editor-layout{display:block!important;width:100%!important;max-width:none!important;height:100dvh!important;min-height:0!important;margin:0!important;padding:8px!important;overflow:hidden!important}
+.app.workspace-fullscreen .editor-layout> :not(#question-workspace){display:none!important}
+.app.workspace-fullscreen .question-workspace{height:calc(100dvh - 16px)!important;min-height:0!important;max-height:none!important}
+.app.workspace-fullscreen .workspace-panel{border-radius:10px}
+.workspace-fullscreen-button{border:1px solid var(--border,#d8e0e8);border-radius:8px;padding:6px 10px;background:var(--surface,#fff);color:inherit;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap}
+.workspace-fullscreen-button:hover{background:var(--surface-hover,#eef2f7)}
+.app.workspace-fullscreen .workspace-fullscreen-button{position:fixed;top:14px;right:18px;z-index:10010;box-shadow:0 2px 10px #0002}
 .question-workspace{display:grid;grid-template-columns:minmax(360px,1fr) minmax(320px,1fr);grid-template-rows:minmax(0,1fr) minmax(0,1fr);gap:12px;height:clamp(380px,calc(100dvh - 270px),980px);min-height:0;align-items:stretch}
 .workspace-panel{position:relative;display:flex;flex-direction:column;min-width:0;min-height:0;overflow:hidden;resize:none;border:1px solid var(--border,#d8e0e8);border-radius:14px;background:var(--surface,#fff);box-shadow:0 2px 8px #172b4d0a}
 .workspace-panel,.workspace-panel-body,#workspace-editor .editor-form{scrollbar-width:none;-ms-overflow-style:none}
@@ -81,7 +92,7 @@
 
         <div class="question-workspace" id="question-workspace" aria-label="문항 작업 공간">
 <section class="workspace-panel" id="workspace-editor" data-panel="editor" data-slot="0">
-<div class="workspace-panel-head"><div class="workspace-panel-title"><span class="workspace-drag-handle" draggable="true" title="끌어서 위치 이동">⠿</span> 문제 입력</div><span class="workspace-hint">드래그하여 위치 변경 · 우측 하단을 끌어 크기 조절</span></div>
+<div class="workspace-panel-head"><div class="workspace-panel-title"><span class="workspace-drag-handle" draggable="true" title="끌어서 위치 이동">⠿</span> 문제 입력</div><div class="workspace-panel-tools"><span class="workspace-hint">드래그하여 위치 변경</span><button class="workspace-fullscreen-button" type="button" id="workspace-fullscreen-toggle" aria-pressed="false">⛶ 전체 화면</button></div></div>
 <form class="editor-form" id="question-form" method="post"
               action="{{ url_for('edit_question', question_id=question.id) if mode == 'edit' else url_for('new_question') }}">
           <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
@@ -366,6 +377,10 @@
   <script defer src="{{ url_for('static', filename='scripts/question-editor.js') }}"></script>
 <script>
 (()=>{const root=document.getElementById("question-workspace");if(!root)return;
+const app=document.querySelector(".app"),fullscreenButton=document.getElementById("workspace-fullscreen-toggle");
+function syncFullscreen(){const active=document.fullscreenElement===app;app.classList.toggle("workspace-fullscreen",active);fullscreenButton.setAttribute("aria-pressed",String(active));fullscreenButton.textContent=active?"⤢ 전체 화면 종료":"⛶ 전체 화면"}
+fullscreenButton.addEventListener("click",async()=>{try{if(document.fullscreenElement===app){await document.exitFullscreen()}else if(!document.fullscreenElement){await app.requestFullscreen()}else{await document.exitFullscreen();await app.requestFullscreen()}}catch(error){console.error("Fullscreen request failed:",error)}});
+document.addEventListener("fullscreenchange",syncFullscreen);
 const panels=[...root.querySelectorAll(".workspace-panel")],key="hexora-question-workspace-layout-v1",defaults={editor:0,preview:1,pdf:3};
 function apply(slots){panels.forEach(p=>{const n=Number.isInteger(slots[p.dataset.panel])?slots[p.dataset.panel]:defaults[p.dataset.panel];p.dataset.slot=n;p.style.gridColumn=String(n%2+1);p.style.gridRow=String(Math.floor(n/2)+1);p.style.gridRowEnd=p.dataset.panel==="editor"&&n===0?"span 2":"auto"})}
 let saved={};try{saved=JSON.parse(localStorage.getItem(key)||"{}")}catch(_){}apply({...defaults,...saved});
