@@ -129,7 +129,7 @@
               <label class="field">학년 <small>선택 사항</small>
                 <select name="grade">
                   <option value="">선택 안 함</option>
-                  {% for grade in ['초1','초2','초3','초4','초5','초6','중1','중2','중3','고1','고2','고3','대학','기타'] %}
+                  {% for grade in ['초1','초2','초3','초4','초5','초6','중1','중2','중3','고1','고2','고3','수능','대학','기타'] %}
                     <option value="{{ grade }}"{% if form_data.get('grade') == grade %} selected{% endif %}>{{ grade }}</option>
                   {% endfor %}
                 </select>
