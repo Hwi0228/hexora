@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#f6f7f8">
+  <title>문항 구역 검토 | HEXORA</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='styles/pages/legacy-hwp_parser.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='styles/shared.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='styles/tokens.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='styles/base.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='styles/layout.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='styles/components.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='styles/pages/hwp-import.css') }}">
+  <style>
+    .segment-source { display:grid; gap:10px; margin:18px 0; }
+    .segment-block { display:grid; grid-template-columns:minmax(150px, 210px) 1fr; gap:12px; padding:14px; border:1px solid var(--border, #dfe3e8); border-radius:10px; background:var(--surface, #fff); }
+    .segment-block.is-question-start { border-color:var(--accent, #64748b); }
+    .segment-controls { display:flex; flex-direction:column; gap:8px; font-size:13px; }
+    .segment-controls label { display:flex; align-items:center; gap:6px; }
+    .segment-controls input[type=text] { width:100%; min-width:0; }
+    .segment-text { margin:0; white-space:pre-wrap; overflow-wrap:anywhere; font:inherit; line-height:1.65; }
+    .segment-preview-list { display:grid; gap:10px; }
+    .segment-preview-item { padding:12px; border:1px solid var(--border, #dfe3e8); border-radius:9px; }
+    .segment-preview-item p { margin:6px 0 0; white-space:pre-wrap; overflow-wrap:anywhere; }
+    .segment-status { padding:10px 12px; border-radius:8px; background:var(--surface-muted, #f4f5f7); }
+    @media (max-width:700px) { .segment-block { grid-template-columns:1fr; } }
+  </style>
+</head>
+<body>
+  <div class="app app-standard">
+    {% include "partials/sidebar.html" %}
+    <main class="hwp-main">
+      {% set header_section = "DOCUMENT IMPORT" %}
+      {% set header_title = "문항 구역 검토" %}
+      {% set header_description = "LLM이 제안한 문항 경계를 확인하거나 직접 문항 시작 지점을 지정합니다." %}
+      {% include "partials/header.html" %}
+      <section class="card">
+        <div class="results-header">
+          <h2>{{ filename }} · 원본 블록 {{ blocks|length }}개</h2>
+          <a class="button" href="{{ url_for('hwp_parser_page') }}">일반 파싱으로 돌아가기</a>
+        </div>
+        <p class="hint">문서의 텍스트와 수식 원문을 Groq에 전달해 경계 후보를 분석합니다. API 키가 없거나 분석에 실패해도 아래에서 직접 구역을 나눌 수 있습니다. LLM은 원본 내용을 수정하지 않습니다.</p>
+        {% if warning %}<div class="segment-status" role="status">{{ warning }}</div>{% endif %}
+        {% if provider == "groq" %}
+          <p class="hint">분석 모델: {{ model }} · 제안 경계 {{ suggestions|length }}개. 낮은 신뢰도 경계는 반드시 확인하세요.</p>
+        {% else %}
+          <p class="hint">수동 분할 모드 · 첫 번째 블록을 문항 시작으로 지정했습니다.</p>
+        {% endif %}
+      </section>
+
+      <section class="card">
+        <h2>문서 블록과 경계</h2>
+        <p class="hint">각 문항의 첫 블록에서 ‘문항 시작’을 선택하세요. 정답·해설이 시작되는 블록에는 ‘정답 영역 시작’을 선택하면 이후 블록은 문항 본문에서 제외됩니다. 체크 상태를 바꾸면 아래 미리보기가 갱신됩니다.</p>
+        <div class="segment-source" id="segment-source">
+          {% for block in blocks %}
+          {% set suggestion = suggestion_by_start.get(block.index) %}
+          <article class="segment-block{% if suggestion %} is-question-start{% endif %}" data-index="{{ block.index }}">
+            <div class="segment-controls">
+              <strong>블록 {{ block.index + 1 }}</strong>
+              <label><input type="checkbox" class="question-boundary" {% if suggestion or (provider != "groq" and loop.first) %}checked{% endif %}> 문항 시작</label>
+              <label>문항 번호
+                <input class="question-number" type="text" maxlength="24" value="{{ suggestion.number if suggestion else '' }}" placeholder="자동 번호" {% if not suggestion and not (provider != 'groq' and loop.first) %}disabled{% endif %}>
+              </label>
+              <label><input type="checkbox" class="answer-boundary" {% if answer_start == block.index %}checked{% endif %}> 정답 영역 시작</label>
+              {% if suggestion %}<small>LLM 신뢰도: {{ (suggestion.confidence * 100)|round|int }}%{% if suggestion.note %} · {{ suggestion.note }}{% endif %}</small>{% endif %}
+            </div>
+            <pre class="segment-text">{{ block.text }}</pre>
+          </article>
+          {% endfor %}
+        </div>
+      </section>
+
+      <section class="card">
+        <h2>문항 미리보기</h2>
+        <p class="hint" id="segment-count" aria-live="polite"></p>
+        <div class="segment-preview-list" id="segment-preview"></div>
+      </section>
+
+      <form class="card import-form" id="segment-import-form" method="post" action="{{ url_for('hwp_parser_page') }}">
+        <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
+        <input type="hidden" name="action" value="save">
+        <textarea name="questions_json" id="questions-json" hidden></textarea>
+        <div>
+          <h2>DB 공통 정보</h2>
+          <p class="hint">선택한 문항에 같은 정보를 적용합니다.</p>
+          <div class="metadata-grid">
+            <label class="metadata-field">과목
+              <select name="subject" required>
+                {% for subject in subjects %}<option value="{{ subject }}">{{ subject }}</option>{% endfor %}
+              </select>
+            </label>
+            <label class="metadata-field">학년<input name="grade" maxlength="50" placeholder="예: 고1" required></label>
+            <label class="metadata-field">단원<input name="unit" maxlength="200" placeholder="예: 다항식" required></label>
+            <label class="metadata-field">출처<input name="source" maxlength="300" placeholder="예: 2026학년도 10월 학력평가" required></label>
+            <label class="metadata-field">연도<input name="year" type="number" min="1" max="2200"></label>
+            <label class="metadata-field">출처 유형
+              <select name="source_type">{% for value in source_types %}<option value="{{ value }}">{{ value }}</option>{% endfor %}</select>
+            </label>
+            <label class="metadata-field">라이선스
+              <select name="license" required>
+                <option value="">라이선스 선택</option>
+                {% for value, label in license_choices.items() %}<option value="{{ value }}">{{ label }}</option>{% endfor %}
+              </select>
+            </label>
+          </div>
+        </div>
+        <p class="hint">현재 이 분할 경로는 블록 경계를 기준으로 본문을 구성합니다. 수식 원문 스크립트는 [수식 원문] 표시로 보존되며, 이 화면에서 LaTeX 변환이나 이미지 바이너리 복원은 수행하지 않습니다.</p>
+        <button class="button primary" type="submit">검토한 문항을 DB 등록 화면으로 전달</button>
+      </form>
+    </main>
+  </div>
+  <script id="segment-data" type="application/json">{{ blocks|tojson }}</script>
+  <script defer src="{{ url_for('static', filename='scripts/hwp-segmentation.js') }}"></script>
+</body>
+</html>
