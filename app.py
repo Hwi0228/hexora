@@ -9,6 +9,7 @@ from auth import register_auth_routes
 from dashboard_routes import register_dashboard_routes
 from changelog_routes import register_changelog_routes
 from hwp_routes import register_hwp_routes
+from groq_key_routes import register_groq_api_routes
 from question_routes import register_question_routes
 from workbook_routes import register_workbook_routes
 from rich_text import render_rich_html
@@ -69,6 +70,7 @@ def create_app():
         return {"app_version": app.config["APP_VERSION"]}
 
     register_auth_routes(app)
+    register_groq_api_routes(app)
     register_dashboard_routes(app)
     register_changelog_routes(app)
     register_question_routes(app)
