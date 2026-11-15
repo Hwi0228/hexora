@@ -32,7 +32,8 @@
             <input type="file" name="document" accept=".hwp,.hwpx,.xml,application/xml,text/xml" required>
             <span class="hint">최대 업로드 크기 12MB</span>
           </label>
-          <button class="button primary" type="submit">문항 추출</button>
+          <button class="button primary" type="submit" name="action" value="parse">기본 문항 추출</button>
+          <button class="button" type="submit" name="action" value="segment">Groq LLM / 직접 구역 나누기</button>
         </form>
         <ol class="processing-log" id="processing-log" aria-live="polite">
           <li class="{% if questions %}done{% elif error %}error{% else %}active{% endif %}" id="log-file">
