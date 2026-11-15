@@ -42,8 +42,10 @@
         </div>
         <p class="hint">문서의 텍스트와 수식 원문을 Groq에 전달해 경계 후보를 분석합니다. API 키가 없거나 분석에 실패해도 아래에서 직접 구역을 나눌 수 있습니다. LLM은 원본 내용을 수정하지 않습니다.</p>
         {% if warning %}<div class="segment-status" role="status">{{ warning }}</div>{% endif %}
-        {% if provider == "groq" %}
+        {% if provider == "groq" and suggestions %}
           <p class="hint">분석 모델: {{ model }} · 제안 경계 {{ suggestions|length }}개. 낮은 신뢰도 경계는 반드시 확인하세요.</p>
+        {% elif provider == "groq" %}
+          <p class="hint">LLM이 확실한 문항 경계를 제안하지 않았습니다. 첫 번째 블록부터 직접 지정해 주세요.</p>
         {% else %}
           <p class="hint">수동 분할 모드 · 첫 번째 블록을 문항 시작으로 지정했습니다.</p>
         {% endif %}
@@ -58,9 +60,9 @@
           <article class="segment-block{% if suggestion %} is-question-start{% endif %}" data-index="{{ block.index }}">
             <div class="segment-controls">
               <strong>블록 {{ block.index + 1 }}</strong>
-              <label><input type="checkbox" class="question-boundary" {% if suggestion or (provider != "groq" and loop.first) %}checked{% endif %}> 문항 시작</label>
+              <label><input type="checkbox" class="question-boundary" {% if suggestion or (not suggestions and loop.first) %}checked{% endif %}> 문항 시작</label>
               <label>문항 번호
-                <input class="question-number" type="text" maxlength="24" value="{{ suggestion.number if suggestion else '' }}" placeholder="자동 번호" {% if not suggestion and not (provider != 'groq' and loop.first) %}disabled{% endif %}>
+                <input class="question-number" type="text" maxlength="24" value="{{ suggestion.number if suggestion else '' }}" placeholder="자동 번호" {% if not suggestion and (suggestions or not loop.first) %}disabled{% endif %}>
               </label>
               <label><input type="checkbox" class="answer-boundary" {% if answer_start == block.index %}checked{% endif %}> 정답 영역 시작</label>
               {% if suggestion %}<small>LLM 신뢰도: {{ (suggestion.confidence * 100)|round|int }}%{% if suggestion.note %} · {{ suggestion.note }}{% endif %}</small>{% endif %}
