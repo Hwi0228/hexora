@@ -1,7 +1,6 @@
 (() => {
   const form = document.querySelector(".upload-form");
   const fileInput = form?.querySelector('input[type="file"]');
-  const submitButton = form?.querySelector('button[type="submit"]');
   const feedback = document.getElementById("process-feedback");
   const steps = [
     document.getElementById("log-file"),
@@ -33,16 +32,17 @@
     if (feedback) feedback.textContent = "파일이 선택되었습니다. 문항 추출을 시작할 수 있습니다.";
   });
 
-  form?.addEventListener("submit", () => {
+  form?.addEventListener("submit", (event) => {
     if (!fileInput?.files?.length) return;
     setStep(0, "done", "파일 확인 완료");
     setStep(1, "active", "파일을 서버로 전송하는 중");
     setStep(2, "", "문항 추출 대기");
     setStep(3, "", "결과 검토 대기");
     if (feedback) feedback.textContent = "서버에서 문서를 분석하고 있습니다. 요청이 끝나면 결과 또는 오류가 표시됩니다.";
+    const submitButton = event.submitter || form.querySelector('button[type="submit"]');
     if (submitButton) {
       submitButton.disabled = true;
-      submitButton.textContent = "문서 분석 중…";
+      submitButton.textContent = submitButton.value === "segment" ? "문서 구조 분석 중…" : "문서 분석 중…";
     }
   });
 
