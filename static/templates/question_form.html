@@ -16,20 +16,23 @@
   <link rel="stylesheet" href="{{ url_for('static', filename='styles/pages/question-editor.css') }}">
 
   <style>
-.question-workspace{display:grid;grid-template-columns:minmax(360px,1fr) minmax(320px,1fr);grid-template-rows:minmax(320px,1fr) minmax(280px,1fr);gap:12px;min-height:760px;align-items:stretch}
-.workspace-panel{position:relative;min-width:0;min-height:240px;overflow:auto;resize:both;border:1px solid var(--border,#d8e0e8);border-radius:14px;background:var(--surface,#fff);box-shadow:0 2px 8px #172b4d0a}
+.question-workspace{display:grid;grid-template-columns:minmax(360px,1fr) minmax(320px,1fr);grid-template-rows:minmax(0,1fr) minmax(0,1fr);gap:12px;height:min(78vh,980px);min-height:680px;align-items:stretch}
+.workspace-panel{position:relative;display:flex;flex-direction:column;min-width:0;min-height:0;overflow:hidden;resize:both;border:1px solid var(--border,#d8e0e8);border-radius:14px;background:var(--surface,#fff);box-shadow:0 2px 8px #172b4d0a}
 .workspace-panel[data-panel="editor"]{grid-column:1;grid-row:1 / span 2}.workspace-panel[data-panel="preview"]{grid-column:2;grid-row:1}.workspace-panel[data-panel="pdf"]{grid-column:2;grid-row:2}
 .workspace-panel.is-dragging{opacity:.48;outline:2px dashed var(--accent,#3976c6)}.workspace-panel.is-drop-target{outline:2px solid var(--accent,#3976c6);outline-offset:2px}
-.workspace-panel-head{position:sticky;top:0;z-index:5;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:11px 14px;background:var(--surface,#fff);border-bottom:1px solid var(--border,#d8e0e8)}
+.workspace-panel-head{position:relative;z-index:5;flex:0 0 auto;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:11px 14px;background:var(--surface,#fff);border-bottom:1px solid var(--border,#d8e0e8)}
 .workspace-panel-title{display:flex;align-items:center;gap:9px;font-weight:700;font-size:14px}.workspace-drag-handle{cursor:grab;touch-action:none;color:var(--muted,#64748b);font-size:17px;user-select:none}
 .workspace-panel-tools{display:flex;gap:6px;align-items:center}.workspace-tool{border:1px solid var(--border,#d8e0e8);border-radius:7px;padding:5px 8px;background:transparent;color:inherit;font-size:12px;cursor:pointer}
-.workspace-panel-body{padding:12px;min-width:0}#workspace-editor .editor-form{padding:0;margin:0}#workspace-editor .form-section{margin:0 0 12px}
+.workspace-panel-body{flex:1 1 auto;min-width:0;min-height:0;overflow:auto;overscroll-behavior:contain;padding:12px}
+#workspace-editor .editor-form{flex:1 1 auto;min-height:0;overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;padding:0;margin:0}
+#workspace-editor .form-section{margin:0 0 12px}
+#workspace-preview-content{min-height:0}
 #workspace-preview-content{min-height:200px;padding:18px;background:#fff;color:#17212f;border:1px solid #e2e8f0;border-radius:8px;line-height:1.75;overflow-wrap:anywhere}
 #workspace-preview-content:empty:before{content:"문제 내용을 입력하면 이곳에 미리보기가 표시됩니다.";color:#94a3b8}
 .workspace-pdf-drop{display:flex;min-height:220px;align-items:center;justify-content:center;flex-direction:column;gap:10px;border:2px dashed #cbd5e1;border-radius:10px;background:#f8fafc;color:#64748b;text-align:center;padding:20px}
 .workspace-pdf-drop.is-over{border-color:var(--accent,#3976c6);background:#eff6ff}.workspace-pdf-drop input{max-width:100%}
 #workspace-pdf-frame{display:none;width:100%;height:440px;border:1px solid var(--border,#d8e0e8);border-radius:8px}.workspace-hint{font-size:11px;color:var(--muted,#64748b)}
-@media(max-width:900px){.question-workspace{grid-template-columns:minmax(0,1fr);grid-template-rows:auto;min-height:0}.workspace-panel,.workspace-panel[data-panel]{grid-column:1!important;grid-row:auto!important;resize:vertical;min-height:260px}.workspace-panel[data-panel="editor"]{min-height:520px}}
+@media(max-width:900px){.question-workspace{grid-template-columns:minmax(0,1fr);grid-template-rows:auto;height:auto;min-height:0}.workspace-panel,.workspace-panel[data-panel]{grid-column:1!important;grid-row:auto!important;resize:vertical;height: min(65vh,720px);min-height:300px}.workspace-panel[data-panel="editor"]{height:min(78vh,820px);min-height:520px}}
   </style>
   </head>
 <body>
