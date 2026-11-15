@@ -474,8 +474,10 @@ class QuestionRegistrationTests(unittest.TestCase):
 
         self.assertIn("문제 등록".encode(), sidebar)
         self.assertIn("문제 DB".encode(), sidebar)
-        for unused_item in ("홈", "문제 상점", "문제지", "AI 변형문제", "출처 분석", "학생 관리", "설정"):
+        for unused_item in ("홈", "문제 상점", "문제지", "AI 변형문제", "출처 분석", "학생 관리"):
             self.assertNotIn(unused_item.encode(), sidebar)
+        self.assertIn("API 키 설정".encode(), sidebar)
+        self.assertNotIn(">설정</a>".encode(), sidebar)
 
     def test_registration_form_is_reachable_from_the_sidebar(self):
         database_response = self.client.get("/questions")

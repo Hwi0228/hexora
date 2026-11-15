@@ -73,7 +73,7 @@ class GroqHwpRouteTests(unittest.TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertIn("문항 구역 검토".encode(), response.data)
-        self.assertIn("GROQ_API_KEY가 설정되지 않았습니다.".encode(), response.data)
+        self.assertIn("개인 Groq API 키가 등록되지 않았습니다.".encode(), response.data)
         self.assertIn(b'class="question-boundary" checked', response.data)
         extractor.return_value.extract_bytes.assert_called_once()
 
