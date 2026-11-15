@@ -128,18 +128,28 @@ def _validated_import(form):
                         f"{source_number}번 정답에 존재하지 않는 선택지 표식이 포함되어 있습니다."
                     )
 
-        normalized_questions.append(
-            {
-                "number": len(normalized_questions) + 1,
-                "question": sanitize_rich_html(prompt.strip()),
-                "answer": sanitize_rich_html(answer.strip()),
-                "explanation": sanitize_rich_html(explanation.strip()),
-                "choices": [
-                    sanitize_rich_html(strip_choice_label(choice))
-                    for choice in choices
-                ],
-            }
-        )
+        normalized_question = {
+            "number": len(normalized_questions) + 1,
+            "question": sanitize_rich_html(prompt.strip()),
+            "answer": sanitize_rich_html(answer.strip()),
+            "explanation": sanitize_rich_html(explanation.strip()),
+            "choices": [
+                sanitize_rich_html(strip_choice_label(choice))
+                for choice in choices
+            ],
+        }
+        source_number = question.get("source_number")
+        if isinstance(source_number, (str, int)) and str(source_number).strip():
+            normalized_question["source_number"] = str(source_number).strip()[:20]
+        source_page = question.get("source_page")
+        if source_page is not None:
+            try:
+                source_page = int(source_page)
+            except (TypeError, ValueError):
+                source_page = None
+            if source_page is not None and source_page > 0:
+                normalized_question["source_page"] = source_page
+        normalized_questions.append(normalized_question)
 
     if errors:
         return normalized_questions or None, None, errors, None
