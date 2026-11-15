@@ -15,6 +15,22 @@
   <link rel="stylesheet" href="{{ url_for('static', filename='styles/components.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='styles/pages/question-editor.css') }}">
 
+  <style>
+.question-workspace{display:grid;grid-template-columns:minmax(360px,1fr) minmax(320px,1fr);grid-template-rows:minmax(320px,1fr) minmax(280px,1fr);gap:12px;min-height:760px;align-items:stretch}
+.workspace-panel{position:relative;min-width:0;min-height:240px;overflow:auto;resize:both;border:1px solid var(--border,#d8e0e8);border-radius:14px;background:var(--surface,#fff);box-shadow:0 2px 8px #172b4d0a}
+.workspace-panel[data-panel="editor"]{grid-column:1;grid-row:1 / span 2}.workspace-panel[data-panel="preview"]{grid-column:2;grid-row:1}.workspace-panel[data-panel="pdf"]{grid-column:2;grid-row:2}
+.workspace-panel.is-dragging{opacity:.48;outline:2px dashed var(--accent,#3976c6)}.workspace-panel.is-drop-target{outline:2px solid var(--accent,#3976c6);outline-offset:2px}
+.workspace-panel-head{position:sticky;top:0;z-index:5;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:11px 14px;background:var(--surface,#fff);border-bottom:1px solid var(--border,#d8e0e8)}
+.workspace-panel-title{display:flex;align-items:center;gap:9px;font-weight:700;font-size:14px}.workspace-drag-handle{cursor:grab;touch-action:none;color:var(--muted,#64748b);font-size:17px;user-select:none}
+.workspace-panel-tools{display:flex;gap:6px;align-items:center}.workspace-tool{border:1px solid var(--border,#d8e0e8);border-radius:7px;padding:5px 8px;background:transparent;color:inherit;font-size:12px;cursor:pointer}
+.workspace-panel-body{padding:12px;min-width:0}#workspace-editor .editor-form{padding:0;margin:0}#workspace-editor .form-section{margin:0 0 12px}
+#workspace-preview-content{min-height:200px;padding:18px;background:#fff;color:#17212f;border:1px solid #e2e8f0;border-radius:8px;line-height:1.75;overflow-wrap:anywhere}
+#workspace-preview-content:empty:before{content:"문제 내용을 입력하면 이곳에 미리보기가 표시됩니다.";color:#94a3b8}
+.workspace-pdf-drop{display:flex;min-height:220px;align-items:center;justify-content:center;flex-direction:column;gap:10px;border:2px dashed #cbd5e1;border-radius:10px;background:#f8fafc;color:#64748b;text-align:center;padding:20px}
+.workspace-pdf-drop.is-over{border-color:var(--accent,#3976c6);background:#eff6ff}.workspace-pdf-drop input{max-width:100%}
+#workspace-pdf-frame{display:none;width:100%;height:440px;border:1px solid var(--border,#d8e0e8);border-radius:8px}.workspace-hint{font-size:11px;color:var(--muted,#64748b)}
+@media(max-width:900px){.question-workspace{grid-template-columns:minmax(0,1fr);grid-template-rows:auto;min-height:0}.workspace-panel,.workspace-panel[data-panel]{grid-column:1!important;grid-row:auto!important;resize:vertical;min-height:260px}.workspace-panel[data-panel="editor"]{min-height:520px}}
+  </style>
   </head>
 <body>
   <div class="app app-standard">
@@ -58,7 +74,10 @@
           <ul class="errors" role="alert">{% for error in errors %}<li>{{ error }}</li>{% endfor %}</ul>
         {% endif %}
 
-        <form class="editor-form" id="question-form" method="post"
+        <div class="question-workspace" id="question-workspace" aria-label="문항 작업 공간">
+<section class="workspace-panel" id="workspace-editor" data-panel="editor" data-slot="0">
+<div class="workspace-panel-head"><div class="workspace-panel-title"><span class="workspace-drag-handle" draggable="true" title="끌어서 위치 이동">⠿</span> 문제 입력</div><span class="workspace-hint">드래그하여 위치 변경 · 우측 하단을 끌어 크기 조절</span></div>
+<form class="editor-form" id="question-form" method="post"
               action="{{ url_for('edit_question', question_id=question.id) if mode == 'edit' else url_for('new_question') }}">
           <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
           <input type="hidden" name="unit" value="{{ form_data.get('unit', '') }}">
@@ -284,6 +303,16 @@
             <button class="button primary" type="submit" name="form_action" value="publish">{{ '수정 저장 · 새 버전 만들기' if mode == 'edit' else '저장하기' }}</button>
           </div>
         </form>
+</section>
+<section class="workspace-panel" id="workspace-preview" data-panel="preview" data-slot="1">
+<div class="workspace-panel-head"><div class="workspace-panel-title"><span class="workspace-drag-handle" draggable="true" title="끌어서 위치 이동">⠿</span> 문제 미리보기</div><button class="workspace-tool" type="button" id="workspace-preview-refresh">새로고침</button></div>
+<div class="workspace-panel-body"><div id="workspace-preview-content" aria-live="polite"></div></div>
+</section>
+<section class="workspace-panel" id="workspace-pdf" data-panel="pdf" data-slot="3">
+<div class="workspace-panel-head"><div class="workspace-panel-title"><span class="workspace-drag-handle" draggable="true" title="끌어서 위치 이동">⠿</span> PDF 띄워놓기</div><button class="workspace-tool" type="button" id="workspace-pdf-clear">닫기</button></div>
+<div class="workspace-panel-body"><div class="workspace-pdf-drop" id="workspace-pdf-drop"><strong>PDF 파일을 여기에 끌어놓으세요</strong><span class="workspace-hint">또는 파일 선택 · 브라우저에서만 미리 봅니다.</span><input type="file" id="workspace-pdf-input" accept="application/pdf,.pdf"></div><iframe id="workspace-pdf-frame" title="참고 PDF 미리보기"></iframe></div>
+</section>
+</div>
       </div>
     </main>
   </div>
@@ -330,5 +359,26 @@
     }|tojson }}
   </script>
   <script defer src="{{ url_for('static', filename='scripts/question-editor.js') }}"></script>
+<script>
+(()=>{const root=document.getElementById("question-workspace");if(!root)return;
+const panels=[...root.querySelectorAll(".workspace-panel")],key="hexora-question-workspace-layout-v1",defaults={editor:0,preview:1,pdf:3};
+function apply(slots){panels.forEach(p=>{const n=Number.isInteger(slots[p.dataset.panel])?slots[p.dataset.panel]:defaults[p.dataset.panel];p.dataset.slot=n;p.style.gridColumn=String(n%2+1);p.style.gridRow=String(Math.floor(n/2)+1);p.style.gridRowEnd=p.dataset.panel==="editor"&&n===0?"span 2":"auto"})}
+let saved={};try{saved=JSON.parse(localStorage.getItem(key)||"{}")}catch(_){}apply({...defaults,...saved});
+let dragged=null;panels.forEach(p=>{const h=p.querySelector(".workspace-drag-handle");h.addEventListener("dragstart",e=>{dragged=p;p.classList.add("is-dragging");e.dataTransfer.effectAllowed="move";e.dataTransfer.setData("text/plain",p.id)});
+p.addEventListener("dragover",e=>{if(dragged&&dragged!==p){e.preventDefault();p.classList.add("is-drop-target")}});
+p.addEventListener("dragleave",()=>p.classList.remove("is-drop-target"));
+p.addEventListener("drop",e=>{e.preventDefault();if(!dragged||dragged===p)return;const a=+dragged.dataset.slot,b=+p.dataset.slot,slots={};panels.forEach(x=>slots[x.dataset.panel]=+x.dataset.slot);slots[dragged.dataset.panel]=b;slots[p.dataset.panel]=a;apply(slots);try{localStorage.setItem(key,JSON.stringify(slots))}catch(_){}});
+p.addEventListener("dragend",()=>{panels.forEach(x=>x.classList.remove("is-dragging","is-drop-target"));dragged=null})});
+const form=document.getElementById("question-form"),preview=document.getElementById("workspace-preview-content");
+function clean(html){const d=new DOMParser().parseFromString(html||"","text/html");d.querySelectorAll("script,style,iframe,object,embed,form,button,input,textarea,select").forEach(n=>n.remove());d.body.querySelectorAll("*").forEach(n=>[...n.attributes].forEach(a=>{if(/^on/i.test(a.name)||((a.name==="href"||a.name==="src")&&/^\s*javascript:/i.test(a.value)))n.removeAttribute(a.name)}));return d.body.innerHTML}
+function refresh(){const a=form.querySelector('[data-source="prompt"]')?.value||"",b=form.querySelector('[data-source="choices"]')?.value||"";preview.innerHTML=clean(a)+(b?"<hr>"+clean(b):"")}
+form.addEventListener("input",refresh);form.addEventListener("submit",refresh);document.getElementById("workspace-preview-refresh").addEventListener("click",refresh);
+const obs=new MutationObserver(refresh);form.querySelectorAll(".ql-editor").forEach(n=>obs.observe(n,{subtree:true,childList:true,characterData:true,attributes:true}));refresh();
+const input=document.getElementById("workspace-pdf-input"),drop=document.getElementById("workspace-pdf-drop"),frame=document.getElementById("workspace-pdf-frame");let url=null;
+function openPdf(file){if(!file)return;if(file.type!=="application/pdf"&&!file.name.toLowerCase().endsWith(".pdf")){alert("PDF 파일만 열 수 있습니다.");return}if(url)URL.revokeObjectURL(url);url=URL.createObjectURL(file);frame.src=url;frame.style.display="block";drop.style.display="none"}
+input.addEventListener("change",()=>openPdf(input.files?.[0]));["dragenter","dragover"].forEach(n=>drop.addEventListener(n,e=>{e.preventDefault();drop.classList.add("is-over")}));["dragleave","drop"].forEach(n=>drop.addEventListener(n,e=>{e.preventDefault();drop.classList.remove("is-over")}));drop.addEventListener("drop",e=>openPdf(e.dataTransfer.files?.[0]));
+document.getElementById("workspace-pdf-clear").addEventListener("click",()=>{if(url)URL.revokeObjectURL(url);url=null;frame.removeAttribute("src");frame.style.display="none";drop.style.display="flex";input.value=""});window.addEventListener("beforeunload",()=>{if(url)URL.revokeObjectURL(url)});
+})();
+</script>
 </body>
 </html>
