@@ -1,0 +1,8 @@
+# Direct runtime dependencies. Update with scripts/update-dependencies.sh.
+Flask==3.1.2
+defusedxml==0.7.1
+hml-equation-parser==1.0.12
+hmleqx==0.2.1
+rhwp-python==0.8.1
+psycopg[binary]==3.2.12
+gunicorn==23.0.0

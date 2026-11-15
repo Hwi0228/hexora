@@ -46,6 +46,18 @@ def _create_indexes(connection):
     connection.execute(
         "CREATE INDEX IF NOT EXISTS idx_questions_user_subject ON questions(user_uuid, subject)"
     )
+    connection.execute(
+        "CREATE INDEX IF NOT EXISTS idx_questions_curriculum_course_grade "
+        "ON questions(subject, curriculum, course, grade)"
+    )
+    connection.execute(
+        "CREATE INDEX IF NOT EXISTS idx_questions_source_filters "
+        "ON questions(subject, source_type, year, license)"
+    )
+    connection.execute(
+        "CREATE INDEX IF NOT EXISTS idx_questions_standard "
+        "ON questions(subject, achievement_standard)"
+    )
 
 def _create_question_revision_table(connection):
     connection.execute(QUESTION_REVISIONS_SCHEMA)

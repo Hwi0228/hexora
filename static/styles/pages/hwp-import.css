@@ -9,3 +9,24 @@
 .processing-log li.error::before { background: #BC6262; }
 
 .imported-choices { list-style: none; padding-left: 0; }
+
+.import-edit-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:14px}
+.import-edit-wide{grid-column:1/-1}
+.import-editable,.import-choice{min-height:44px;padding:10px;border:1px solid #d7e0e9;border-radius:8px;background:#fff;white-space:pre-wrap;overflow-wrap:anywhere}
+.import-editable:focus,.import-choice:focus{outline:2px solid #356a9a;outline-offset:1px}
+.import-choice-list{display:grid;gap:8px}
+.import-choice{min-height:38px}
+.import-edit-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:12px}
+.import-correction-status{margin-left:8px;font-size:12px;color:#64748b;font-weight:500}
+.import-correction-status.is-corrected{color:#17633a}
+.import-original-details{font-size:12px;color:#64748b}
+.import-original-details pre{max-width:100%;max-height:180px;overflow:auto;white-space:pre-wrap}
+.import-warning{margin:12px 0;padding:12px;border:1px solid #e6c98a;border-radius:8px;background:#fffaf0}
+.import-warning ul{margin:8px 0}
+@media(max-width:700px){.import-edit-grid{grid-template-columns:1fr}}
+
+.import-math-review{padding:10px 12px;border:1px solid var(--hexora-border);border-radius:8px;background:#f8fafc}
+.import-math-comparison{display:grid;gap:6px;padding:12px 0;border-top:1px solid var(--hexora-border)}
+.import-math-comparison pre{max-height:160px;overflow:auto;white-space:pre-wrap;overflow-wrap:anywhere;padding:10px;border-radius:6px;background:#fff}
+.import-math-comparison code{white-space:pre-wrap;overflow-wrap:anywhere}
+.import-math-rendered{padding:10px;background:#fff;border-radius:6px;overflow-x:auto}

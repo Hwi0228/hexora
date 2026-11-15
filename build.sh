@@ -23,7 +23,7 @@ if [[ -z "$FREETYPE_LIB" ]]; then
 fi
 echo "Bundled FreeType: $FREETYPE_LIB"
 
-python -m pip install -r requirements.txt
+python -m pip install -r requirements.lock
 
 # Preload the bundled library before importing rhwp so its native extension
 # resolves libfreetype.so.6 from the deploy artifact, not the host image.

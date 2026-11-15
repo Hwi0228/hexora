@@ -8,6 +8,7 @@ from flask import abort, request, send_file
 from auth import login_required
 from database import get_db
 from hwpx_export import build_exam_hwpx
+from latex_to_hancom import LatexEquationConversionError
 
 
 def export_exam_hwpx():
@@ -51,11 +52,14 @@ def export_exam_hwpx():
         abort(400, description="시험지 제목은 100자 이내로 입력해 주세요.")
 
     include_answers = request.form.get("include_answers") == "1"
-    hwpx_bytes = build_exam_hwpx(
-        questions,
-        title=title,
-        include_answers=include_answers,
-    )
+    try:
+        hwpx_bytes = build_exam_hwpx(
+            questions,
+            title=title,
+            include_answers=include_answers,
+        )
+    except LatexEquationConversionError as error:
+        abort(422, description=f"한컴 수식으로 변환할 수 없는 수식이 있습니다: {error}")
     filename = re.sub(r"[^\w가-힣 .()-]", "", title, flags=re.UNICODE).strip(" .")
     filename = (filename or "HEXORA_시험지")[:80]
 

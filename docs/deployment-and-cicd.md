@@ -35,12 +35,12 @@ flowchart TD
 
 HEXORA는 standard Python `unittest` 프레임워크 기반의 회귀 테스트 체계를 갖추고 있습니다.
 
-### 2.1 테스트 모듈 구성 (11개 파일)
+### 2.1 테스트 모듈 구성
 
 | 테스트 파일 | 주요 검증 대상 |
 | --- | --- |
 | `tests/test_app.py` | Flask 통합 라우트, 로그인/세션, CSRF, 문제 등록/편집/삭제, 충돌 방지, 폴더 트리 |
-| `tests/test_database_backends.py` | SQLite 및 PostgreSQL 어댑터 파라미터 변환(`?` -> `%s`), 인덱스/스키마 자동 생성 (외부 DB 접속 없이 단위 검증) |
+| `tests/test_database_backends.py` | SQLite 및 PostgreSQL 공통 CRUD, FK cascade, rollback parity (CI의 격리된 PostgreSQL 서비스 포함) |
 | `tests/test_exam_export.py` | 문항 선택 후 HWPX 패키지 생성, 정답/해설 옵션 XML 유효성 검증 |
 | `tests/test_hwp_import.py` | HWP 가져오기 폼 유효성 및 등록 흐름 검증 |
 | `tests/test_hwp_routes.py` | `/hwp` 업로드 라우트 및 `/exams/export` 다운로드 엔드포인트 검증 |
@@ -50,11 +50,15 @@ HEXORA는 standard Python `unittest` 프레임워크 기반의 회귀 테스트 
 | `tests/test_curriculum_data.py` | 학년/과목별 개정 교육과정 성취기준 데이터 매핑 검증 |
 | `tests/test_versioning.py` | `VERSION` 파일 단일 원천 검증 |
 
-### 2.2 테스트 실행 명령
+### 2.2 테스트 및 정적 분석 실행
 
 ```powershell
 # 전체 자동 테스트 수행
 python -m unittest discover -s tests -v
+python -m pip install -r requirements-dev.txt
+ruff check . --select E4,E7,E9,F --ignore E501,F401,F841
+coverage run --rcfile=.coveragerc -m unittest discover -s tests -v
+coverage report --rcfile=.coveragerc -m
 ```
 
 ---
@@ -72,7 +76,7 @@ set -euo pipefail
 
 # 1. Python 패키지 설치
 python -m pip install --upgrade pip
-python -m pip install -r requirements.txt
+python -m pip install -r requirements.lock
 
 # 2. hmleqx Python API 확인
 python - <<'PY'
@@ -160,3 +164,14 @@ permissions:
 - **PATCH**: 버그 수정, 렌더링 스타일 수정, 문서 업데이트 시 상향.
 
 모든 기능 단위 작업은 PR 기반으로 진행되며, PR 승인 및 병합 시 `VERSION`과 `CHANGELOG.md`가 함께 업데이트되어 자동 배포 및 릴리즈가 이루어집니다.
+
+
+## 5. 재현 가능한 Python 빌드와 운영 점검
+
+- `.python-version`이 로컬·CI·Render의 Python minor 버전 기준(3.11)입니다.
+- `requirements.in`은 직접 런타임 의존성, `requirements.lock`은 런타임 전체 고정 집합, `requirements-dev.txt`는 Ruff·coverage·pip-tools 개발 도구입니다. `requirements.txt`는 기존 설치 명령과의 호환을 위해 lock 파일을 포함합니다.
+- 의존성 갱신은 `bash scripts/update-dependencies.sh`로 수행한 뒤 lock diff와 CI를 검토합니다.
+- Render 기본 프록시에서는 `TRUSTED_PROXY_HOPS=1`을 사용합니다. 자체 프록시를 추가했다면 실제 홉 수를 확인해 설정하고, 임의의 `X-Forwarded-For` 값을 신뢰하지 않습니다.
+- `/health/live`는 프로세스 생존만, `/health/ready`는 DB 연결까지 확인합니다.
+- JSON 로그에는 `X-Request-ID`, 경로, 상태 코드, 처리 시간 및 HWP 파싱 시간이 포함됩니다. 요청 본문·쿼리 문자열·인증정보는 로그로 남기지 않습니다.
+- GitHub Actions는 unittest, Ruff lint, coverage를 별도 작업으로 실행하며 PostgreSQL 통합 테스트에는 격리된 서비스 DB를 제공합니다.

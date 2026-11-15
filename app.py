@@ -15,9 +15,11 @@ from hwp_routes import register_hwp_routes
 from question_routes import register_question_routes
 from workbook_routes import register_workbook_routes
 from legal_routes import register_legal_routes
+from rate_limit import register_rate_limit
 from admin_database_routes import register_admin_database_routes
 from rich_text import render_rich_html
 from sidebar import render_sidebar
+from observability import register_observability
 
 
 def _is_production_environment():
@@ -116,10 +118,22 @@ def create_app():
         or os.environ.get("FLASK_SESSION_COOKIE_SECURE", "").strip().lower()
         in {"1", "true", "yes"}
     )
+    render_environment = os.environ.get("RENDER", "").strip().lower() in {"1", "true", "yes"}
+    try:
+        trusted_proxy_hops = int(os.environ.get("TRUSTED_PROXY_HOPS", "1" if render_environment else "0"))
+    except ValueError as error:
+        raise RuntimeError("TRUSTED_PROXY_HOPS must be an integer from 0 to 5.") from error
+    if not 0 <= trusted_proxy_hops <= 5:
+        raise RuntimeError("TRUSTED_PROXY_HOPS must be an integer from 0 to 5.")
+    app.config["TRUSTED_PROXY_HOPS"] = trusted_proxy_hops
     if _is_production_environment():
-        # Render terminates TLS at one trusted reverse proxy and forwards the
-        # original scheme through X-Forwarded-Proto.
-        app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1)
+        # Only trust the configured number of reverse-proxy hops. In Render's
+        # default topology, one platform proxy supplies X-Forwarded-For.
+        app.wsgi_app = ProxyFix(
+            app.wsgi_app,
+            x_for=trusted_proxy_hops,
+            x_proto=1 if render_environment else 0,
+        )
     if not app.config["SECRET_KEY"]:
         app.config["SECRET_KEY"] = _secret_key(app)
 
@@ -186,6 +200,7 @@ def create_app():
             )
         return response
 
+    register_observability(app)
     register_auth_routes(app)
     register_dashboard_routes(app)
     register_changelog_routes(app)
@@ -193,6 +208,7 @@ def create_app():
     register_workbook_routes(app)
     register_hwp_routes(app)
     register_legal_routes(app)
+    register_rate_limit(app)
     register_admin_database_routes(app)
 
     @app.cli.command("create-admin")

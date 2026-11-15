@@ -116,6 +116,59 @@ class QuestionAdapterTests(unittest.TestCase):
         self.assertEqual(result.detection.answer_template, AnswerTemplate.MIXED)
         self.assertEqual([q.answer for q in result.questions], ["②", "24", "③"])
 
+    def test_formula_source_and_converted_latex_are_exposed_for_review(self):
+        from unittest.mock import patch
+
+        formula = DocumentBlock(
+            BlockKind.FORMULA, SourcePosition(paragraph=0, character=8),
+            "a over b", {"original_script": "a over b"},
+        )
+        doc = DocumentIR("hwpx", (
+            p("1. 다음 식을 계산하시오.", 0), formula,
+            p("정답 및 해설", 1), p("1. (답) 1", 2),
+        ))
+        with patch("hwp_engine.assembly._equation_to_latex", return_value=r"\dfrac{a}{b}"):
+            result = assemble_document(doc, self.registry)
+        obj = result.as_payload()["questions"][0]["math_objects"][0]
+        self.assertEqual(obj["original_script"], "a over b")
+        self.assertEqual(obj["latex"], r"\dfrac{a}{b}")
+        self.assertIsNone(obj["conversion_error"])
+
+    def test_formula_after_answer_heading_is_not_attached_to_question(self):
+        from unittest.mock import patch
+
+        formula = DocumentBlock(
+            BlockKind.FORMULA, SourcePosition(paragraph=2, character=0),
+            "answer formula", {"original_script": "answer formula"},
+        )
+        doc = DocumentIR("hwpx", (
+            p("1. 다음 식을 계산하시오.", 0),
+            p("정답 및 해설", 1),
+            formula,
+            p("1. (답) 1", 3),
+        ))
+        with patch("hwp_engine.assembly._equation_to_latex", return_value="x"):
+            result = assemble_document(doc, self.registry)
+        self.assertEqual(result.as_payload()["questions"][0]["math_objects"], [])
+
+    def test_formula_conversion_failure_keeps_original_script_visible(self):
+        from unittest.mock import patch
+
+        formula = DocumentBlock(
+            BlockKind.FORMULA, SourcePosition(paragraph=0, character=8),
+            "unknown command", {"original_script": "unknown command"},
+        )
+        doc = DocumentIR("hwpx", (
+            p("1. 다음 식을 계산하시오.", 0), formula,
+            p("정답 및 해설", 1), p("1. (답) 1", 2),
+        ))
+        with patch("hwp_engine.assembly._equation_to_latex", side_effect=ValueError("unsupported")):
+            result = assemble_document(doc, self.registry)
+        obj = result.as_payload()["questions"][0]["math_objects"][0]
+        self.assertEqual(obj["original_script"], "unknown command")
+        self.assertEqual(obj["latex"], "")
+        self.assertEqual(obj["conversion_error"], "unsupported")
+
     def test_validator_rejects_missing_out_of_range_and_orphan_answers(self):
         doc = DocumentIR("hwpx", (
             p("1. 다음 중 옳은 것은?", 0),

@@ -165,6 +165,9 @@ POSTGRES_SCHEMA_STATEMENTS = (
     """,
     "ALTER TABLE questions ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMP",
     "CREATE INDEX IF NOT EXISTS idx_questions_user_subject ON questions(user_uuid, subject)",
+    "CREATE INDEX IF NOT EXISTS idx_questions_curriculum_course_grade ON questions(subject, curriculum, course, grade)",
+    "CREATE INDEX IF NOT EXISTS idx_questions_source_filters ON questions(subject, source_type, year, license)",
+    "CREATE INDEX IF NOT EXISTS idx_questions_standard ON questions(subject, achievement_standard)",
     "CREATE INDEX IF NOT EXISTS idx_workbooks_kind_title ON workbooks(kind, title)",
     "CREATE INDEX IF NOT EXISTS idx_workbook_entries_workbook ON workbook_entries(workbook_id, id)",
     "CREATE UNIQUE INDEX IF NOT EXISTS idx_workbook_entries_question ON workbook_entries(workbook_id, question_id) WHERE question_id IS NOT NULL",
@@ -189,8 +192,6 @@ POSTGRES_SCHEMA_STATEMENTS = (
 
 def initialize_postgres_database(connection):
     """Create the HEXORA schema once per app process and database URL."""
-    from flask import current_app
-
     database_key = current_app.config["DATABASE_URL"]
     if database_key in _POSTGRES_SCHEMA_READY:
         return

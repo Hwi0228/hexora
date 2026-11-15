@@ -4,3 +4,8 @@
 .history-revision { border-top-color: #EDF1F5; }
 
 .history-comparison-list { margin-top: 14px; }
+
+.diff-side-label{display:block;margin-bottom:6px;font-size:11px;font-weight:700;color:#64748b}
+.diff-removed{background:#fff0f0;color:#9b2c2c;text-decoration:line-through;text-decoration-thickness:1px}
+.diff-added{background:#e8f7ee;color:#17633a;text-decoration:none}
+.history-change .value{line-height:1.8;overflow-wrap:anywhere}

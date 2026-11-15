@@ -19,14 +19,14 @@ HEXORA는 교사, 강사, 출제자, 학습자가 문제를 손쉽게 관리하�
 
 ### 2.1 계정 및 권한 관리
 - 이메일 및 비밀번호 기반 회원가입/로그인 (비밀번호 12자 이상, `werkzeug.security` 단방향 해시 저장).
-- **최초 가입자 관리자 승격**: 가장 처음 가입한 계정은 자동으로 `admin` 역할을 부여받아 전체 사용자 현황 조회 및 작성자별 문제 필터링 권한을 가집니다.
+- **명시적 관리자 부트스트랩**: 일반 회원가입은 `user` 역할만 부여합니다. 첫 관리자는 `flask --app app create-admin` CLI 명령으로 생성합니다.
 - **원작성자 보존**: 공동 편집이 진행되더라도 문항의 최초 작성자(`user_uuid`) 정보는 기여 이력으로 영구히 보존됩니다.
 
 ### 2.2 공동 문제 은행 및 개인 관리 기능
 - **공개 위키 모델**: 등록된 모든 문제는 모든 로그인 사용자에게 공유됩니다.
 - **6자리 Base36 문항 식별자**: 각 문제는 내부 `id`와 더불어 6자리 알파벳/숫자 조합 식별자(예: `000001` -> `00000A`)로 가독성 있게 표기됩니다.
 - **개인 폴더 관리**: 사용자별로 계정 고유의 폴더 및 하위 폴더(UUID 식별)를 생성하고 문항을 이동시킬 수 있습니다.
-- **개인 메모 및 임시 저장**: 다른 회원의 수정에 영향을 주지 않는 비공개 문항 메모 기능과 작성 중인 문항의 자동/수동 임시 저장(Draft) 기능을 제공합니다.
+- **개인 메모 및 자동 임시 저장**: 비공개 문항 메모와 디바운스 자동 저장·새로고침 후 복구·수동 임시 저장을 제공합니다.
 - **성취기준 및 교육과정 매핑**: 과목, 학년, 교육과정(성취기준) 코드를 문항에 분류 매핑할 수 있습니다.
 
 ### 2.3 WYSIWYG 수식 편집 및 KaTeX 렌더링
@@ -36,7 +36,7 @@ HEXORA는 교사, 강사, 출제자, 학습자가 문제를 손쉽게 관리하�
 
 ### 2.4 HWP / HWPX 가져오기 및 내보내기
 - **구조화 파싱**: `rhwp-python` 라이브러리를 사용해 HWP/HWPX 문서 내 표(Table) 구조 및 문단형 시험지(`1.`, `1)`, `1번` 등)에서 문항, 선택지, 정답, 해설을 자동 파싱합니다.
-- **수식 파싱**: HWP 수식 스크립트를 Rust로 작성된 `hmleq` CLI로 정밀 변환하여 LaTeX 구문으로 추출합니다.
+- **수식 파싱**: HWP 수식 스크립트는 `hmleqx` Python API로 LaTeX 변환합니다. HWPX 시험지 내보내기는 지원되는 LaTeX 부분집합을 한컴 수식 스크립트로 변환해 네이티브 `hp:equation` 객체로 기록합니다.
 - **HWPX 시험지 내보내기**: 문제 DB 목록에서 문항 카드를 선택하여 제목 및 정답/해설 포함 여부를 지정하면, 표준 HWPX 압축 패키지 구조로 시험지를 자동 생성합니다 (한 번에 최대 100문항).
 
 ---
@@ -49,7 +49,7 @@ HEXORA는 교사, 강사, 출제자, 학습자가 문제를 손쉽게 관리하�
 | **WSGI Server** | Gunicorn 23.0.0 | Production Application Server (Procfile) |
 | **Database** | SQLite3 / PostgreSQL (psycopg 3.2+) | 이중 지원 DB 어댑터 |
 | **Document Parser** | `rhwp-python` 0.8.1, `hml-equation-parser` 1.0.12 | HWP/HWPX 문서 구조 분석 및 HWPML 표/수식 추출 |
-| **Math Converter** | `hmleq` (Rust CLI) | HWP Equation Script -> LaTeX Translator |
+| **Math Converter** | `hmleqx==0.2.1`, HEXORA `latex_to_hancom.py` | Hancom Equation Script ↔ supported LaTeX subset |
 | **Frontend Renderer** | Jinja2, KaTeX 0.16.x | HTML Server-side Rendering & Client-side Math Latex Rendering |
 | **Rich Text Editor** | Quill 2.0.3 | WYSIWYG HTML & Inline Formula Editor |
 | **CSS System** | Academic Blue (Design Tokens) | Design System (`static/styles/tokens.css`, `layout.css` 등) |
@@ -62,7 +62,7 @@ HEXORA는 교사, 강사, 출제자, 학습자가 문제를 손쉽게 관리하�
 
 ### 4.1 필수 요구 사항
 - Python 3.11+
-- Rust toolchain (`cargo` - `hmleq` 빌드용, `build.sh` 실행 시 자동 처리)
+- Python 3.11 (`.python-version` 기준)
 
 ### 4.2 로컬 개발 환경 구축 (Windows PowerShell)
 
@@ -75,7 +75,7 @@ cd hexora
 py -3.11 -m venv .venv
 .\.venv\Scripts\Activate.ps1
 
-# 3. 의존성 패키지 및 hmleq CLI 설치
+# 3. 의존성 패키지 및 hmleqx Python API
 bash build.sh
 
 # 4. 환경 변수 설정 및 앱 실행 (SQLite 기본값)
@@ -86,7 +86,7 @@ python app.py
 
 웹 브라우저에서 `http://127.0.0.1:5000`에 접속하여 서비스를 사용할 수 있습니다.
 
-### 4.3 단위 테스트 실행
+### 4.3 테스트 및 품질 검사 실행
 
 ```powershell
 python -m unittest discover -s tests -v

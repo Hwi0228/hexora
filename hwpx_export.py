@@ -100,6 +100,7 @@ def _build_section_xml(questions, title, include_answers):
     ET.SubElement(empty_run, f"{{{_HP}}}t")
 
     next_id = 1000000002
+    next_equation_id = 2000000000
 
     def append_paragraph(
         paragraph_text="",
@@ -109,7 +110,7 @@ def _build_section_xml(questions, title, include_answers):
         para_style="19",
         page_break=False,
     ):
-        nonlocal next_id
+        nonlocal next_id, next_equation_id
         paragraph = ET.SubElement(section, f"{{{_HP}}}p", {
             "id": str(next_id),
             "paraPrIDRef": str(para_style),
@@ -126,8 +127,42 @@ def _build_section_xml(questions, title, include_answers):
                 f"{{{_HP}}}run",
                 {"charPrIDRef": str(item.get("char_style", char_style))},
             )
-            text_node = ET.SubElement(run, f"{{{_HP}}}t")
-            text_node.text = str(item.get("text", "") or "")
+            if "equation_script" in item:
+                equation = ET.SubElement(run, f"{{{_HP}}}equation", {
+                    "id": str(next_equation_id),
+                    "zOrder": "0",
+                    "numberingType": "EQUATION",
+                    "textWrap": "TOP_AND_BOTTOM",
+                    "textFlow": "BOTH_SIDES",
+                    "lock": "0",
+                    "dropcapstyle": "None",
+                    "version": "Equation Version 60",
+                    "baseLine": "86",
+                    "textColor": "#000000",
+                    "baseUnit": "1000",
+                    "lineMode": "CHAR",
+                    "font": "HancomEQN",
+                })
+                next_equation_id += 1
+                ET.SubElement(equation, f"{{{_HP}}}sz", {
+                    "width": "0", "widthRelTo": "ABSOLUTE",
+                    "height": "0", "heightRelTo": "ABSOLUTE", "protect": "0",
+                })
+                ET.SubElement(equation, f"{{{_HP}}}pos", {
+                    "treatAsChar": "1", "affectLSpacing": "0", "flowWithText": "1",
+                    "allowOverlap": "0", "holdAnchorAndSO": "0",
+                    "vertRelTo": "PARA", "horzRelTo": "PARA",
+                    "vertAlign": "TOP", "horzAlign": "LEFT",
+                    "vertOffset": "0", "horzOffset": "0",
+                })
+                ET.SubElement(equation, f"{{{_HP}}}outMargin", {
+                    "left": "56", "right": "56", "top": "0", "bottom": "0",
+                })
+                ET.SubElement(equation, f"{{{_HP}}}shapeComment").text = "수식입니다."
+                ET.SubElement(equation, f"{{{_HP}}}script").text = str(item["equation_script"])
+            else:
+                text_node = ET.SubElement(run, f"{{{_HP}}}t")
+                text_node.text = str(item.get("text", "") or "")
 
     for paragraph in _question_paragraphs(questions, title, include_answers):
         append_paragraph(

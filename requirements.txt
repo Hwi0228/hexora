@@ -1,7 +1,2 @@
-Flask>=3.0,<4.0
-defusedxml>=0.7.1,<0.8
-hml-equation-parser==1.0.12
-hmleqx
-rhwp-python==0.8.1
-psycopg[binary]>=3.2,<4.0
-gunicorn>=23,<24
+# Compatibility entry point; the fully pinned deployment set is in requirements.lock.
+-r requirements.lock

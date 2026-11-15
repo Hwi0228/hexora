@@ -94,7 +94,7 @@ Quill 2 WYSIWYG 편집기에서 생성된 HTML 본문 내의 악성 스크립트
 
 | 라우트 URL | HTTP 메서드 | 엔드포인트 | 주요 역할 |
 | --- | --- | --- | --- |
-| `/questions` | GET | `main` | 문제 DB 메인 (검색, 과목/학년 필터, 폴더 트리, 시험지 선택) |
+| `/questions` | GET | `main` | 문제 DB 메인 (키워드·교육과정·출처·성취기준 필터, 정렬, 폴더 트리) |
 | `/questions/new` | GET, POST | `new_question` | 새 문제 등록 (Quill 2 편집기, 임시저장 연동) |
 | `/questions/<id>/edit` | GET, POST | `edit_question` | 문항 편집 (버전 충돌 방지, 수정 요약 기록) |
 | `/questions/<id>/history` | GET | `question_history` | 문항 버전 변경 이력 및 Diff 조회 |
@@ -135,3 +135,17 @@ Quill 2 WYSIWYG 편집기에서 생성된 HTML 본문 내의 악성 스크립트
   1. 원격 GitHub 저장소의 `CHANGELOG.md` 원문을 HTTP 요청(`urllib.request`)으로 먼저 조회를 시도합니다 (타임아웃 3초).
   2. 네트워크 오류 또는 GitHub 연결 불가 시 서비스 배포 버전에 동봉된 로컬 `CHANGELOG.md` 파일로 폴백합니다.
   3. 마크다운 내용을 파싱하여 버전별 변경사항(Added, Changed, Fixed 등)을 구조화된 HTML 템플릿으로 제공합니다.
+
+
+## 7. 운영 관측성 및 요청 제한
+
+- `observability.py`: 요청별 UUID `X-Request-ID`, JSON 구조화 로그, HTTP 처리 시간, HWP 파싱 소요 시간, `/health/live` 및 `/health/ready` 제공
+- `rate_limit.py`: 로그인·회원가입·권리 신고 요청을 IP 및 계정 식별자 기준으로 제한합니다. IP 식별은 `ProxyFix`가 신뢰하도록 설정한 프록시 홉 수에 의존합니다.
+- 로그에는 요청 본문·쿼리 문자열·비밀번호를 기록하지 않습니다.
+
+## 8. 검색·편집 보조 기능
+
+- `question_browse_routes.py`: 키워드, 교육과정, 교과, 학년, 문항 유형, 출처 유형, 연도, 라이선스, 성취기준 필터와 최신·수정·관련도 정렬
+- `question_history_routes.py`: HTML 태그 표현 차이를 정규화한 뒤 필드별 텍스트 삽입·삭제를 표시합니다.
+- `question_drafts.py` 및 `static/scripts/question-editor.js`: 기존 비공개 Draft 저장 경로를 디바운스 자동 저장에 재사용합니다.
+- `latex_to_hancom.py`: HWPX 내보내기에서 지원되는 LaTeX 수식을 한컴 수식 스크립트로 변환합니다.

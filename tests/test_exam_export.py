@@ -92,6 +92,12 @@ class ExamExportRouteTests(unittest.TestCase):
             data["include_answers"] = "1"
         return self.client.post("/exams/export", data=data)
 
+    def get_equation_scripts(self, response):
+        self.assertEqual(response.status_code, 200)
+        with zipfile.ZipFile(io.BytesIO(response.data)) as archive:
+            root = ET.fromstring(archive.read("Contents/section0.xml"))
+        return [node.text or "" for node in root.iter(f"{{{HP}}}script")]
+
     def get_section_text(self, response):
         self.assertEqual(response.status_code, 200)
         self.assertIn(".hwpx", response.headers.get("Content-Disposition", ""))
@@ -121,7 +127,8 @@ class ExamExportRouteTests(unittest.TestCase):
         self.assertIn("이름:", text)
         self.assertIn("공통 지문", text)
         self.assertIn("보기 내용", text)
-        self.assertIn("$x^2$", text)
+        scripts = self.get_equation_scripts(response)
+        self.assertIn("x ^ 2", scripts)
         self.assertIn("① 하나", text)
         self.assertLess(text.index("두 번째 문제"), text.index("첫 번째 문제"))
         self.assertNotIn("정답: ①", text)
@@ -162,6 +169,36 @@ class ExamExportRouteTests(unittest.TestCase):
             char_style == "45" and paragraph_text.startswith("QUESTION 01")
             for char_style, paragraph_text in styled_text
         ))
+
+    def test_latex_is_exported_as_native_hancom_equation_objects(self):
+        question_id = self.add_question(
+            r"<p>분수 $\dfrac{1}{2}$</p>",
+            "정답",
+            choices=[
+                '<span class="ql-math-inline" data-latex="\sqrt[3]{5}"></span>'
+            ],
+        )
+        response = self.export([question_id])
+        scripts = self.get_equation_scripts(response)
+        self.assertIn("{1} over {2}", scripts)
+        self.assertIn("sqrt {3} of {5}", scripts)
+        with zipfile.ZipFile(io.BytesIO(response.data)) as archive:
+            root = ET.fromstring(archive.read("Contents/section0.xml"))
+        equations = list(root.iter(f"{{{HP}}}equation"))
+        self.assertEqual(len(equations), 2)
+        self.assertTrue(all(
+            equation.find(f"{{{HP}}}script") is not None
+            and equation.find(f"{{{HP}}}pos").get("treatAsChar") == "1"
+            for equation in equations
+        ))
+
+    def test_unsupported_latex_commands_reject_the_export_explicitly(self):
+        question_id = self.add_question(
+            r"<p>지원하지 않는 명령 $\notARealMathCommand{x}$</p>",
+            "1",
+        )
+        response = self.export([question_id])
+        self.assertEqual(response.status_code, 422)
 
     def test_teacher_export_can_include_answer_and_explanation(self):
         question_id = self.add_question("<p>교사용 문항</p>", "④")

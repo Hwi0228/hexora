@@ -624,3 +624,70 @@ const editorConfig = configNode
     });
     standardArea.addEventListener("change", () => loadStandards());
 
+
+
+// Persist private drafts automatically while editing. The existing POST draft
+// action remains the single server-side validation and storage path.
+const draftStatus = document.getElementById("draft-meta");
+let draftSaveTimer = null;
+let draftSaveInFlight = false;
+let draftSavePending = false;
+let lastSavedDraftPayload = "";
+
+function draftPayloadKey(formData) {
+  return JSON.stringify(Array.from(formData.entries()).map(([key, value]) => [
+    key,
+    typeof value === "string" ? value : value.name
+  ]));
+}
+
+async function saveDraftAutomatically() {
+  if (!form || !draftStatus) return;
+  if (draftSaveInFlight) {
+    draftSavePending = true;
+    return;
+  }
+
+  const formData = new FormData(form);
+  formData.set("form_action", "draft");
+  const payloadKey = draftPayloadKey(formData);
+  if (payloadKey === lastSavedDraftPayload) return;
+
+  draftSaveInFlight = true;
+  draftStatus.textContent = "자동 저장 중…";
+  try {
+    const response = await fetch(form.action, {
+      method: "POST",
+      body: formData,
+      headers: { "X-Requested-With": "XMLHttpRequest" },
+      credentials: "same-origin"
+    });
+    if (!response.ok) throw new Error("draft-save-failed");
+    lastSavedDraftPayload = payloadKey;
+    draftStatus.textContent = "자동 저장됨 · " +
+      new Date().toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" });
+  } catch (_error) {
+    draftStatus.textContent = "자동 저장에 실패했습니다. 연결을 확인하거나 임시 저장을 눌러 주세요.";
+  } finally {
+    draftSaveInFlight = false;
+    if (draftSavePending) {
+      draftSavePending = false;
+      window.clearTimeout(draftSaveTimer);
+      draftSaveTimer = window.setTimeout(saveDraftAutomatically, 250);
+    }
+  }
+}
+
+function scheduleDraftSave() {
+  if (!draftStatus) return;
+  draftStatus.textContent = "변경 사항 저장 대기 중…";
+  window.clearTimeout(draftSaveTimer);
+  draftSaveTimer = window.setTimeout(saveDraftAutomatically, 1500);
+}
+
+if (form && draftStatus) {
+  form.addEventListener("input", scheduleDraftSave);
+  form.addEventListener("change", scheduleDraftSave);
+  form.addEventListener("submit", () => window.clearTimeout(draftSaveTimer), true);
+  window.addEventListener("pagehide", () => window.clearTimeout(draftSaveTimer));
+}

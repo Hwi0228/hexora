@@ -2,13 +2,24 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from functools import lru_cache
 import re
 
 from .adapters import AdapterRegistry
 from .detection import detect_templates
 from .models import (
-    AnswerTemplate, DocumentIR, ExtractedQuestion, QuestionTemplate,
+    AnswerTemplate, BlockKind, DocumentIR, ExtractedQuestion, QuestionTemplate,
     TemplateDetection,
+)
+from parse_hwp import _equation_to_latex
+
+@lru_cache(maxsize=2048)
+def _cached_equation_to_latex(script: str) -> str:
+    return _equation_to_latex(script)
+
+_ANSWER_SECTION = re.compile(
+    r"^\s*(?:(?:[ⅠⅡⅢⅣⅤⅥⅦⅧⅨⅩ]+)\s*[.)]?\s*)?"
+    r"(?:정\s*답(?:\s*(?:\(해\s*설\)|및\s*해\s*설|과\s*해\s*설))?|정답\s*/\s*해설)\s*$"
 )
 
 CHOICE_LABELS = "①②③④⑤⑥⑦⑧⑨⑩"
@@ -28,6 +39,7 @@ class AssembledQuestion:
     answer: str
     explanation: str
     source: object | None = None
+    math_objects: tuple[dict, ...] = ()
 
 @dataclass(frozen=True, slots=True)
 class AssemblyResult:
@@ -49,6 +61,7 @@ class AssemblyResult:
                     "choices": list(item.choices),
                     "answer": item.answer,
                     "explanation": item.explanation,
+                    "math_objects": list(item.math_objects),
                     "source": (
                         {
                             "section": item.source.section,
@@ -160,6 +173,81 @@ def assemble_document(
             explanation=explanation,
             source=question.source,
         ))
+    def position_key(position):
+        return (
+            position.section, position.paragraph,
+            -1 if position.row is None else position.row,
+            -1 if position.column is None else position.column,
+            -1 if position.character is None else position.character,
+        )
+
+    answer_section = next(
+        (
+            block.position for block in document.blocks
+            if block.kind == BlockKind.PARAGRAPH
+            and _ANSWER_SECTION.fullmatch(block.text.strip())
+        ),
+        None,
+    )
+    answer_section_key = position_key(answer_section) if answer_section else None
+    formula_blocks = sorted(
+        (block for block in document.blocks if block.kind == BlockKind.FORMULA),
+        key=lambda block: (
+            block.position.section, block.position.paragraph,
+            -1 if block.position.row is None else block.position.row,
+            -1 if block.position.column is None else block.position.column,
+            -1 if block.position.character is None else block.position.character,
+        ),
+    )
+
+    enriched = []
+    for index, item in enumerate(assembled):
+        if item.source is None:
+            enriched.append(item)
+            continue
+        start_key = position_key(item.source)
+        next_key = next(
+            (position_key(candidate.source) for candidate in assembled[index + 1:]
+             if candidate.source is not None),
+            None,
+        )
+        math_objects = []
+        for block in formula_blocks:
+            key = position_key(block.position)
+            if (
+                key < start_key
+                or (next_key is not None and key >= next_key)
+                or (answer_section_key is not None and key >= answer_section_key)
+            ):
+                continue
+            script = str(block.payload.get("original_script") or block.text or "")
+            if not script:
+                continue
+            try:
+                latex = _cached_equation_to_latex(script)
+                conversion_error = None
+            except Exception as exc:
+                latex = ""
+                conversion_error = str(exc)[:300]
+            math_objects.append({
+                "original_script": script,
+                "latex": latex,
+                "conversion_error": conversion_error,
+                "source_position": {
+                    "section": block.position.section,
+                    "paragraph": block.position.paragraph,
+                    "row": block.position.row,
+                    "column": block.position.column,
+                    "character": block.position.character,
+                },
+            })
+        enriched.append(AssembledQuestion(
+            number=item.number, question=item.question, choices=item.choices,
+            answer=item.answer, explanation=item.explanation, source=item.source,
+            math_objects=tuple(math_objects),
+        ))
+    assembled = enriched
+
     issues.extend(validate_assembled(
         assembled, answer_map, answer_template=detection.answer_template
     ))

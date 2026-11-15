@@ -93,3 +93,132 @@ class DatabaseBackendConfigurationTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class DatabaseBackendParityIntegrationTests(unittest.TestCase):
+    """Run the same CRUD, FK, and rollback contract against both backends."""
+
+    def test_shared_data_lifecycle_on_sqlite_and_postgresql(self):
+        import tempfile
+        import uuid
+        from pathlib import Path
+        from database import close_db, get_db
+
+        backends = [("sqlite", None)]
+        postgres_url = os.environ.get("HEXORA_TEST_POSTGRES_URL", "").strip()
+        if postgres_url:
+            backends.append(("postgresql", postgres_url))
+
+        with tempfile.TemporaryDirectory() as directory:
+            for backend, database_url in backends:
+                with self.subTest(backend=backend):
+                    environment = {
+                        "DATABASE_TYPE": backend,
+                        "FLASK_SECRET_KEY": "database-parity-test-secret",
+                    }
+                    if backend == "sqlite":
+                        environment["DATABASE_PATH"] = str(Path(directory) / "parity.sqlite3")
+                    else:
+                        environment["DATABASE_URL"] = database_url
+                    with patch.dict(os.environ, environment, clear=False):
+                        app = create_app()
+                    app.config.update(TESTING=True)
+                    user_id = str(uuid.uuid4())
+                    try:
+                        with app.app_context():
+                            connection = get_db()
+                            connection.execute(
+                                "INSERT INTO users (uuid, email, display_name, password_hash, role) "
+                                "VALUES (?, ?, ?, ?, 'user')",
+                                (user_id, f"parity-{user_id}@example.test", "Parity", "hash"),
+                            )
+                            folder_id = str(uuid.uuid4())
+                            connection.execute(
+                                "INSERT INTO folders (uuid, user_uuid, name) VALUES (?, ?, ?)",
+                                (folder_id, user_id, "Parity folder"),
+                            )
+                            cursor = connection.execute(
+                                """INSERT INTO questions
+                                   (user_uuid, folder_uuid, subject, grade, unit, prompt, answer, source)
+                                   VALUES (?, ?, '수학', '고1', '테스트', '문제', '정답', '테스트')
+                                   RETURNING id""",
+                                (user_id, folder_id),
+                            )
+                            question_id = cursor.fetchone()["id"]
+                            connection.execute(
+                                """INSERT INTO question_revisions
+                                   (question_id, revision_number, editor_uuid, summary, snapshot_json)
+                                   VALUES (?, 1, ?, '최초 등록', '{}')""",
+                                (question_id, user_id),
+                            )
+                            connection.execute(
+                                """INSERT INTO question_drafts
+                                   (user_uuid, draft_key, question_id, base_revision, payload_json)
+                                   VALUES (?, ?, ?, 1, '{}')""",
+                                (user_id, f"question:{question_id}", question_id),
+                            )
+                            workbook_cursor = connection.execute(
+                                "INSERT INTO workbooks (kind, title, created_by) VALUES ('community', 'Parity', ?) RETURNING id",
+                                (user_id,),
+                            )
+                            workbook_id = workbook_cursor.fetchone()["id"]
+                            connection.execute(
+                                "INSERT INTO workbook_entries (workbook_id, question_id, unit) VALUES (?, ?, '테스트')",
+                                (workbook_id, question_id),
+                            )
+                            connection.execute(
+                                """INSERT INTO rights_reports
+                                   (category, requested_action, requester_role, requester_name,
+                                    requester_email, target_url, details)
+                                   VALUES ('copyright', 'review', 'author', 'Parity', ?, '/', 'test')""",
+                                (f"parity-{user_id}@example.test",),
+                            )
+                            connection.commit()
+
+                            self.assertEqual(
+                                connection.execute("SELECT prompt FROM questions WHERE id = ?", (question_id,)).fetchone()[0],
+                                "문제",
+                            )
+                            self.assertEqual(
+                                connection.execute("SELECT COUNT(*) FROM question_revisions WHERE question_id = ?", (question_id,)).fetchone()[0],
+                                1,
+                            )
+                            self.assertEqual(
+                                connection.execute("SELECT COUNT(*) FROM question_drafts WHERE user_uuid = ?", (user_id,)).fetchone()[0],
+                                1,
+                            )
+                            self.assertEqual(
+                                connection.execute("SELECT COUNT(*) FROM workbook_entries WHERE workbook_id = ?", (workbook_id,)).fetchone()[0],
+                                1,
+                            )
+
+                            connection.execute("DELETE FROM users WHERE uuid = ?", (user_id,))
+                            connection.commit()
+                            for table, column, value in (
+                                ("questions", "id", question_id),
+                                ("folders", "uuid", folder_id),
+                                ("question_revisions", "question_id", question_id),
+                                ("question_drafts", "user_uuid", user_id),
+                            ):
+                                self.assertEqual(
+                                    connection.execute(f"SELECT COUNT(*) FROM {table} WHERE {column} = ?", (value,)).fetchone()[0],
+                                    0,
+                                    msg=f"{backend}: cascade cleanup failed for {table}",
+                                )
+                            # A failed transaction must not leave a partially written row.
+                            connection.execute(
+                                "INSERT INTO users (uuid, email, display_name, password_hash, role) VALUES (?, ?, ?, ?, 'user')",
+                                (str(uuid.uuid4()), f"rollback-{user_id}@example.test", "Rollback", "hash"),
+                            )
+                            connection.rollback()
+                            self.assertEqual(
+                                connection.execute("SELECT COUNT(*) FROM users WHERE email = ?", (f"rollback-{user_id}@example.test",)).fetchone()[0],
+                                0,
+                            )
+                    finally:
+                        with app.app_context():
+                            close_db()
+
+
+if __name__ == "__main__":
+    unittest.main()

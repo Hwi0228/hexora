@@ -1,9 +1,10 @@
 import json
+import time
 from defusedxml import ElementTree as ET
 from defusedxml.common import DefusedXmlException
 from pathlib import Path
 
-from flask import abort, g, redirect, render_template, request, url_for
+from flask import abort, current_app, g, redirect, render_template, request, url_for
 
 from auth import login_required
 from constants import NAV_ITEMS, SUBJECTS, LICENSE_CHOICES, SOURCE_TYPES
@@ -19,7 +20,7 @@ from hwp_engine.models import QuestionTemplate
 from exam_export_routes import export_exam_hwpx, register_exam_export_routes
 
 
-def _render_page(questions=None, result_json=None, error=None, form_data=None):
+def _render_page(questions=None, result_json=None, error=None, form_data=None, warnings=None):
     folders = get_db().execute(
         "SELECT uuid, name FROM folders WHERE user_uuid = ? ORDER BY LOWER(name), uuid",
         (g.user["uuid"],),
@@ -35,6 +36,7 @@ def _render_page(questions=None, result_json=None, error=None, form_data=None):
         result_json=result_json,
         error=error,
         form_data=form_data or {},
+        warnings=warnings or [],
     )
 
 
@@ -42,10 +44,21 @@ def hwp_parser_page():
     questions = None
     result_json = None
     error = None
+    warnings = []
 
     if request.method == "POST":
         if request.form.get("action") == "save":
             result_json = request.form.get("questions_json", "")
+            try:
+                saved_payload = json.loads(result_json)
+                saved_issues = saved_payload.get("validation", {}).get("issues", []) if isinstance(saved_payload, dict) else []
+                warnings = [
+                    issue.get("message", "검토가 필요한 항목입니다.")
+                    for issue in saved_issues
+                    if isinstance(issue, dict) and issue.get("severity") == "warning"
+                ]
+            except (TypeError, ValueError):
+                warnings = []
             questions, selection, errors, error = _validated_import(request.form)
             if not error and errors:
                 error = " ".join(errors)
@@ -97,11 +110,21 @@ def hwp_parser_page():
                             "source": metadata["source"],
                             "year": metadata["year"],
                             "exam": "",
-                            "original_question_number": str(imported["number"]),
+                            "original_question_number": str(imported.get("source_number") or imported["number"]),
                             "page": None,
                             "source_url": "",
                             "license": metadata["license"],
                         }
+                        if imported.get("corrected_fields") or imported.get("math_objects"):
+                            snapshot["import_provenance"] = {
+                                "source_number": imported.get("source_number", str(imported["number"])),
+                                "original": imported.get("original", {}),
+                                "corrected_fields": imported.get("corrected_fields", []),
+                                "math_objects": imported.get("math_objects", []),
+                            }
+                        import_summary = "HWP 문서에서 가져옴"
+                        if imported.get("corrected_fields"):
+                            import_summary += " · 수동 보정"
                         connection.execute(
                             """
                             INSERT INTO question_revisions (
@@ -111,7 +134,7 @@ def hwp_parser_page():
                             VALUES (?, 1, ?, ?, ?)
                             """,
                             (
-                                question_id, g.user["uuid"], "HWP 문서에서 가져옴",
+                                question_id, g.user["uuid"], import_summary,
                                 json.dumps(snapshot, ensure_ascii=False, separators=(",", ":")),
                             ),
                         )
@@ -129,14 +152,16 @@ def hwp_parser_page():
                 result_json=result_json,
                 error=error,
                 form_data=form_data,
+                warnings=warnings,
             )
 
         uploaded = request.files.get("document")
         if uploaded is None or not uploaded.filename:
             error = "파싱할 HWP, HWPX 또는 section0.xml 파일을 선택해 주세요."
         else:
+            started_at = time.perf_counter()
+            extension = Path(uploaded.filename).suffix.lower()
             try:
-                extension = Path(uploaded.filename).suffix.lower()
                 file_limit = (
                     MAX_SECTION_XML_SIZE if extension == ".xml"
                     else MAX_DOCUMENT_BYTES
@@ -173,6 +198,10 @@ def hwp_parser_page():
                         result_json = json.dumps(
                             payload, ensure_ascii=False, indent=2
                         )
+                        warnings = [
+                            issue.message for issue in assembled.issues
+                            if issue.severity == "warning"
+                        ]
                         validation_errors = [
                             issue.message for issue in assembled.issues
                             if issue.severity == "error"
@@ -198,10 +227,32 @@ def hwp_parser_page():
                         ensure_ascii=False,
                         indent=2,
                     )
+                current_app.logger.info(
+                    "hwp_parse_complete",
+                    extra={
+                        "event": "hwp_parse_complete",
+                        "stage": "document_parse",
+                        "file_type": extension.lstrip("."),
+                        "question_count": len(questions or []),
+                        "elapsed_ms": round((time.perf_counter() - started_at) * 1000, 2),
+                    },
+                )
             except (ValueError, RuntimeError, ET.ParseError, DefusedXmlException) as exc:
+                current_app.logger.warning(
+                    "hwp_parse_failed",
+                    extra={
+                        "event": "hwp_parse_failed",
+                        "stage": "document_parse",
+                        "file_type": extension.lstrip("."),
+                        "error_type": type(exc).__name__,
+                        "elapsed_ms": round((time.perf_counter() - started_at) * 1000, 2),
+                    },
+                )
                 error = str(exc)
 
-    return _render_page(questions=questions, result_json=result_json, error=error)
+    return _render_page(
+        questions=questions, result_json=result_json, error=error, warnings=warnings
+    )
 
 
 

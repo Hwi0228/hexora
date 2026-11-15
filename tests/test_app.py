@@ -156,6 +156,14 @@ class QuestionRegistrationTests(unittest.TestCase):
         self.register(other, "draft-reader@example.com", "다른 사용자")
         self.assertNotIn("작성 중인 문제".encode(), other.get("/questions").data)
 
+    def test_question_editor_uses_debounced_private_draft_autosave(self):
+        script_path = Path(__file__).resolve().parents[1] / "static" / "scripts" / "question-editor.js"
+        script = script_path.read_text(encoding="utf-8")
+        self.assertIn("setTimeout(saveDraftAutomatically, 1500)", script)
+        self.assertIn('formData.set("form_action", "draft")', script)
+        self.assertIn("fetch(form.action", script)
+        self.assertIn("lastSavedDraftPayload", script)
+
     def test_edit_temporary_draft_does_not_overwrite_public_question_or_add_revision(self):
         self.csrf_post(self.client, "/questions/new", data=self.valid_question())
         response = self.client.get("/questions/1/edit")
@@ -990,9 +998,11 @@ class QuestionRegistrationTests(unittest.TestCase):
         self.assertEqual(history.status_code, 200)
         self.assertIn("위키 편집자".encode(), history.data)
         self.assertIn("변경 비교".encode(), history.data)
-        self.assertIn("<strong>문제</strong>".encode(), history.data)
+        self.assertIn("문제".encode(), history.data)
+        self.assertIn('class="diff-removed"'.encode(), history.data)
+        self.assertIn('class="diff-added"'.encode(), history.data)
         self.assertIn(r"$\frac{1}{2}$".encode(), history.data)
-        self.assertIn("<em>수정한</em>".encode(), history.data)
+        self.assertIn("수정한".encode(), history.data)
         self.assertIn(r"$\tfrac{2}{3}$".encode(), history.data)
         self.assertNotIn("&lt;p&gt;관리자 원본".encode(), history.data)
         self.assertNotIn("&lt;p&gt;다른 회원이".encode(), history.data)

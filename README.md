@@ -4,9 +4,9 @@
 
 ## 계정
 
-이메일과 비밀번호로 회원가입/로그인합니다. 비밀번호는 12자 이상이어야 하고 단방향 해시로 저장됩니다. 첫 번째 가입 계정이 관리자가 되며, 기존 문제와 폴더는 첫 계정에 연결됩니다. 문제는 모든 로그인 회원에게 공개되는 공동 문제 은행으로 운영하고, 원작성자 정보는 기여 이력으로 보존합니다. 폴더는 사용자별 개인 분류로 유지합니다. 관리자는 **작성자별 문항 현황**에서 원작성자별 등록 문항 수를 확인하고 작성자 기준으로 문제를 필터링할 수 있습니다.
+이메일과 비밀번호로 회원가입/로그인합니다. 비밀번호는 12자 이상이어야 하고 단방향 해시로 저장됩니다. 일반 회원가입으로는 관리자 권한이 부여되지 않습니다. 운영자는 `flask --app app create-admin` 명령으로 첫 관리자를 명시적으로 생성합니다. 문제는 모든 로그인 회원에게 공개되는 공동 문제 은행으로 운영하고, 원작성자 정보는 기여 이력으로 보존합니다. 폴더는 사용자별 개인 분류로 유지합니다. 관리자는 **작성자별 문항 현황**에서 원작성자별 등록 문항 수를 확인하고 작성자 기준으로 문제를 필터링할 수 있습니다.
 
-운영 배포에서는 `HEXORA_ENV=production`과 충분히 긴 무작위 `FLASK_SECRET_KEY`를 반드시 설정해야 합니다. Render에서는 `RENDER=true`가 자동 감지되므로 `HEXORA_ENV`를 별도로 지정하지 않아도 키가 필수입니다. 키가 없거나 길이·문자 다양성 검증을 통과하지 못하면 앱 시작이 실패합니다. 개발 환경에서는 키를 `instance/.secret_key`에 자동 생성하고 Git에서 제외합니다. HTTPS 운영 환경의 쿠키 설정은 별도 보안 작업(#27)에서 다룹니다.
+운영 배포에서는 `HEXORA_ENV=production`과 충분히 긴 무작위 `FLASK_SECRET_KEY`를 반드시 설정해야 합니다. Render에서는 `RENDER=true`가 자동 감지되므로 `HEXORA_ENV`를 별도로 지정하지 않아도 키가 필수입니다. 키가 없거나 길이·문자 다양성 검증을 통과하지 못하면 앱 시작이 실패합니다. 개발 환경에서는 키를 `instance/.secret_key`에 자동 생성하고 Git에서 제외합니다. HTTPS 운영에서는 보안 쿠키를 사용합니다. Render 기본 프록시 환경은 `TRUSTED_PROXY_HOPS=1`을 사용하며, 다른 프록시 토폴로지에서는 실제 신뢰 프록시 홉 수를 확인해 명시해야 합니다.
 
 ## 최초 관리자 계정 설정
 
@@ -42,9 +42,9 @@ Flask 앱을 실행한 다음 **문제 DB 등록**을 눌러 과목, 학년, 단
 
 ## HWP 문항 파싱
 
-로그인한 뒤 사이드바의 **HWP 파싱**에서 `.hwp` 또는 `.hwpx`를 업로드하면 `rhwp-python`으로 문서 전체를 파싱하고 구조화 IR을 통해 문항을 추출합니다. 기존 정답·해설 표 형식뿐 아니라 `1.`, `1)`, `1번`, `Q1.` 등으로 시작하는 일반 문단형 시험지도 지원하며, 정답과 해설이 문서에 없는 경우에도 문제와 선택지를 추출할 수 있습니다. 여러 섹션을 순회하며, 업로드 파일은 서버에 보관하지 않습니다. 단독 HWPML `section0.xml`은 기존 호환 파서로 처리합니다.
+로그인한 뒤 사이드바의 **HWP 파싱**에서 `.hwp` 또는 `.hwpx`를 업로드하면 `rhwp-python` Reader와 `hwp_engine`의 Detector·Adapter·Assembler·Validator를 거쳐 문항을 추출합니다. `1.`, `1)`, `1번`, `Q1.` 형식의 문단형 문항과 표 기반 문항을 지원합니다. 미리보기에서 원본 문항 번호, 문제, 선택지, 정답, 해설을 직접 보정하고 문항 경계를 분리하거나 병합할 수 있습니다. 원본 값과 수정 필드는 최초 버전의 가져오기 출처 정보로 보존하며, 구조 검증 경고가 있으면 확인 동의 후 등록합니다. 업로드 파일은 서버에 보관하지 않습니다.
 
-수식 블록은 rhwp IR의 원본 HWP 수식 스크립트를 읽고 `hmleq` CLI로 LaTeX로 변환합니다. 문제 편집기의 한컴 한/글 입력 모드에서는 브라우저에서 수식을 변환하며, 변환된 LaTeX와 원본 스크립트를 함께 보존해 다시 편집할 수 있습니다. 서버 변환 API도 제공됩니다. 그림 블록은 문항 텍스트에 위치 표시자로 남깁니다. 실제 그림 파일을 문제 DB에 저장하는 기능은 아직 포함하지 않습니다. 파싱 결과에서 등록할 문항을 고르고 과목·학년·단원·출처 유형·출처·연도·라이선스 등의 공통 정보를 입력하면 공개 문제 DB에 일괄 등록됩니다. HWP에서 가져온 각 문항은 최초 버전 이력도 함께 생성됩니다. 업로드·추출 단계와 오류는 화면의 처리 로그에 표시됩니다.
+한컴 수식 스크립트는 PyPI `hmleqx`의 Python API `to_latex()`로 LaTeX 변환합니다. 문제 편집기의 한컴 입력 모드도 동일한 서버 변환 API를 사용합니다. 그림 블록은 위치 표시자로 남기며, 실제 그림 파일을 문제 DB에 저장하는 기능은 포함하지 않습니다. 사용자 화면에는 추출 결과와 필요한 오류만 표시하고, 진단 정보는 요청 ID·처리 시간과 함께 서버의 구조화 JSON 로그에 기록합니다.
 
 에듀넷 등 외부 자료는 내려받을 수 있다는 사실만으로 재배포 권한이 생기지 않습니다. 특히 출처표시·비영리·변경금지 조건이 있는 자료는 추출 결과를 외부에 공개하기 전에 원본 제공자의 이용 조건과 별도 허락 필요 여부를 확인해야 합니다.
 
@@ -58,9 +58,13 @@ Flask 앱을 실행한 다음 **문제 DB 등록**을 눌러 과목, 학년, 단
 
 ```powershell
 python -m unittest discover -s tests -v
+python -m pip install -r requirements-dev.txt
+ruff check . --select E4,E7,E9,F --ignore E501,F401,F841
+coverage run --rcfile=.coveragerc -m unittest discover -s tests -v
+coverage report --rcfile=.coveragerc -m
 ```
 
-현재 테스트는 SQLite 기반 회귀 테스트와 PostgreSQL 연결 어댑터·설정·스키마 단위 테스트를 포함합니다. PostgreSQL 테스트 단위 테스트는 외부 DB 접속 없이 실행됩니다. GitHub Actions에서도 PR 및 기본 브랜치 푸시 시 동일한 테스트를 수행합니다.
+테스트는 SQLite 회귀 테스트와 PostgreSQL 연결 어댑터 테스트를 포함합니다. `HEXORA_TEST_POSTGRES_URL`이 설정되면 동일한 CRUD·외래 키·트랜잭션 시나리오를 실제 PostgreSQL에서도 실행합니다. GitHub Actions는 격리된 PostgreSQL 서비스를 제공하며, unittest·Ruff 정적 분석·coverage 보고를 별도 작업으로 수행합니다.
 
 ### Windows 로컬 실행
 
@@ -68,16 +72,13 @@ PR 브랜치를 내려받은 뒤 Python 3.11 가상환경에서 의존성을 설
 
 ```powershell
 # GitHub CLI가 설치되어 있고 인증된 경우
-gh pr checkout 13
-
-# 또는 GitHub CLI 없이 PR 브랜치를 가져오는 경우
-git fetch origin pull/13/head:pr-13
-git switch pr-13
+git switch dev
+git pull --ff-only origin dev
 
 py -3.11 -m venv .venv
 .\.venv\Scripts\Activate.ps1
 python -m pip install --upgrade pip
-python -m pip install -r requirements.txt
+python -m pip install -r requirements.lock
 ```
 
 개발용 세션 키를 별도로 지정하려면 다음 명령으로 무작위 키를 생성할 수 있습니다. 운영 환경에서는 생성한 값을 Render의 `FLASK_SECRET_KEY` 환경 변수에 등록하고, 저장소나 로그에 남기지 마세요.
@@ -132,7 +133,7 @@ python app.py
 ## 의존성 및 실행
 
 ```powershell
-python -m pip install -r requirements.txt
+python -m pip install -r requirements.lock
 python app.py
 ```
 
@@ -187,3 +188,8 @@ Render 서비스의 Custom Domains에 `hexora.kro.kr`을 등록하고 DNS를 연
 PR을 검토한 뒤 `master`에 병합하면 GitHub Actions가 `VERSION`의 변경 여부를 확인하고, 해당 버전의 `CHANGELOG.md` 항목을 릴리즈 노트로 사용해 `vX.Y.Z` 태그와 GitHub Release를 자동 생성합니다. PR 승인만으로는 릴리즈하지 않으며, 병합이 완료된 뒤에만 실행됩니다. 별도 PAT 없이 워크플로의 `GITHUB_TOKEN`을 사용합니다.
 
 앱 공통 사이드바 하단의 버전 표시는 실행 시 `VERSION` 파일에서 읽습니다. 따라서 `master` 병합 후 호스팅 서비스가 새 코드를 배포하면 사이트에도 동일한 버전이 표시됩니다.
+
+
+## 운영·품질 구현 노트
+
+P1 안정화 항목의 동작, 설정, 제한 사항은 [P1 구현 노트](docs/p1-implementation.md)를 참고하세요.
