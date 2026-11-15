@@ -12,6 +12,7 @@ from parse_rhwp import MAX_DOCUMENT_BYTES, parse_questions_from_rhwp_bytes
 from hwp_import_validation import MAX_IMPORTED_QUESTIONS, MAX_SECTION_XML_SIZE, _get_section_xml, _validated_import
 from exam_export_routes import export_exam_hwpx, register_exam_export_routes
 from hwp_engine.core.extractor import HwpCoreExtractor
+from groq_key_routes import get_user_groq_api_key
 from hwp_engine.groq_segmenter import (
     GroqSegmentationError,
     document_blocks_for_segmentation,
@@ -84,7 +85,8 @@ def hwp_parser_page():
                     if not blocks:
                         raise ValueError("문서에서 검토할 텍스트·수식 블록을 찾지 못했습니다.")
                     try:
-                        segmentation = suggest_question_boundaries(blocks)
+                        api_key = get_user_groq_api_key(g.user["uuid"])
+                        segmentation = suggest_question_boundaries(blocks, api_key=api_key)
                     except GroqSegmentationError as exc:
                         segmentation = {
                             "provider": "manual",
