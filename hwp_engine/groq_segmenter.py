@@ -7,6 +7,7 @@ rewritten by the model.
 from __future__ import annotations
 
 import json
+import logging
 import os
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
@@ -17,6 +18,8 @@ DEFAULT_GROQ_MODEL = "openai/gpt-oss-20b"
 MAX_BLOCKS = 1200
 MAX_INPUT_CHARS = 60_000
 MAX_QUESTIONS = 500
+
+logger = logging.getLogger(__name__)
 
 
 class GroqSegmentationError(ValueError):
@@ -118,8 +121,10 @@ def suggest_question_boundaries(
     timeout: float = 45.0,
 ) -> dict:
     """Ask Groq for advisory boundaries. Missing credentials means manual mode."""
+    logger.info("Groq segmentation entered; api_key_present=%s blocks=%d", bool((api_key or "").strip()), len(blocks))
     key = (api_key or "").strip()
     if not key:
+        logger.warning("Groq request skipped: no user API key was available")
         return {
             "provider": "manual",
             "model": None,
@@ -160,6 +165,7 @@ def suggest_question_boundaries(
             {"role": "user", "content": user_prompt},
         ],
     }).encode("utf-8")
+    logger.info("Groq request prepared; model=%s blocks=%d input_chars=%d", model_name, len(compact_blocks), len(user_prompt))
     request = Request(
         GROQ_CHAT_COMPLETIONS_URL,
         data=request_body,
@@ -170,16 +176,23 @@ def suggest_question_boundaries(
         method="POST",
     )
     try:
+        logger.info("Groq outbound HTTP request starting; model=%s url=%s", model_name, GROQ_CHAT_COMPLETIONS_URL)
         with urlopen(request, timeout=timeout) as response:
+            logger.info("Groq HTTP response received; status=%s model=%s", getattr(response, "status", "unknown"), model_name)
             response_payload = json.loads(response.read().decode("utf-8"))
     except HTTPError as exc:
+        logger.warning("Groq HTTP error received; status=%s model=%s", exc.code, model_name)
         if exc.code in {401, 403}:
             raise GroqSegmentationError("Groq API 인증에 실패했습니다. 개인 API 키가 유효한지 확인해 주세요.") from None
         if exc.code == 429:
             raise GroqSegmentationError("Groq API 요청 한도를 초과했습니다. 잠시 후 다시 시도해 주세요.") from None
         raise GroqSegmentationError(f"Groq API 요청에 실패했습니다. (HTTP {exc.code})") from None
-    except (URLError, TimeoutError):
+    except URLError as exc:
+        logger.exception("Groq outbound connection failed; reason_type=%s model=%s", type(exc.reason).__name__, model_name)
         raise GroqSegmentationError("Groq API에 연결하지 못했습니다. 네트워크 상태를 확인해 주세요.") from None
+    except TimeoutError:
+        logger.exception("Groq outbound request timed out; model=%s", model_name)
+        raise GroqSegmentationError("Groq API 요청 시간이 초과되었습니다. 잠시 후 다시 시도해 주세요.") from None
     except (UnicodeDecodeError, json.JSONDecodeError):
         raise GroqSegmentationError("Groq API 응답을 해석하지 못했습니다.") from None
 
@@ -190,5 +203,6 @@ def suggest_question_boundaries(
         raise GroqSegmentationError("Groq가 유효한 JSON 문항 경계를 반환하지 않았습니다.") from None
 
     validated = validate_segmentation(model_payload, len(blocks))
+    logger.info("Groq segmentation completed; model=%s segments=%d", model_name, len(validated["segments"]))
     validated.update({"provider": "groq", "model": model_name, "warning": ""})
     return validated
