@@ -26,22 +26,15 @@ MAX_PDF_BYTES = 12 * 1024 * 1024
 MAX_PDF_PAGES = 200
 MAX_PDF_QUESTIONS = 500
 
-_ESSAY_ONLY = re.compile(
-    r"(?:서술하시오|서술하여라|논술하시오|논하시오|"
-    r"자신의 생각을 쓰시오|이유를 자세히 설명하시오|"
-    r"풀이 과정을 서술하시오)"
-)
-
-
 def _extract_page_paragraphs(page: fitz.Page) -> list[str]:
     """Extract selectable text while decoding font-scoped HyhwpEQ glyphs."""
     paragraphs: list[str] = []
     for raw_line in extract_pdf_page_lines(page):
-        line = re.sub(r"[\\t\\u00a0 ]+", " ", raw_line).strip()
+        line = re.sub(r"[\t\u00a0 ]+", " ", raw_line).strip()
         if not line:
             continue
         # Page-number-only lines are not useful question content.
-        if re.fullmatch(r"(?:-\\s*)?\\d{1,3}(?:\\s*-)?", line):
+        if re.fullmatch(r"(?:-\s*)?\d{1,3}(?:\s*-)?", line):
             continue
         paragraphs.append(line)
     return paragraphs
@@ -120,20 +113,9 @@ def parse_questions_from_pdf_bytes(
                 f"문항 수가 허용 한도({MAX_PDF_QUESTIONS}개)를 초과합니다."
             )
 
-        # Keep all detected questions. A PDF may omit its answer key, and
-        # essay/short-answer questions are still valid HEXORA source material.
-        # Do not filter here: doing so also shifts source-page provenance.
-        for index, question in enumerate(questions):
-            item = dict(question)
-            item["number"] = index + 1
-            if index < len(question_starts):
-                item["source_number"] = question_starts[index][0]
-                item["source_page"] = question_starts[index][1]
-            else:
-                item["source_number"] = question.get("number", index + 1)
-                item["source_page"] = None
-
-        return [dict(question) for question in questions] if False else [
+        # Keep all detected questions, including questions without an answer key.
+        # Filtering here would also shift the source-page provenance.
+        return [
             {
                 **question,
                 "number": index + 1,
@@ -150,4 +132,3 @@ def parse_questions_from_pdf_bytes(
             }
             for index, question in enumerate(questions)
         ]
-
