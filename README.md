@@ -38,6 +38,23 @@ Flask 앱을 실행한 다음 **문제 DB 등록**을 눌러 과목, 학년, 단
 
 에듀넷 등 외부 자료는 내려받을 수 있다는 사실만으로 재배포 권한이 생기지 않습니다. 특히 출처표시·비영리·변경금지 조건이 있는 자료는 추출 결과를 외부에 공개하기 전에 원본 제공자의 이용 조건과 별도 허락 필요 여부를 확인해야 합니다.
 
+## 개인 Groq API 키 (BYOK)
+
+HWP 문항 구역 분석은 사용자 본인의 Groq API 키를 사용합니다. 로그인 후 사이드바의 **API 키 설정**에서 키를 등록·교체·삭제할 수 있습니다. 키 원문은 화면에 다시 표시하지 않으며, 계정별로 암호화해 저장합니다. 개인 키가 없으면 기존 수동 구역 분할 기능을 사용할 수 있습니다.
+
+Render의 Environment에 다음 변수를 추가해야 합니다.
+
+- `GROQ_KEY_ENCRYPTION_KEY`: Fernet 형식의 서버 암호화 키
+- `GROQ_MODEL` (선택): Groq 모델 ID. 미설정 시 코드의 기본 모델 사용
+
+암호화 키는 다음 명령으로 생성합니다.
+
+```powershell
+python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+```
+
+**중요:** `GROQ_KEY_ENCRYPTION_KEY`는 사용자 API 키를 복호화하는 데 필요합니다. 배포 후 이 값을 변경하거나 분실하면 기존에 저장한 키를 복호화할 수 없으므로, Render 비밀 환경 변수에 고정해 안전하게 보관해야 합니다. 이 키는 Git 저장소에 커밋하지 마세요.
+
 ## 화면 디자인
 
 전체 화면은 Academic Blue 기반의 Academic Knowledge Workspace 디자인을 공유합니다. `static/styles/tokens.css`, `static/styles/base.css`, `static/styles/layout.css`, `static/styles/components.css`가 디자인 토큰과 공통 요소를 담당하며, `static/styles/pages/` 아래 파일은 화면별 레이아웃을 정의합니다. 공통 사이드바와 페이지 헤더는 `static/templates/partials/`의 Jinja partial로 재사용합니다.
