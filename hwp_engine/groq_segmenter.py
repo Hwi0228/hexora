@@ -118,14 +118,14 @@ def suggest_question_boundaries(
     timeout: float = 45.0,
 ) -> dict:
     """Ask Groq for advisory boundaries. Missing credentials means manual mode."""
-    key = (api_key if api_key is not None else os.getenv("GROQ_API_KEY", "")).strip()
+    key = (api_key or "").strip()
     if not key:
         return {
             "provider": "manual",
             "model": None,
             "segments": [],
             "answer_start_block": None,
-            "warning": "GROQ_API_KEY가 설정되지 않아 수동 구역 지정 모드로 열었습니다.",
+            "warning": "개인 Groq API 키가 등록되지 않아 수동 구역 지정 모드로 열었습니다. 설정에서 본인 키를 등록할 수 있습니다.",
         }
     if not blocks:
         raise GroqSegmentationError("분석할 텍스트 블록이 없습니다.")
@@ -174,7 +174,7 @@ def suggest_question_boundaries(
             response_payload = json.loads(response.read().decode("utf-8"))
     except HTTPError as exc:
         if exc.code in {401, 403}:
-            raise GroqSegmentationError("Groq API 인증에 실패했습니다. Render의 GROQ_API_KEY를 확인해 주세요.") from None
+            raise GroqSegmentationError("Groq API 인증에 실패했습니다. 개인 API 키가 유효한지 확인해 주세요.") from None
         if exc.code == 429:
             raise GroqSegmentationError("Groq API 요청 한도를 초과했습니다. 잠시 후 다시 시도해 주세요.") from None
         raise GroqSegmentationError(f"Groq API 요청에 실패했습니다. (HTTP {exc.code})") from None
