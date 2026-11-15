@@ -11,6 +11,12 @@ from parse_hwp import parse_questions_from_xml
 from parse_rhwp import MAX_DOCUMENT_BYTES, parse_questions_from_rhwp_bytes
 from hwp_import_validation import MAX_IMPORTED_QUESTIONS, MAX_SECTION_XML_SIZE, _get_section_xml, _validated_import
 from exam_export_routes import export_exam_hwpx, register_exam_export_routes
+from hwp_engine.core.extractor import HwpCoreExtractor
+from hwp_engine.groq_segmenter import (
+    GroqSegmentationError,
+    document_blocks_for_segmentation,
+    suggest_question_boundaries,
+)
 
 
 def _render_page(questions=None, result_json=None, error=None, form_data=None):
@@ -32,12 +38,65 @@ def _render_page(questions=None, result_json=None, error=None, form_data=None):
     )
 
 
+def _render_segment_review(blocks, segmentation, filename):
+    suggestions = segmentation.get("segments", [])
+    suggestion_by_start = {
+        item["start_block"]: item for item in suggestions
+    }
+    return render_template(
+        "hwp_segment_review.html",
+        nav_items=NAV_ITEMS,
+        subjects=SUBJECTS,
+        license_choices=LICENSE_CHOICES,
+        source_types=SOURCE_TYPES,
+        blocks=blocks,
+        suggestions=suggestions,
+        suggestion_by_start=suggestion_by_start,
+        answer_start=segmentation.get("answer_start_block"),
+        provider=segmentation.get("provider", "manual"),
+        model=segmentation.get("model"),
+        warning=segmentation.get("warning", ""),
+        filename=filename,
+    )
+
+
 def hwp_parser_page():
     questions = None
     result_json = None
     error = None
 
     if request.method == "POST":
+        if request.form.get("action") == "segment":
+            uploaded = request.files.get("document")
+            if uploaded is None or not uploaded.filename:
+                error = "구역을 나눌 HWP 또는 HWPX 파일을 선택해 주세요."
+            else:
+                try:
+                    filename = Path(uploaded.filename).name
+                    extension = Path(filename).suffix.lower()
+                    if extension not in {".hwp", ".hwpx"}:
+                        raise ValueError("LLM/직접 구역 지정은 HWP 또는 HWPX 파일에서 사용할 수 있습니다.")
+                    content = uploaded.read(MAX_DOCUMENT_BYTES + 1)
+                    if len(content) > MAX_DOCUMENT_BYTES:
+                        raise ValueError("문서 크기가 허용 한도(12MB)를 초과했습니다.")
+                    document = HwpCoreExtractor().extract_bytes(content, filename=filename)
+                    blocks = document_blocks_for_segmentation(document)
+                    if not blocks:
+                        raise ValueError("문서에서 검토할 텍스트·수식 블록을 찾지 못했습니다.")
+                    try:
+                        segmentation = suggest_question_boundaries(blocks)
+                    except GroqSegmentationError as exc:
+                        segmentation = {
+                            "provider": "manual",
+                            "model": None,
+                            "segments": [],
+                            "answer_start_block": None,
+                            "warning": f"LLM 분석에 실패했습니다. 수동 분할은 계속 사용할 수 있습니다. {exc}",
+                        }
+                    return _render_segment_review(blocks, segmentation, filename)
+                except (ValueError, RuntimeError) as exc:
+                    error = str(exc)
+
         if request.form.get("action") == "save":
             result_json = request.form.get("questions_json", "")
             questions, selection, errors, error = _validated_import(request.form)
@@ -91,7 +150,7 @@ def hwp_parser_page():
                             "source": metadata["source"],
                             "year": metadata["year"],
                             "exam": "",
-                            "original_question_number": str(imported["number"]),
+                            "original_question_number": str(imported.get("source_number") or imported["number"]),
                             "page": None,
                             "source_url": "",
                             "license": metadata["license"],
