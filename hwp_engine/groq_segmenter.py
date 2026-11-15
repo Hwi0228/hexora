@@ -13,7 +13,7 @@ from urllib.request import Request, urlopen
 
 
 GROQ_CHAT_COMPLETIONS_URL = "https://api.groq.com/openai/v1/chat/completions"
-DEFAULT_GROQ_MODEL = "qwen/qwen3.8-27b"
+DEFAULT_GROQ_MODEL = "openai/gpt-oss-20b"
 MAX_BLOCKS = 1200
 MAX_INPUT_CHARS = 60_000
 MAX_QUESTIONS = 500
