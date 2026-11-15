@@ -13,7 +13,7 @@ def _collect_question_data(form):
         "subject": form.get("subject", "").strip(),
         "grade": form.get("grade", "").strip(),
         "course": form.get("course", "").strip(),
-        "curriculum": form.get("curriculum", "2015 개정 교육과정").strip(),
+        "curriculum": form.get("curriculum", "").strip(),
         "unit": form.get("unit", "").strip(),
         "achievement_standard": form.get("achievement_standard", "").strip(),
         "difficulty": form.get("difficulty", "중").strip(),
