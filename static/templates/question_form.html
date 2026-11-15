@@ -109,16 +109,16 @@
               <input type="hidden" name="title" value="{{ form_data.get('title', '') }}">
               <input type="hidden" name="difficulty" value="{{ form_data.get('difficulty', '중') }}">
               <input type="hidden" name="points" value="{{ form_data.get('points', 4)|default(4, true) }}">
-              <label class="field">과목 <span class="required">*</span>
-                <select name="subject" required>
+              <label class="field">과목 <small>선택 사항</small>
+                <select name="subject">
                   <option value="">과목 선택</option>
                   {% for subject in subjects %}
                     <option value="{{ subject }}"{% if form_data.get('subject') == subject %} selected{% endif %}>{{ subject }}</option>
                   {% endfor %}
                 </select>
               </label>
-              <label class="field">학년 <span class="required">*</span>
-                <select name="grade" required>
+              <label class="field">학년 <small>선택 사항</small>
+                <select name="grade">
                   <option value="">선택 안 함</option>
                   {% for grade in ['초1','초2','초3','초4','초5','초6','중1','중2','중3','고1','고2','고3','대학','기타'] %}
                     <option value="{{ grade }}"{% if form_data.get('grade') == grade %} selected{% endif %}>{{ grade }}</option>
@@ -127,8 +127,8 @@
               </label>
               <label class="field">교육과정
                 <select name="curriculum" id="curriculum-select">
-                  {% for curriculum in curriculum_options %}
-                    <option value="{{ curriculum }}"{% if form_data.get('curriculum', '2015 개정 교육과정') == curriculum %} selected{% endif %}>{{ curriculum }}</option>
+                  <option value="">선택 안 함</option>\n                  {% for curriculum in curriculum_options %}
+                    <option value="{{ curriculum }}"{% if form_data.get('curriculum', '') == curriculum %} selected{% endif %}>{{ curriculum }}</option>
                   {% endfor %}
                 </select>
               </label>
