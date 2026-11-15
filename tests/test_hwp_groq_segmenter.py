@@ -43,27 +43,32 @@ class GroqSegmentationTests(unittest.TestCase):
         self.assertEqual(result["segments"], [])
         urlopen.assert_not_called()
 
-    def test_validates_sorted_non_overlapping_ranges_and_answer_start(self):
+    def test_validates_sorted_question_starts_and_answer_start(self):
         result = validate_segmentation(
             {
                 "segments": [
-                    {"number": "1", "start_block": 0, "end_block": 2, "confidence": 0.9},
-                    {"number": "2", "start_block": 3, "end_block": 3, "confidence": 0.7},
+                    {"number": "1", "start_block": 0, "confidence": 0.9},
+                    {"number": "2", "start_block": 2, "confidence": 0.7},
                 ],
                 "answer_start_block": 4,
             },
             len(self.blocks),
         )
         self.assertEqual(result["segments"][0]["number"], "1")
+        self.assertEqual(result["segments"][1]["start_block"], 2)
         self.assertEqual(result["answer_start_block"], 4)
 
-    def test_rejects_overlapping_or_out_of_range_segments(self):
+    def test_rejects_duplicate_or_out_of_order_and_out_of_range_starts(self):
         for payload in (
             {"segments": [
-                {"start_block": 0, "end_block": 2},
-                {"start_block": 2, "end_block": 3},
+                {"start_block": 0},
+                {"start_block": 0},
             ]},
-            {"segments": [{"start_block": 0, "end_block": 99}]},
+            {"segments": [
+                {"start_block": 2},
+                {"start_block": 1},
+            ]},
+            {"segments": [{"start_block": 99}]},
         ):
             with self.subTest(payload=payload):
                 with self.assertRaises(GroqSegmentationError):
@@ -72,7 +77,7 @@ class GroqSegmentationTests(unittest.TestCase):
     def test_groq_response_is_parsed_and_model_output_is_validated(self):
         model_payload = {
             "segments": [
-                {"number": "1", "start_block": 0, "end_block": 2, "confidence": 0.93, "note": "번호 표식"}
+                {"number": "1", "start_block": 0, "confidence": 0.93, "note": "번호 표식"}
             ],
             "answer_start_block": 3,
         }
