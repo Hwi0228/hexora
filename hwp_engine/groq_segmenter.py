@@ -153,7 +153,7 @@ def suggest_question_boundaries(
     request_body = json.dumps({
         "model": model_name,
         "temperature": 0,
-        "max_tokens": 4096,
+        "max_completion_tokens": 4096,
         "response_format": {"type": "json_object"},
         "messages": [
             {"role": "system", "content": system_prompt},
