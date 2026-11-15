@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from functools import lru_cache
 import re
 
 from .adapters import AdapterRegistry
@@ -11,6 +12,15 @@ from .models import (
     TemplateDetection,
 )
 from parse_hwp import _equation_to_latex
+
+@lru_cache(maxsize=2048)
+def _cached_equation_to_latex(script: str) -> str:
+    return _equation_to_latex(script)
+
+_ANSWER_SECTION = re.compile(
+    r"^\\s*(?:(?:[ⅠⅡⅢⅣⅤⅥⅦⅧⅨⅩ]+)\\s*[.)]?\\s*)?"
+    r"(?:정\\s*답(?:\\s*(?:\\(해\\s*설\\)|및\\s*해\\s*설|과\\s*해\\s*설))?|정답\\s*/\\s*해설)\\s*$"
+)
 
 CHOICE_LABELS = "①②③④⑤⑥⑦⑧⑨⑩"
 
@@ -163,6 +173,15 @@ def assemble_document(
             explanation=explanation,
             source=question.source,
         ))
+    answer_section = next(
+        (
+            block.position for block in document.blocks
+            if block.kind == BlockKind.PARAGRAPH
+            and _ANSWER_SECTION.fullmatch(block.text.strip())
+        ),
+        None,
+    )
+    answer_section_key = position_key(answer_section) if answer_section else None
     formula_blocks = sorted(
         (block for block in document.blocks if block.kind == BlockKind.FORMULA),
         key=lambda block: (
@@ -195,13 +214,17 @@ def assemble_document(
         math_objects = []
         for block in formula_blocks:
             key = position_key(block.position)
-            if key < start_key or (next_key is not None and key >= next_key):
+            if (
+                key < start_key
+                or (next_key is not None and key >= next_key)
+                or (answer_section_key is not None and key >= answer_section_key)
+            ):
                 continue
             script = str(block.payload.get("original_script") or block.text or "")
             if not script:
                 continue
             try:
-                latex = _equation_to_latex(script)
+                latex = _cached_equation_to_latex(script)
                 conversion_error = None
             except Exception as exc:
                 latex = ""
