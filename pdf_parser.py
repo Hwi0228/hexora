@@ -12,6 +12,8 @@ from typing import Any
 
 import fitz
 
+from pdf_hwp_equation import extract_pdf_page_lines
+
 from rhwp_question_parser import (
     _ANSWER_SECTION_HEADING,
     _QUESTION_START,
@@ -32,15 +34,14 @@ _ESSAY_ONLY = re.compile(
 
 
 def _extract_page_paragraphs(page: fitz.Page) -> list[str]:
-    """Extract selectable text in visual reading order without flattening math glyphs."""
-    text = page.get_text("text", sort=True)
+    """Extract selectable text while decoding font-scoped HyhwpEQ glyphs."""
     paragraphs: list[str] = []
-    for raw_line in text.splitlines():
-        line = re.sub(r"[\t\u00a0 ]+", " ", raw_line).strip()
+    for raw_line in extract_pdf_page_lines(page):
+        line = re.sub(r"[\\t\\u00a0 ]+", " ", raw_line).strip()
         if not line:
             continue
         # Page-number-only lines are not useful question content.
-        if re.fullmatch(r"(?:-\s*)?\d{1,3}(?:\s*-)?", line):
+        if re.fullmatch(r"(?:-\\s*)?\\d{1,3}(?:\\s*-)?", line):
             continue
         paragraphs.append(line)
     return paragraphs
@@ -119,32 +120,34 @@ def parse_questions_from_pdf_bytes(
                 f"문항 수가 허용 한도({MAX_PDF_QUESTIONS}개)를 초과합니다."
             )
 
-        # Essay-style prompts are intentionally excluded from the default
-        # import set. Keep objective and short-answer items with a detectable
-        # answer; users can still review all remaining candidates before saving.
-        filtered: list[dict[str, Any]] = []
+        # Keep all detected questions. A PDF may omit its answer key, and
+        # essay/short-answer questions are still valid HEXORA source material.
+        # Do not filter here: doing so also shifts source-page provenance.
         for index, question in enumerate(questions):
-            prompt = str(question.get("question", "")).strip()
-            choices = question.get("choices") or []
-            answer = str(question.get("answer", "")).strip()
-            if not choices and _ESSAY_ONLY.search(prompt):
-                continue
-            if not choices and not answer:
-                continue
-
             item = dict(question)
-            item["number"] = len(filtered) + 1
+            item["number"] = index + 1
             if index < len(question_starts):
                 item["source_number"] = question_starts[index][0]
                 item["source_page"] = question_starts[index][1]
             else:
                 item["source_number"] = question.get("number", index + 1)
                 item["source_page"] = None
-            filtered.append(item)
 
-        if not filtered:
-            raise ValueError(
-                "등록 가능한 객관식·단답형 문항을 찾지 못했습니다. "
-                "정답이 포함된 문항인지 확인해 주세요."
-            )
-        return filtered
+        return [dict(question) for question in questions] if False else [
+            {
+                **question,
+                "number": index + 1,
+                "source_number": (
+                    question_starts[index][0]
+                    if index < len(question_starts)
+                    else question.get("number", index + 1)
+                ),
+                "source_page": (
+                    question_starts[index][1]
+                    if index < len(question_starts)
+                    else None
+                ),
+            }
+            for index, question in enumerate(questions)
+        ]
+
