@@ -13,8 +13,11 @@
 
   const downloadButton = document.getElementById("download-json");
   const jsonOutput = document.getElementById("json-result");
+  const importForm = document.querySelector(".import-form");
   downloadButton?.addEventListener("click", () => {
     if (!jsonOutput) return;
+    // Flush the review editor's debounced state before exporting its JSON.
+    importForm?.dispatchEvent(new Event("hexora:sync-import-payload"));
     const blob = new Blob([jsonOutput.value], { type: "application/json;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");

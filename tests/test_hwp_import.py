@@ -88,6 +88,11 @@ class HwpImportValidationTests(unittest.TestCase):
         self.assertIn("question.original && typeof question.original === \"object\"", script)
         self.assertIn("range.cloneContents()", script)
         self.assertIn('form.addEventListener("hexora:sync-import-payload"', script)
+        upload_script = (
+            Path(__file__).resolve().parents[1]
+            / "static" / "scripts" / "hwp-import.js"
+        ).read_text(encoding="utf-8")
+        self.assertIn('dispatchEvent(new Event("hexora:sync-import-payload"))', upload_script)
 
     def test_manual_corrections_keep_original_values_and_source_number(self):
         form = MultiDict([
