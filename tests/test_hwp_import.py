@@ -87,6 +87,7 @@ class HwpImportValidationTests(unittest.TestCase):
         self.assertIn("schedulePayloadSync()", script)
         self.assertIn("question.original && typeof question.original === \"object\"", script)
         self.assertIn("range.cloneContents()", script)
+        self.assertIn('captureCard(editor.closest("[data-import-question]"))', script)
         self.assertIn('form.addEventListener("hexora:sync-import-payload"', script)
         upload_script = (
             Path(__file__).resolve().parents[1]

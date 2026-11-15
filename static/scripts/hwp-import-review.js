@@ -305,6 +305,7 @@
     const selection = window.getSelection();
     if (!selection || !selection.rangeCount) return;
     const range = selection.getRangeAt(0);
+    if (!editor.contains(range.commonAncestorContainer)) return;
     range.deleteContents();
     const textNode = document.createTextNode(plainText);
     range.insertNode(textNode);
@@ -312,6 +313,7 @@
     range.collapse(true);
     selection.removeAllRanges();
     selection.addRange(range);
+    captureCard(editor.closest("[data-import-question]"));
     syncPayload();
   }
 
