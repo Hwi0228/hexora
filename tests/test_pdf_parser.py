@@ -73,5 +73,74 @@ class PdfQuestionParserTests(unittest.TestCase):
             parse_questions_from_pdf_bytes(b"%PDF-1.4", "exam.hwp")
 
 
+    def test_decodes_hyhwp_eq_latin_digits_and_operators(self):
+        from pdf_hwp_equation import decode_hyhwp_equation_text
+
+        encoded = "\\ue0ea\\ue044\\ue0fc\\ue045\\ue047\\ue03d"
+        self.assertEqual(
+            decode_hyhwp_equation_text(encoded, "ABCDEF+HyhwpEQ"),
+            "f(x)=0",
+        )
+
+    def test_decodes_hyhwp_eq_greek_and_structural_glyphs(self):
+        from pdf_hwp_equation import decode_hyhwp_equation_text
+
+        encoded = "\\ue088\\ue09d\\ue0ac \\ue05c\\ue06d\\ue06e"
+        self.assertEqual(
+            decode_hyhwp_equation_text(encoded, "HyhwpEQ"),
+            "Δα\\\\pi \\sqrt\\over\\vec",
+        )
+
+    def test_does_not_decode_pua_from_unrelated_fonts(self):
+        from pdf_hwp_equation import decode_hyhwp_equation_text
+
+        encoded = "\\ue0ea\\ue044\\ue0fc"
+        self.assertEqual(
+            decode_hyhwp_equation_text(encoded, "ABCDEF+ArialMT"),
+            encoded,
+        )
+
+    def test_preserves_unknown_hyhwp_eq_private_use_glyphs(self):
+        from pdf_hwp_equation import decode_hyhwp_equation_text
+
+        encoded = "\\ue0ea\\ue123\\ue044"
+        self.assertEqual(
+            decode_hyhwp_equation_text(encoded, "HyhwpEQ"),
+            "f\\ue123(",
+        )
+
+    def test_extracts_pdf_lines_in_visual_order_and_decodes_equation_spans(self):
+        from pdf_hwp_equation import extract_pdf_page_lines
+
+        class FakePage:
+            def get_text(self, mode, sort=False):
+                self.asserted = (mode, sort)
+                return {
+                    "blocks": [
+                        {
+                            "lines": [
+                                {
+                                    "bbox": (0, 10, 100, 20),
+                                    "spans": [
+                                        {"bbox": (30, 10, 40, 20), "text": "\\ue0fc", "font": "HyhwpEQ"},
+                                        {"bbox": (10, 10, 20, 20), "text": "\\ue0ea", "font": "HyhwpEQ"},
+                                    ],
+                                },
+                                {
+                                    "bbox": (0, 30, 100, 40),
+                                    "spans": [
+                                        {"bbox": (10, 30, 20, 40), "text": "문항", "font": "MalgunGothic"},
+                                    ],
+                                },
+                            ]
+                        }
+                    ]
+                }
+
+        page = FakePage()
+        self.assertEqual(extract_pdf_page_lines(page), ["fx", "문항"])
+        self.assertEqual(page.asserted, ("dict", True))
+
+
 if __name__ == "__main__":
     unittest.main()
