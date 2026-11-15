@@ -88,7 +88,7 @@ class PdfQuestionParserTests(unittest.TestCase):
         encoded = "\\ue088\\ue09d\\ue0ac \\ue05c\\ue06d\\ue06e"
         self.assertEqual(
             decode_hyhwp_equation_text(encoded, "HyhwpEQ"),
-            "Δα\\\\pi \\sqrt\\over\\vec",
+            "Δα\\pi \\sqrt\\over\\vec",
         )
 
     def test_does_not_decode_pua_from_unrelated_fonts(self):
