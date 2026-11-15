@@ -36,7 +36,7 @@ class GroqSegmentationTests(unittest.TestCase):
         self.assertEqual(self.blocks[2]["source_index"], 2)
 
     def test_missing_api_key_returns_manual_mode_without_network(self):
-        with patch.dict("os.environ", {"GROQ_API_KEY": ""}, clear=False):
+        with patch.dict("os.environ", {"GROQ_API_KEY": "legacy-shared-key"}, clear=False):
             with patch("hwp_engine.groq_segmenter.urlopen") as urlopen:
                 result = suggest_question_boundaries(self.blocks)
         self.assertEqual(result["provider"], "manual")
