@@ -32,6 +32,15 @@
 .workspace-panel,.workspace-panel-body,#workspace-editor .editor-form{scrollbar-width:none;-ms-overflow-style:none}
 .workspace-panel::-webkit-scrollbar,.workspace-panel-body::-webkit-scrollbar,#workspace-editor .editor-form::-webkit-scrollbar{display:none;width:0;height:0}
 .workspace-panel[data-panel="editor"]{grid-column:1;grid-row:1 / span 2}.workspace-panel[data-panel="preview"]{grid-column:2;grid-row:1}.workspace-panel[data-panel="pdf"]{grid-column:2;grid-row:2}
+.workspace-resize-handle{position:absolute;z-index:20;background:transparent;touch-action:none}
+.workspace-resize-handle::after{content:"";position:absolute;background:var(--accent,#3976c6);border-radius:4px;opacity:0;transition:opacity .15s}
+.workspace-resize-handle:hover::after,.workspace-resize-handle.is-active::after{opacity:.7}
+.workspace-resize-handle--column{top:0;bottom:0;left:calc(var(--workspace-left,50%) - 6px);width:12px;cursor:col-resize}
+.workspace-resize-handle--column::after{top:0;bottom:0;left:5px;width:2px}
+.workspace-resize-handle--row{left:50%;right:0;top:calc(var(--workspace-row,50%) - 6px);height:12px;cursor:row-resize}
+.workspace-resize-handle--row::after{left:0;right:0;top:5px;height:2px}
+.question-workspace.is-resizing{user-select:none;cursor:col-resize}
+.question-workspace.is-resizing-row{user-select:none;cursor:row-resize}
 .workspace-panel.is-dragging{opacity:.48;outline:2px dashed var(--accent,#3976c6)}.workspace-panel.is-drop-target{outline:2px solid var(--accent,#3976c6);outline-offset:2px}
 .workspace-panel-head{position:relative;z-index:5;flex:0 0 auto;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:11px 14px;background:var(--surface,#fff);border-bottom:1px solid var(--border,#d8e0e8)}
 .workspace-panel-title{display:flex;align-items:center;gap:9px;font-weight:700;font-size:14px}.workspace-drag-handle{cursor:grab;touch-action:none;color:var(--muted,#64748b);font-size:17px;user-select:none}
@@ -385,6 +394,20 @@ document.addEventListener("fullscreenchange",syncFullscreen);
 const panels=[...root.querySelectorAll(".workspace-panel")],key="hexora-question-workspace-layout-v1",defaults={editor:0,preview:1,pdf:3};
 function apply(slots){panels.forEach(p=>{const n=Number.isInteger(slots[p.dataset.panel])?slots[p.dataset.panel]:defaults[p.dataset.panel];p.dataset.slot=n;p.style.gridColumn=String(n%2+1);p.style.gridRow=String(Math.floor(n/2)+1);p.style.gridRowEnd=p.dataset.panel==="editor"&&n===0?"span 2":"auto"})}
 let saved={};try{saved=JSON.parse(localStorage.getItem(key)||"{}")}catch(_){}apply({...defaults,...saved});
+const sizeKey="hexora-question-workspace-sizes-v1";
+let sizes={columns:50,rows:50};try{sizes={...sizes,...JSON.parse(localStorage.getItem(sizeKey)||"{}")}}catch(_){}
+function applySizes(){const col=Math.max(30,Math.min(70,Number(sizes.columns)||50)),row=Math.max(25,Math.min(75,Number(sizes.rows)||50));root.style.setProperty("--workspace-left",col+"%");root.style.setProperty("--workspace-row",row+"%");root.style.gridTemplateColumns=col+"% minmax(0,1fr)";root.style.gridTemplateRows=row+"% minmax(0,1fr)";const editor=root.querySelector('[data-panel="editor"]');if(editor)editor.style.gridRow="1 / span 2"}
+function saveSizes(){try{localStorage.setItem(sizeKey,JSON.stringify(sizes))}catch(_){}}
+applySizes();
+function addResizeHandle(kind){const h=document.createElement("div");h.className="workspace-resize-handle workspace-resize-handle--"+kind;h.setAttribute("role","separator");h.setAttribute("aria-orientation",kind==="column"?"vertical":"horizontal");h.setAttribute("aria-label",kind==="column"?"입력 영역 너비 조절":"오른쪽 패널 높이 조절");h.tabIndex=0;root.appendChild(h);
+let start=0,initial=0;
+h.addEventListener("pointerdown",e=>{if(window.matchMedia("(max-width: 900px)").matches)return;start=kind==="column"?e.clientX:e.clientY;initial=kind==="column"?sizes.columns:sizes.rows;h.setPointerCapture(e.pointerId);h.classList.add("is-active");root.classList.add(kind==="column"?"is-resizing":"is-resizing-row")});
+h.addEventListener("pointermove",e=>{if(!h.hasPointerCapture(e.pointerId))return;const rect=root.getBoundingClientRect(),delta=kind==="column"?e.clientX-start:e.clientY-start,extent=kind==="column"?rect.width:rect.height;sizes[kind==="column"?"columns":"rows"]=Math.max(kind==="column"?30:25,Math.min(kind==="column"?70:75,initial+delta/extent*100));applySizes()});
+function finish(e){if(h.hasPointerCapture(e.pointerId)){h.releasePointerCapture(e.pointerId);saveSizes()}h.classList.remove("is-active");root.classList.remove("is-resizing","is-resizing-row")}
+h.addEventListener("pointerup",finish);h.addEventListener("pointercancel",finish);
+h.addEventListener("keydown",e=>{if(!["ArrowLeft","ArrowRight","ArrowUp","ArrowDown"].includes(e.key))return;e.preventDefault();const k=kind==="column"?"columns":"rows",direction=["ArrowRight","ArrowDown"].includes(e.key)?1:-1;sizes[k]=Math.max(kind==="column"?30:25,Math.min(kind==="column"?70:75,sizes[k]+direction*2));applySizes();saveSizes()});
+}
+addResizeHandle("column");addResizeHandle("row");
 let dragged=null;panels.forEach(p=>{const h=p.querySelector(".workspace-drag-handle");h.addEventListener("dragstart",e=>{dragged=p;p.classList.add("is-dragging");e.dataTransfer.effectAllowed="move";e.dataTransfer.setData("text/plain",p.id)});
 p.addEventListener("dragover",e=>{if(dragged&&dragged!==p){e.preventDefault();p.classList.add("is-drop-target")}});
 p.addEventListener("dragleave",()=>p.classList.remove("is-drop-target"));
