@@ -99,9 +99,12 @@ def _validated_import(form):
         ):
             errors.append("문항 내용, 정답, 해설 또는 선택지의 형식이 올바르지 않습니다.")
             break
+        source_number = question.get("source_number", question.get("number", len(normalized_questions) + 1))
+        source_number = str(source_number).strip()[:24] or str(len(normalized_questions) + 1)
         normalized_questions.append(
             {
                 "number": len(normalized_questions) + 1,
+                "source_number": source_number,
                 "question": sanitize_rich_html(prompt.strip()),
                 "answer": sanitize_rich_html(answer.strip()),
                 "explanation": sanitize_rich_html(explanation.strip()),
