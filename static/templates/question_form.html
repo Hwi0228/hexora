@@ -27,7 +27,7 @@
 .workspace-fullscreen-button{border:1px solid var(--border,#d8e0e8);border-radius:8px;padding:6px 10px;background:var(--surface,#fff);color:inherit;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap}
 .workspace-fullscreen-button:hover{background:var(--surface-hover,#eef2f7)}
 .app.workspace-fullscreen .workspace-fullscreen-button{position:fixed;top:14px;right:18px;z-index:10010;box-shadow:0 2px 10px #0002}
-.question-workspace{display:grid;grid-template-columns:minmax(360px,1fr) minmax(320px,1fr);grid-template-rows:minmax(0,1fr) minmax(0,1fr);gap:12px;height:clamp(380px,calc(100dvh - 270px),980px);min-height:0;align-items:stretch}
+.question-workspace{position:relative;display:grid;grid-template-columns:minmax(360px,1fr) minmax(320px,1fr);grid-template-rows:minmax(0,1fr) minmax(0,1fr);gap:12px;height:clamp(380px,calc(100dvh - 270px),980px);min-height:0;align-items:stretch}
 .workspace-panel{position:relative;display:flex;flex-direction:column;min-width:0;min-height:0;overflow:hidden;resize:none;border:1px solid var(--border,#d8e0e8);border-radius:14px;background:var(--surface,#fff);box-shadow:0 2px 8px #172b4d0a}
 .workspace-panel,.workspace-panel-body,#workspace-editor .editor-form{scrollbar-width:none;-ms-overflow-style:none}
 .workspace-panel::-webkit-scrollbar,.workspace-panel-body::-webkit-scrollbar,#workspace-editor .editor-form::-webkit-scrollbar{display:none;width:0;height:0}
@@ -37,7 +37,7 @@
 .workspace-resize-handle:hover::after,.workspace-resize-handle.is-active::after{opacity:.7}
 .workspace-resize-handle--column{top:0;bottom:0;left:calc(var(--workspace-left,50%) - 6px);width:12px;cursor:col-resize}
 .workspace-resize-handle--column::after{top:0;bottom:0;left:5px;width:2px}
-.workspace-resize-handle--row{left:50%;right:0;top:calc(var(--workspace-row,50%) - 6px);height:12px;cursor:row-resize}
+.workspace-resize-handle--row{left:var(--workspace-left,50%);right:0;top:calc(var(--workspace-row-position,50%) - 6px);height:12px;cursor:row-resize}
 .workspace-resize-handle--row::after{left:0;right:0;top:5px;height:2px}
 .question-workspace.is-resizing{user-select:none;cursor:col-resize}
 .question-workspace.is-resizing-row{user-select:none;cursor:row-resize}
@@ -396,13 +396,13 @@ function apply(slots){panels.forEach(p=>{const n=Number.isInteger(slots[p.datase
 let saved={};try{saved=JSON.parse(localStorage.getItem(key)||"{}")}catch(_){}apply({...defaults,...saved});
 const sizeKey="hexora-question-workspace-sizes-v1";
 let sizes={columns:50,rows:50};try{sizes={...sizes,...JSON.parse(localStorage.getItem(sizeKey)||"{}")}}catch(_){}
-function applySizes(){const col=Math.max(30,Math.min(70,Number(sizes.columns)||50)),row=Math.max(25,Math.min(75,Number(sizes.rows)||50));root.style.setProperty("--workspace-left",col+"%");root.style.setProperty("--workspace-row",row+"%");root.style.gridTemplateColumns=col+"% minmax(0,1fr)";root.style.gridTemplateRows=row+"% minmax(0,1fr)";const editor=root.querySelector('[data-panel="editor"]');if(editor)editor.style.gridRow="1 / span 2"}
+function applySizes(){const col=Math.max(30,Math.min(70,Number(sizes.columns)||50)),row=Math.max(25,Math.min(75,Number(sizes.rows)||50));root.style.setProperty("--workspace-left",col+"%");root.style.setProperty("--workspace-row",row+"%");root.style.gridTemplateColumns=col+"fr minmax(0,"+(100-col)+"fr)";root.style.gridTemplateRows="minmax(0,"+row+"fr) minmax(0,"+(100-row)+"fr)";const rowHandle=root.querySelector(".workspace-resize-handle--row");if(rowHandle){const gap=parseFloat(getComputedStyle(root).rowGap)||0;root.style.setProperty("--workspace-row-position",((root.clientHeight-gap)*row/100+gap/2)+"px")}const editor=root.querySelector('[data-panel="editor"]');if(editor)editor.style.gridRow="1 / span 2"}
 function saveSizes(){try{localStorage.setItem(sizeKey,JSON.stringify(sizes))}catch(_){}}
 applySizes();
 function addResizeHandle(kind){const h=document.createElement("div");h.className="workspace-resize-handle workspace-resize-handle--"+kind;h.setAttribute("role","separator");h.setAttribute("aria-orientation",kind==="column"?"vertical":"horizontal");h.setAttribute("aria-label",kind==="column"?"입력 영역 너비 조절":"오른쪽 패널 높이 조절");h.tabIndex=0;root.appendChild(h);
 let start=0,initial=0;
 h.addEventListener("pointerdown",e=>{if(window.matchMedia("(max-width: 900px)").matches)return;start=kind==="column"?e.clientX:e.clientY;initial=kind==="column"?sizes.columns:sizes.rows;h.setPointerCapture(e.pointerId);h.classList.add("is-active");root.classList.add(kind==="column"?"is-resizing":"is-resizing-row")});
-h.addEventListener("pointermove",e=>{if(!h.hasPointerCapture(e.pointerId))return;const rect=root.getBoundingClientRect(),delta=kind==="column"?e.clientX-start:e.clientY-start,extent=kind==="column"?rect.width:rect.height;sizes[kind==="column"?"columns":"rows"]=Math.max(kind==="column"?30:25,Math.min(kind==="column"?70:75,initial+delta/extent*100));applySizes()});
+h.addEventListener("pointermove",e=>{if(!h.hasPointerCapture(e.pointerId))return;const rect=root.getBoundingClientRect(),delta=kind==="column"?e.clientX-start:e.clientY-start,extent=kind==="column"?rect.width:rect.height;sizes[kind==="column"?"columns":"rows"]=Math.max(kind==="column"?30:25,Math.min(kind==="column"?70:75,initial+delta/Math.max(1,extent-(kind==="column"?(parseFloat(getComputedStyle(root).columnGap)||0):(parseFloat(getComputedStyle(root).rowGap)||0)))*100));applySizes()});
 function finish(e){if(h.hasPointerCapture(e.pointerId)){h.releasePointerCapture(e.pointerId);saveSizes()}h.classList.remove("is-active");root.classList.remove("is-resizing","is-resizing-row")}
 h.addEventListener("pointerup",finish);h.addEventListener("pointercancel",finish);
 h.addEventListener("keydown",e=>{if(!["ArrowLeft","ArrowRight","ArrowUp","ArrowDown"].includes(e.key))return;e.preventDefault();const k=kind==="column"?"columns":"rows",direction=["ArrowRight","ArrowDown"].includes(e.key)?1:-1;sizes[k]=Math.max(kind==="column"?30:25,Math.min(kind==="column"?70:75,sizes[k]+direction*2));applySizes();saveSizes()});
