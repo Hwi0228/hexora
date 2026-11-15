@@ -173,6 +173,14 @@ def assemble_document(
             explanation=explanation,
             source=question.source,
         ))
+    def position_key(position):
+        return (
+            position.section, position.paragraph,
+            -1 if position.row is None else position.row,
+            -1 if position.column is None else position.column,
+            -1 if position.character is None else position.character,
+        )
+
     answer_section = next(
         (
             block.position for block in document.blocks
@@ -191,14 +199,6 @@ def assemble_document(
             -1 if block.position.character is None else block.position.character,
         ),
     )
-
-    def position_key(position):
-        return (
-            position.section, position.paragraph,
-            -1 if position.row is None else position.row,
-            -1 if position.column is None else position.column,
-            -1 if position.character is None else position.character,
-        )
 
     enriched = []
     for index, item in enumerate(assembled):
