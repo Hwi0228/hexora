@@ -30,13 +30,68 @@
   };
 
   const cards = () => Array.from(list.querySelectorAll("[data-import-question]"));
-  const originalFor = (question, index) => ({
-    source_number: String(question.source_number ?? question.number ?? index + 1),
-    question: String(question.question || ""),
-    choices: Array.isArray(question.choices) ? question.choices.slice() : [],
-    answer: String(question.answer || ""),
-    explanation: String(question.explanation || "")
-  });
+  const originalFor = (question, index) => {
+    // A validation retry can render an already-corrected payload. Keep its
+    // first extracted values as the baseline instead of treating corrections
+    // as the new "original".
+    const baseline = question.original && typeof question.original === "object"
+      ? question.original
+      : question;
+    return {
+      source_number: String(baseline.source_number ?? question.source_number ?? question.number ?? index + 1),
+      question: String(baseline.question || ""),
+      choices: Array.isArray(baseline.choices) ? baseline.choices.slice() : [],
+      answer: String(baseline.answer || ""),
+      explanation: String(baseline.explanation || "")
+    };
+  };
+  const cardState = new WeakMap();
+  let payloadSyncTimer = null;
+
+  function correctionFields(values, original, boundaryChanged) {
+    const fields = ["source_number", "question", "choices", "answer", "explanation"]
+      .filter((field) => JSON.stringify(values[field]) !== JSON.stringify(original[field]));
+    if (boundaryChanged) fields.push("question_boundary");
+    return fields;
+  }
+
+  function updateCorrectionStatus(card, state) {
+    const changed = correctionFields(
+      state.values, state.original, state.boundaryChanged
+    );
+    const status = card.querySelector("[data-correction-status]");
+    if (status) {
+      status.textContent = changed.length ? "수동 보정됨" : "원본";
+      status.classList.toggle("is-corrected", changed.length > 0);
+    }
+    return changed;
+  }
+
+  function captureCard(card) {
+    let state = cardState.get(card);
+    if (!state) {
+      const index = Number(card.dataset.index || 0);
+      state = {
+        original: JSON.parse(card.dataset.original || "{}"),
+        values: readCard(card),
+        boundaryChanged: card.dataset.boundaryChanged === "true"
+      };
+      cardState.set(card, state);
+    } else {
+      state.values = readCard(card);
+      state.boundaryChanged = card.dataset.boundaryChanged === "true";
+    }
+    updateCorrectionStatus(card, state);
+    return state;
+  }
+
+  function schedulePayloadSync() {
+    if (payloadSyncTimer !== null) window.clearTimeout(payloadSyncTimer);
+    payloadSyncTimer = window.setTimeout(() => {
+      payloadSyncTimer = null;
+      syncPayload();
+    }, 250);
+  }
 
   function questionOriginal(index) {
     return originalFor(sourceQuestions[index] || {}, index);
@@ -46,6 +101,11 @@
     const original = questionOriginal(index);
     card.dataset.original = JSON.stringify(original);
     card.dataset.boundaryChanged = "false";
+    cardState.set(card, {
+      original,
+      values: readCard(card),
+      boundaryChanged: false
+    });
     const originalView = card.querySelector("[data-import-original]");
     if (originalView) originalView.textContent = JSON.stringify(original, null, 2);
   });
@@ -67,11 +127,9 @@
 
   function syncPayload() {
     const updated = cards().map((card, index) => {
-      const values = readCard(card);
-      const original = JSON.parse(card.dataset.original || "{}");
-      const correctedFields = ["source_number", "question", "choices", "answer", "explanation"]
-        .filter((field) => JSON.stringify(values[field]) !== JSON.stringify(original[field]));
-      if (card.dataset.boundaryChanged === "true") correctedFields.push("question_boundary");
+      const state = captureCardIfMissing(card, index);
+      const values = state.values;
+      const correctedFields = updateCorrectionStatus(card, state);
       const question = {
         number: index + 1,
         source_number: values.source_number,
@@ -81,13 +139,8 @@
         explanation: values.explanation
       };
       if (correctedFields.length) {
-        question.original = original;
+        question.original = state.original;
         question.corrected_fields = correctedFields;
-      }
-      const status = card.querySelector("[data-correction-status]");
-      if (status) {
-        status.textContent = correctedFields.length ? "수동 보정됨" : "원본";
-        status.classList.toggle("is-corrected", correctedFields.length > 0);
       }
       return question;
     });
@@ -95,6 +148,19 @@
     else payload.questions = updated;
     hidden.value = JSON.stringify(payload);
     if (jsonPreview) jsonPreview.value = JSON.stringify(payload, null, 2);
+  }
+
+  function captureCardIfMissing(card, index) {
+    let state = cardState.get(card);
+    if (!state) {
+      state = {
+        original: JSON.parse(card.dataset.original || "{}"),
+        values: readCard(card),
+        boundaryChanged: card.dataset.boundaryChanged === "true"
+      };
+      cardState.set(card, state);
+    }
+    return state;
   }
 
   function splitQuestion(card) {
@@ -106,6 +172,13 @@
       const range = selection.getRangeAt(0).cloneRange();
       range.collapse(true);
       range.setEnd(editor, editor.childNodes.length);
+      const preview = document.createElement("div");
+      preview.append(range.cloneContents());
+      remainder = preview.innerHTML;
+      if (!remainder.trim()) {
+        window.alert("분리 위치 뒤에 문항 내용이 없습니다.");
+        return;
+      }
       const fragment = range.extractContents();
       const holder = document.createElement("div");
       holder.append(fragment);
@@ -138,6 +211,13 @@
     nextCard.dataset.original = card.dataset.original;
     nextCard.dataset.boundaryChanged = "true";
     card.dataset.boundaryChanged = "true";
+    const original = JSON.parse(card.dataset.original || "{}");
+    cardState.set(nextCard, {
+      original,
+      values: readCard(nextCard),
+      boundaryChanged: true
+    });
+    captureCard(card);
     list.insertBefore(nextCard, card.nextElementSibling);
     reindex();
     syncPayload();
@@ -170,14 +250,25 @@
 
     const leftOriginal = JSON.parse(card.dataset.original || "{}");
     const rightOriginal = JSON.parse(nextCard.dataset.original || "{}");
-    card.dataset.original = JSON.stringify({
+    const mergedOriginal = {
       source_number: [leftOriginal.source_number, rightOriginal.source_number].filter(Boolean).join(", "),
       question: [leftOriginal.question, rightOriginal.question].filter(Boolean).join("\n"),
       choices: [...(leftOriginal.choices || []), ...(rightOriginal.choices || [])],
       answer: [leftOriginal.answer, rightOriginal.answer].filter(Boolean).join("\n"),
       explanation: [leftOriginal.explanation, rightOriginal.explanation].filter(Boolean).join("\n")
-    });
+    };
+    card.dataset.original = JSON.stringify(mergedOriginal);
     card.dataset.boundaryChanged = "true";
+    const currentSelection = card.querySelector('input[name="selected_questions"]');
+    const nextSelection = nextCard.querySelector('input[name="selected_questions"]');
+    if (currentSelection && nextSelection) {
+      currentSelection.checked = currentSelection.checked || nextSelection.checked;
+    }
+    cardState.set(card, {
+      original: mergedOriginal,
+      values: readCard(card),
+      boundaryChanged: true
+    });
     nextCard.remove();
     reindex();
     syncPayload();
@@ -218,8 +309,17 @@
     if (target?.closest('[contenteditable="true"]')) event.preventDefault();
   });
 
-  form.addEventListener("input", syncPayload);
-  form.addEventListener("change", syncPayload);
+  function handleCardEdit(event) {
+    const target = event.target instanceof Element ? event.target : event.target?.parentElement;
+    const card = target?.closest("[data-import-question]");
+    if (!card || !list.contains(card)) return;
+    captureCard(card);
+    schedulePayloadSync();
+  }
+
+  form.addEventListener("input", handleCardEdit);
+  form.addEventListener("change", handleCardEdit);
+  form.addEventListener("hexora:sync-import-payload", syncPayload);
   form.addEventListener("submit", (event) => {
     syncPayload();
     const acknowledgement = form.querySelector('input[name="warnings_acknowledged"]');

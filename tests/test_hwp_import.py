@@ -83,6 +83,11 @@ class HwpImportValidationTests(unittest.TestCase):
         ).read_text(encoding="utf-8")
         self.assertIn('list.addEventListener("paste"', script)
         self.assertIn('list.addEventListener("drop"', script)
+        self.assertIn("const cardState = new WeakMap()", script)
+        self.assertIn("schedulePayloadSync()", script)
+        self.assertIn("question.original && typeof question.original === \"object\"", script)
+        self.assertIn("range.cloneContents()", script)
+        self.assertIn('form.addEventListener("hexora:sync-import-payload"', script)
 
     def test_manual_corrections_keep_original_values_and_source_number(self):
         form = MultiDict([
