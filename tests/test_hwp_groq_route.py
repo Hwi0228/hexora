@@ -58,7 +58,7 @@ class GroqHwpRouteTests(unittest.TestCase):
                     "model": None,
                     "segments": [],
                     "answer_start_block": None,
-                    "warning": "GROQ_API_KEY가 설정되지 않았습니다.",
+                    "warning": "개인 Groq API 키가 등록되지 않았습니다.",
                 },
             ):
                 response = self.client.post(
