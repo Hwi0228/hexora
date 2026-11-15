@@ -82,6 +82,15 @@ const editorConfig = configNode
       const hancomMathFields = document.getElementById("hancom-math-fields");
       const conversionError = document.getElementById("math-conversion-error");
       const mathCancel = document.getElementById("math-input-cancel");
+      const mathPreview = document.createElement("div");
+      mathPreview.id = "math-live-preview";
+      mathPreview.setAttribute("aria-live", "polite");
+      mathPreview.style.cssText = "margin:14px 0;padding:14px;min-height:76px;border:1px solid var(--border,#d8e0e8);border-radius:9px;background:var(--surface,#fff);display:flex;align-items:center;justify-content:center;overflow-x:auto;color:var(--text,#17212f)";
+      mathPreview.textContent = "수식을 입력하면 미리보기가 표시됩니다.";
+      hancomMathFields.after(mathPreview);
+      let mathPreviewTimer = null;
+      let mathPreviewRequest = 0;
+      let mathPreviewController = null;
       let mathDialogAction = null;
 
       function closeMathDialog() {
@@ -104,6 +113,7 @@ const editorConfig = configNode
         conversionError.hidden = true;
         mathDialogAction = action;
         mathDialog.hidden = false;
+        updateMathPreview();
         requestAnimationFrame(() => {
           mathInput.focus();
           mathInput.select();
@@ -116,11 +126,65 @@ const editorConfig = configNode
         hancomMathFields.hidden = !hancomMode;
       }
 
+      function renderMathPreview(latex) {
+        mathPreview.replaceChildren();
+        if (!latex) {
+          mathPreview.textContent = "수식을 입력하면 미리보기가 표시됩니다.";
+          return;
+        }
+        if (window.katex) {
+          try {
+            window.katex.render(latex, mathPreview, { throwOnError: false, strict: "ignore", displayMode: true });
+            return;
+          } catch (error) {
+            console.warn("Live math preview failed.", error);
+          }
+        }
+        mathPreview.textContent = latex;
+      }
+
+      function updateMathPreview() {
+        const requestId = ++mathPreviewRequest;
+        if (mathPreviewTimer) window.clearTimeout(mathPreviewTimer);
+        if (mathPreviewController) mathPreviewController.abort();
+        const isHancom = mathInputMode.value === "hancom";
+        const source = (isHancom ? hancomInput : mathInput).value.trim();
+        conversionError.hidden = true;
+        if (!source) { renderMathPreview(""); return; }
+        if (!isHancom) { renderMathPreview(source); return; }
+        mathPreview.textContent = "한컴 수식을 변환하는 중…";
+        mathPreviewTimer = window.setTimeout(async () => {
+          const controller = new AbortController();
+          mathPreviewController = controller;
+          try {
+            const response = await fetch(editorConfig.hancomConversionUrl || "/api/math/hancom-to-latex", {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                "X-CSRF-Token": form.querySelector('input[name="_csrf_token"]')?.value || ""
+              },
+              body: JSON.stringify({ script: source }),
+              signal: controller.signal
+            });
+            const payload = await response.json().catch(() => ({}));
+            if (!response.ok) throw new Error(payload.error || "한컴 수식 변환에 실패했습니다.");
+            if (requestId !== mathPreviewRequest) return;
+            renderMathPreview(String(payload.latex || "").trim());
+          } catch (error) {
+            if (error.name === "AbortError" || requestId !== mathPreviewRequest) return;
+            mathPreview.textContent = error.message || "미리보기를 생성하지 못했습니다.";
+          }
+        }, 250);
+      }
+
       mathInputMode.addEventListener("change", () => {
         updateMathInputFields();
         conversionError.hidden = true;
+        updateMathPreview();
         (mathInputMode.value === "hancom" ? hancomInput : mathInput).focus();
       });
+      mathInput.addEventListener("input", updateMathPreview);
+      hancomInput.addEventListener("input", updateMathPreview);
 
       mathDialogForm.addEventListener("submit", async (event) => {
         event.preventDefault();
