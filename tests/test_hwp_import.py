@@ -94,6 +94,35 @@ class HwpImportValidationTests(unittest.TestCase):
         ).read_text(encoding="utf-8")
         self.assertIn('dispatchEvent(new Event("hexora:sync-import-payload"))', upload_script)
 
+    def test_formula_comparison_data_survives_validation_and_retry(self):
+        payload = {
+            "questions": [{
+                "number": 1,
+                "source_number": "1",
+                "question": "수식이 포함된 문제",
+                "choices": [],
+                "answer": "",
+                "explanation": "",
+                "math_objects": [{
+                    "original_script": "a over b",
+                    "latex": r"\\dfrac{a}{b}",
+                    "conversion_error": None,
+                    "source_position": {"section": 0, "paragraph": 1},
+                }],
+            }],
+        }
+        form = MultiDict([
+            ("questions_json", json.dumps(payload, ensure_ascii=False)),
+            ("subject", "수학"), ("grade", "고1"), ("unit", "테스트 단원"),
+            ("source", "업로드 문서"), ("license", "ORIGINAL"),
+            ("source_type", "기타"), ("selected_questions", "0"),
+        ])
+        questions, selection, errors, error = _validated_import(form)
+        self.assertIsNone(error)
+        self.assertEqual(errors, [])
+        self.assertEqual(questions[0]["math_objects"][0]["original_script"], "a over b")
+        self.assertEqual(questions[0]["math_objects"][0]["latex"], r"\\dfrac{a}{b}")
+
     def test_manual_corrections_keep_original_values_and_source_number(self):
         form = MultiDict([
             ("questions_json", json.dumps({"questions": [{

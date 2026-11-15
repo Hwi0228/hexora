@@ -177,6 +177,31 @@ def _validated_import(form):
                 field for field in corrected_fields
                 if isinstance(field, str) and field in allowed_corrections
             ]
+        math_objects = question.get("math_objects", [])
+        if isinstance(math_objects, list):
+            preserved_math = []
+            for math_object in math_objects[:100]:
+                if not isinstance(math_object, dict):
+                    continue
+                original_script = math_object.get("original_script", "")
+                latex = math_object.get("latex", "")
+                if not isinstance(original_script, str) or len(original_script) > 5000:
+                    continue
+                if not isinstance(latex, str) or len(latex) > 5000:
+                    continue
+                preserved_math.append({
+                    "original_script": original_script,
+                    "latex": latex,
+                    "conversion_error": str(math_object.get("conversion_error") or "")[:300],
+                    "source_position": (
+                        math_object.get("source_position")
+                        if isinstance(math_object.get("source_position"), dict)
+                        else None
+                    ),
+                })
+            if preserved_math:
+                normalized["math_objects"] = preserved_math
+
         normalized_questions.append(normalized)
 
     if errors:

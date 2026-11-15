@@ -125,6 +125,32 @@
               <label class="metadata-field import-edit-wide">해설
                 <div class="math-content import-editable" contenteditable="true" role="textbox" aria-multiline="true" data-import-field="explanation">{{ question.explanation|render_rich_html }}</div>
               </label>
+              {% if question.math_objects %}
+              <div class="metadata-field import-edit-wide import-math-review">
+                <details>
+                  <summary>수식 원본·변환 결과 비교 · {{ question.math_objects|length }}개</summary>
+                  {% for math in question.math_objects %}
+                  <div class="import-math-comparison">
+                    <span class="hint">원본 한컴 수식 스크립트</span>
+                    <pre>{{ math.original_script }}</pre>
+                    {% if math.latex %}
+                    <span class="hint">변환된 LaTeX</span>
+                    <code>{{ math.latex }}</code>
+                    <div class="math-content import-math-rendered">
+                      {% if math.latex.startswith('\\\\displaystyle') or math.latex.startswith('\\\\dfrac') %}
+                      <div class="ql-math-block" data-latex="{{ math.latex }}" data-input-format="latex"></div>
+                      {% else %}
+                      <span class="ql-math-inline" data-latex="{{ math.latex }}" data-input-format="latex"></span>
+                      {% endif %}
+                    </div>
+                    {% else %}
+                    <p class="error" role="alert">수식 변환 실패: {{ math.conversion_error or '변환 결과를 만들지 못했습니다.' }}</p>
+                    {% endif %}
+                  </div>
+                  {% endfor %}
+                </details>
+              </div>
+              {% endif %}
             </div>
             <div class="import-edit-actions">
               <button class="button" type="button" data-split-question>커서 위치에서 문항 분리</button>

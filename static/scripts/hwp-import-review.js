@@ -74,6 +74,7 @@
       state = {
         original: JSON.parse(card.dataset.original || "{}"),
         values: readCard(card),
+        mathObjects: [],
         boundaryChanged: card.dataset.boundaryChanged === "true"
       };
       cardState.set(card, state);
@@ -104,6 +105,7 @@
     cardState.set(card, {
       original,
       values: readCard(card),
+      mathObjects: questionMathObjects(index),
       boundaryChanged: false
     });
     const originalView = card.querySelector("[data-import-original]");
@@ -138,6 +140,7 @@
         answer: values.answer,
         explanation: values.explanation
       };
+      if (state.mathObjects?.length) question.math_objects = state.mathObjects;
       if (correctedFields.length) {
         question.original = state.original;
         question.corrected_fields = correctedFields;
@@ -156,6 +159,7 @@
       state = {
         original: JSON.parse(card.dataset.original || "{}"),
         values: readCard(card),
+        mathObjects: [],
         boundaryChanged: card.dataset.boundaryChanged === "true"
       };
       cardState.set(card, state);
@@ -215,6 +219,7 @@
     cardState.set(nextCard, {
       original,
       values: readCard(nextCard),
+      mathObjects: [],
       boundaryChanged: true
     });
     captureCard(card);
@@ -248,6 +253,12 @@
       else if (next.innerHTML.trim()) appendSafeContent(current, next);
     }
 
+    const leftState = captureCard(card);
+    const rightState = captureCard(nextCard);
+    const mergedMathObjects = [
+      ...(leftState.mathObjects || []),
+      ...(rightState.mathObjects || [])
+    ];
     const leftOriginal = JSON.parse(card.dataset.original || "{}");
     const rightOriginal = JSON.parse(nextCard.dataset.original || "{}");
     const mergedOriginal = {
@@ -267,6 +278,7 @@
     cardState.set(card, {
       original: mergedOriginal,
       values: readCard(card),
+      mathObjects: mergedMathObjects,
       boundaryChanged: true
     });
     nextCard.remove();
