@@ -98,8 +98,8 @@ def hwp_parser_page():
                             "source": metadata["source"],
                             "year": metadata["year"],
                             "exam": "",
-                            "original_question_number": str(imported["number"]),
-                            "page": None,
+                            "original_question_number": str(imported.get("source_number", imported["number"])),
+                            "page": imported.get("source_page"),
                             "source_url": "",
                             "license": metadata["license"],
                         }
