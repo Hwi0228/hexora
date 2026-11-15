@@ -34,6 +34,7 @@
           </label>
           <button class="button primary" type="submit" name="action" value="parse">기본 문항 추출</button>
           <button class="button" type="submit" name="action" value="segment">Groq LLM / 직접 구역 나누기</button>
+          <p class="hint">Groq 모드는 추출된 텍스트와 수식 원문을 Groq API로 전송합니다. 원본 HWP 파일과 그림 바이너리는 전송하지 않습니다. API 키가 없으면 수동 분할로 열립니다.</p>
         </form>
         <ol class="processing-log" id="processing-log" aria-live="polite">
           <li class="{% if questions %}done{% elif error %}error{% else %}active{% endif %}" id="log-file">
