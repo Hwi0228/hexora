@@ -41,6 +41,13 @@
     if (feedback) feedback.textContent = "서버에서 문서를 분석하고 있습니다. 요청이 끝나면 결과 또는 오류가 표시됩니다.";
     const submitButton = event.submitter || form.querySelector('button[type="submit"]');
     if (submitButton) {
+      if (submitButton.name) {
+        const submittedAction = document.createElement("input");
+        submittedAction.type = "hidden";
+        submittedAction.name = submitButton.name;
+        submittedAction.value = submitButton.value;
+        form.append(submittedAction);
+      }
       submitButton.disabled = true;
       submitButton.textContent = submitButton.value === "segment" ? "문서 구조 분석 중…" : "문서 분석 중…";
     }
