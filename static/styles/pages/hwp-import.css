@@ -24,3 +24,9 @@
 .import-warning{margin:12px 0;padding:12px;border:1px solid #e6c98a;border-radius:8px;background:#fffaf0}
 .import-warning ul{margin:8px 0}
 @media(max-width:700px){.import-edit-grid{grid-template-columns:1fr}}
+
+.import-math-review{padding:10px 12px;border:1px solid var(--hexora-border);border-radius:8px;background:#f8fafc}
+.import-math-comparison{display:grid;gap:6px;padding:12px 0;border-top:1px solid var(--hexora-border)}
+.import-math-comparison pre{max-height:160px;overflow:auto;white-space:pre-wrap;overflow-wrap:anywhere;padding:10px;border-radius:6px;background:#fff}
+.import-math-comparison code{white-space:pre-wrap;overflow-wrap:anywhere}
+.import-math-rendered{padding:10px;background:#fff;border-radius:6px;overflow-x:auto}

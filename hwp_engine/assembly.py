@@ -18,8 +18,8 @@ def _cached_equation_to_latex(script: str) -> str:
     return _equation_to_latex(script)
 
 _ANSWER_SECTION = re.compile(
-    r"^\\s*(?:(?:[ⅠⅡⅢⅣⅤⅥⅦⅧⅨⅩ]+)\\s*[.)]?\\s*)?"
-    r"(?:정\\s*답(?:\\s*(?:\\(해\\s*설\\)|및\\s*해\\s*설|과\\s*해\\s*설))?|정답\\s*/\\s*해설)\\s*$"
+    r"^\s*(?:(?:[ⅠⅡⅢⅣⅤⅥⅦⅧⅨⅩ]+)\s*[.)]?\s*)?"
+    r"(?:정\s*답(?:\s*(?:\(해\s*설\)|및\s*해\s*설|과\s*해\s*설))?|정답\s*/\s*해설)\s*$"
 )
 
 CHOICE_LABELS = "①②③④⑤⑥⑦⑧⑨⑩"

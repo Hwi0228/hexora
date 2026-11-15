@@ -137,11 +137,7 @@
                     <span class="hint">변환된 LaTeX</span>
                     <code>{{ math.latex }}</code>
                     <div class="math-content import-math-rendered">
-                      {% if math.latex.startswith('\\\\displaystyle') or math.latex.startswith('\\\\dfrac') %}
-                      <div class="ql-math-block" data-latex="{{ math.latex }}" data-input-format="latex"></div>
-                      {% else %}
                       <span class="ql-math-inline" data-latex="{{ math.latex }}" data-input-format="latex"></span>
-                      {% endif %}
                     </div>
                     {% else %}
                     <p class="error" role="alert">수식 변환 실패: {{ math.conversion_error or '변환 결과를 만들지 못했습니다.' }}</p>

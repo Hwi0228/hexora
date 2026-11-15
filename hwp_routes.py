@@ -115,11 +115,12 @@ def hwp_parser_page():
                             "source_url": "",
                             "license": metadata["license"],
                         }
-                        if imported.get("corrected_fields"):
+                        if imported.get("corrected_fields") or imported.get("math_objects"):
                             snapshot["import_provenance"] = {
                                 "source_number": imported.get("source_number", str(imported["number"])),
                                 "original": imported.get("original", {}),
-                                "corrected_fields": imported["corrected_fields"],
+                                "corrected_fields": imported.get("corrected_fields", []),
+                                "math_objects": imported.get("math_objects", []),
                             }
                         import_summary = "HWP 문서에서 가져옴"
                         if imported.get("corrected_fields"):

@@ -127,11 +127,11 @@ class QuestionAdapterTests(unittest.TestCase):
             p("1. 다음 식을 계산하시오.", 0), formula,
             p("정답 및 해설", 1), p("1. (답) 1", 2),
         ))
-        with patch("hwp_engine.assembly._equation_to_latex", return_value=r"\\dfrac{a}{b}"):
+        with patch("hwp_engine.assembly._equation_to_latex", return_value=r"\dfrac{a}{b}"):
             result = assemble_document(doc, self.registry)
         obj = result.as_payload()["questions"][0]["math_objects"][0]
         self.assertEqual(obj["original_script"], "a over b")
-        self.assertEqual(obj["latex"], r"\\dfrac{a}{b}")
+        self.assertEqual(obj["latex"], r"\dfrac{a}{b}")
         self.assertIsNone(obj["conversion_error"])
 
     def test_formula_conversion_failure_keeps_original_script_visible(self):
