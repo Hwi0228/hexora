@@ -97,6 +97,10 @@
   function questionOriginal(index) {
     return originalFor(sourceQuestions[index] || {}, index);
   }
+  function questionMathObjects(index) {
+    const values = sourceQuestions[index]?.math_objects;
+    return Array.isArray(values) ? values.map((item) => ({ ...item })) : [];
+  }
 
   cards().forEach((card, index) => {
     const original = questionOriginal(index);
