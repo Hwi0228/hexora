@@ -166,6 +166,7 @@ def create_app():
             "; ".join(
                 (
                     "default-src 'self'",
+                    "frame-src 'self' blob:",
                     "base-uri 'self'",
                     "object-src 'none'",
                     "frame-ancestors 'none'",
