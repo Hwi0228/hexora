@@ -10,6 +10,7 @@ from constants import NAV_ITEMS, SUBJECTS, LICENSE_CHOICES, SOURCE_TYPES
 from database import get_db
 from parse_hwp import parse_questions_from_xml
 from parse_rhwp import MAX_DOCUMENT_BYTES, parse_questions_from_rhwp_bytes
+from pdf_parser import MAX_PDF_BYTES, parse_questions_from_pdf_bytes
 from hwp_import_validation import MAX_IMPORTED_QUESTIONS, MAX_SECTION_XML_SIZE, _get_section_xml, _validated_import
 from hwp_engine.adapters import default_registry
 from hwp_engine.assembly import assemble_document
@@ -133,12 +134,13 @@ def hwp_parser_page():
 
         uploaded = request.files.get("document")
         if uploaded is None or not uploaded.filename:
-            error = "파싱할 HWP, HWPX 또는 section0.xml 파일을 선택해 주세요."
+            error = "파싱할 HWP, HWPX, PDF 또는 section0.xml 파일을 선택해 주세요."
         else:
             try:
                 extension = Path(uploaded.filename).suffix.lower()
                 file_limit = (
                     MAX_SECTION_XML_SIZE if extension == ".xml"
+                    else MAX_PDF_BYTES if extension == ".pdf"
                     else MAX_DOCUMENT_BYTES
                 )
                 content = uploaded.read(file_limit + 1)
@@ -186,11 +188,16 @@ def hwp_parser_page():
                         questions = parse_questions_from_rhwp_bytes(
                             content, filename=filename
                         )
+                elif extension == ".pdf":
+                    filename = Path(uploaded.filename).name
+                    questions = parse_questions_from_pdf_bytes(
+                        content, filename=filename
+                    )
                 elif extension == ".xml":
                     xml_content = _get_section_xml(uploaded.filename, content)
                     questions = parse_questions_from_xml(xml_content)
                 else:
-                    raise ValueError("HWP, HWPX 또는 HWPML section0.xml 파일만 업로드할 수 있습니다.")
+                    raise ValueError("HWP, HWPX, PDF 또는 HWPML section0.xml 파일만 업로드할 수 있습니다.")
 
                 if result_json is None:
                     result_json = json.dumps(
