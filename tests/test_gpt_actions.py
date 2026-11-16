@@ -80,6 +80,7 @@ class GPTActionsOAuthTests(unittest.TestCase):
             "code": callback["code"][0],
         })
         self.assertEqual(exchanged.status_code, 200)
+        self.last_token_response = exchanged.json
         return exchanged.json["access_token"]
 
     def question(self):
@@ -132,6 +133,77 @@ class GPTActionsOAuthTests(unittest.TestCase):
             headers={"Authorization": f"Bearer {token}"},
         )
         self.assertEqual(response.status_code, 403)
+
+    def test_consent_form_cannot_escalate_requested_scope(self):
+        params = {
+            "client_id": "test-actions-client",
+            "redirect_uri": self.redirect_uri,
+            "response_type": "code",
+            "scope": "questions:read",
+            "state": "scope-binding-state",
+        }
+        page = self.client.get("/actions/oauth/authorize", query_string=params)
+        self.assertEqual(page.status_code, 200)
+
+        tampered = self.client.post("/actions/oauth/authorize", data={
+            **params,
+            "scope": "questions:read questions:write",
+            "decision": "allow",
+            "_csrf_token": self.csrf,
+        })
+        self.assertEqual(tampered.status_code, 400)
+
+    def test_authorization_code_is_single_use_and_token_response_is_not_cacheable(self):
+        params = {
+            "client_id": "test-actions-client",
+            "redirect_uri": self.redirect_uri,
+            "response_type": "code",
+            "scope": "questions:read",
+            "state": "single-use-state",
+        }
+        self.client.get("/actions/oauth/authorize", query_string=params)
+        approved = self.client.post("/actions/oauth/authorize", data={
+            **params,
+            "decision": "allow",
+            "_csrf_token": self.csrf,
+        })
+        callback = parse_qs(urlparse(approved.location).query)
+        token_request = {
+            "grant_type": "authorization_code",
+            "client_id": "test-actions-client",
+            "client_secret": "test-actions-client-secret",
+            "redirect_uri": self.redirect_uri,
+            "code": callback["code"][0],
+        }
+
+        first = self.client.post("/actions/oauth/token", data=token_request)
+        self.assertEqual(first.status_code, 200)
+        self.assertEqual(first.headers.get("Cache-Control"), "no-store")
+        self.assertEqual(first.headers.get("Pragma"), "no-cache")
+
+        replay = self.client.post("/actions/oauth/token", data=token_request)
+        self.assertEqual(replay.status_code, 400)
+        self.assertEqual(replay.json["error"], "invalid_grant")
+
+    def test_refresh_token_rotation_rejects_reuse(self):
+        self.authorize_and_exchange("questions:read")
+        original_refresh = self.last_token_response["refresh_token"]
+        refresh_request = {
+            "grant_type": "refresh_token",
+            "client_id": "test-actions-client",
+            "client_secret": "test-actions-client-secret",
+            "refresh_token": original_refresh,
+        }
+
+        rotated = self.client.post("/actions/oauth/token", data=refresh_request)
+        self.assertEqual(rotated.status_code, 200)
+        self.assertNotEqual(rotated.json["refresh_token"], original_refresh)
+        self.assertEqual(rotated.headers.get("Cache-Control"), "no-store")
+        self.assertEqual(rotated.headers.get("Pragma"), "no-cache")
+
+        replay = self.client.post("/actions/oauth/token", data=refresh_request)
+        self.assertEqual(replay.status_code, 400)
+        self.assertEqual(replay.json["error"], "invalid_grant")
 
     def test_oauth_rejects_unregistered_redirect_and_wrong_client_secret(self):
         bad_redirect = self.client.get("/actions/oauth/authorize", query_string={
