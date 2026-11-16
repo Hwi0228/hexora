@@ -28,6 +28,25 @@ def authorize():
         abort(401)
 
     connection = get_db()
+    user_token = request.headers.get("X-HEXORA-User-Token", "").strip()
+    if user_token:
+        import hashlib
+        record = connection.execute(
+            """SELECT t.user_uuid, t.scope, t.expires_at
+            FROM oauth_tokens t WHERE t.token_hash = ? AND t.token_type = 'access_token'""",
+            (hashlib.sha256(user_token.encode("utf-8")).hexdigest(),),
+        ).fetchone()
+        import time
+        if record is None or record["expires_at"] < int(time.time()):
+            abort(401)
+        g.user = connection.execute(
+            "SELECT uuid, email, display_name, role FROM users WHERE uuid = ?",
+            (record["user_uuid"],),
+        ).fetchone()
+        if g.user is None:
+            abort(401)
+        g.oauth_scopes = set(record["scope"].split())
+        return
     service_user_uuid = os.environ.get("HEXORA_MCP_SERVICE_USER_UUID", "").strip()
     if service_user_uuid:
         user = connection.execute(
@@ -78,6 +97,8 @@ def health():
 
 @mcp_api.get("/questions")
 def search_questions():
+    if hasattr(g, "oauth_scopes") and "questions:read" not in g.oauth_scopes:
+        abort(403)
     query = request.args.get("query", "").strip()
     filters = {
         key: request.args.get(key, "").strip()
@@ -131,6 +152,8 @@ def search_questions():
 
 @mcp_api.get("/questions/<code>")
 def get_question(code):
+    if hasattr(g, "oauth_scopes") and "questions:read" not in g.oauth_scopes:
+        abort(403)
     question_id = parse_question_number(code)
     if question_id is None:
         abort(404)
@@ -149,6 +172,8 @@ def get_question(code):
 
 @mcp_api.get("/standards")
 def standards():
+    if hasattr(g, "oauth_scopes") and "questions:read" not in g.oauth_scopes:
+        abort(403)
     from question_constants import CURRICULUM_STANDARDS
 
     query = request.args.get("query", "").strip()
@@ -205,6 +230,8 @@ def collect(payload):
 
 @mcp_api.post("/questions/validate")
 def validate_question():
+    if hasattr(g, "oauth_scopes") and "questions:write" not in g.oauth_scopes:
+        abort(403)
     payload = request.get_json(silent=True)
     if not isinstance(payload, dict):
         return jsonify({"ok": False, "valid": False, "errors": ["JSON 객체가 필요합니다."]}), 400
@@ -214,6 +241,8 @@ def validate_question():
 
 @mcp_api.post("/questions")
 def create_question():
+    if hasattr(g, "oauth_scopes") and "questions:write" not in g.oauth_scopes:
+        abort(403)
     body = request.get_json(silent=True)
     if not isinstance(body, dict) or not isinstance(body.get("question"), dict):
         return jsonify({
