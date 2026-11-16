@@ -19,8 +19,6 @@ from admin_database_routes import register_admin_database_routes
 from rich_text import render_rich_html
 from sidebar import render_sidebar
 from mcp_api import mcp_api
-from actions_api import actions_api
-from actions_oauth import register_actions_oauth_routes
 from oauth_routes import register_oauth_routes
 
 
@@ -199,9 +197,7 @@ def create_app():
     register_legal_routes(app)
     register_admin_database_routes(app)
     app.register_blueprint(mcp_api)
-    app.register_blueprint(actions_api)
     register_oauth_routes(app)
-    register_actions_oauth_routes(app)
 
     @app.cli.command("create-admin")
     @click.option("--email", prompt=True, help="최초 관리자 계정 이메일")
