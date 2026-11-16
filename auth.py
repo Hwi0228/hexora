@@ -31,8 +31,8 @@ def load_user_and_protect_forms():
 
     is_mcp_endpoint = (request.endpoint or "").startswith("mcp_api.")
     oauth_public_endpoints = {
-        "authorization_metadata", "protected_resource_metadata",
-        "register_client", "token", "revoke", "introspect",
+        "oauth.authorization_metadata", "oauth.protected_resource_metadata",
+        "oauth.register_client", "oauth.token", "oauth.revoke", "oauth.introspect",
     }
     is_oauth_protocol_endpoint = request.endpoint in oauth_public_endpoints
     if not is_mcp_endpoint and not is_oauth_protocol_endpoint:
