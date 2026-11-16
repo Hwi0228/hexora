@@ -78,6 +78,29 @@ class McpApiTests(unittest.TestCase):
             200,
         )
 
+
+    def test_service_user_is_provisioned_without_render_shell(self):
+        os.environ["HEXORA_MCP_SERVICE_USER_UUID"] = ""
+        response = self.client.get(
+            "/api/integrations/mcp/health",
+            headers=self.headers,
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            self.query_one(
+                "SELECT COUNT(*) FROM users WHERE email = ?",
+                ("hexora-mcp@service.invalid",),
+            ),
+            1,
+        )
+        self.assertEqual(
+            self.query_one(
+                "SELECT role FROM users WHERE email = ?",
+                ("hexora-mcp@service.invalid",),
+            ),
+            "user",
+        )
+
     def test_question_can_be_validated_and_created_with_revision(self):
         payload = self.question()
         validated = self.client.post(

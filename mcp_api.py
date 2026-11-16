@@ -3,8 +3,11 @@
 import hmac
 import json
 import os
+import secrets
+import uuid
 
 from database import begin_write_transaction, get_db
+from werkzeug.security import generate_password_hash
 from flask import Blueprint, abort, g, jsonify, request
 from question_ids import format_question_number, parse_question_number
 from question_repository import _question_row
@@ -24,16 +27,47 @@ def authorize():
     if not expected or not supplied or not hmac.compare_digest(expected, supplied):
         abort(401)
 
-    service_user_uuid = os.environ.get("HEXORA_MCP_SERVICE_USER_UUID", "")
-    if not service_user_uuid:
-        abort(503, description="HEXORA_MCP_SERVICE_USER_UUID is not configured")
-
-    user = get_db().execute(
-        "SELECT uuid, email, display_name, role FROM users WHERE uuid = ?",
-        (service_user_uuid,),
-    ).fetchone()
-    if user is None:
-        abort(503, description="Configured MCP service user does not exist")
+    connection = get_db()
+    service_user_uuid = os.environ.get("HEXORA_MCP_SERVICE_USER_UUID", "").strip()
+    if service_user_uuid:
+        user = connection.execute(
+            "SELECT uuid, email, display_name, role FROM users WHERE uuid = ?",
+            (service_user_uuid,),
+        ).fetchone()
+        if user is None:
+            abort(503, description="Configured MCP service user does not exist")
+    else:
+        # Render Shell is not required: provision the technical author identity
+        # on the first request authenticated with the private server-to-server token.
+        service_email = "hexora-mcp@service.invalid"
+        try:
+            begin_write_transaction(connection, lock_table="users")
+            user = connection.execute(
+                "SELECT uuid, email, display_name, role FROM users WHERE email = ?",
+                (service_email,),
+            ).fetchone()
+            if user is None:
+                service_user_uuid = str(uuid.uuid4())
+                connection.execute(
+                    """
+                    INSERT INTO users (uuid, email, display_name, password_hash, role)
+                    VALUES (?, ?, ?, ?, 'user')
+                    """,
+                    (
+                        service_user_uuid,
+                        service_email,
+                        "HEXORA MCP",
+                        generate_password_hash(secrets.token_urlsafe(48)),
+                    ),
+                )
+                user = connection.execute(
+                    "SELECT uuid, email, display_name, role FROM users WHERE uuid = ?",
+                    (service_user_uuid,),
+                ).fetchone()
+            connection.commit()
+        except Exception:
+            connection.rollback()
+            raise
     g.user = user
 
 
