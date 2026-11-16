@@ -597,11 +597,18 @@ class QuestionRegistrationTests(unittest.TestCase):
         other_client = app.test_client()
         self.register(other_client, "other@example.com", "다른 사용자")
         other_uuid = self.create_folder(other_client, "비공개 폴더")
-        self.csrf_post(self.client, "/questions/new", data=self.valid_question())
+        create_response = self.csrf_post(
+            self.client, "/questions/new", data=self.valid_question()
+        )
+        self.assertEqual(create_response.status_code, 302)
 
+        question_id = self.query_one(
+            "SELECT id FROM questions WHERE user_uuid = ? ORDER BY id DESC LIMIT 1",
+            (self.admin_uuid,),
+        )
         response = self.csrf_post(
             self.client,
-            "/questions/1/folder",
+            f"/questions/{question_id}/folder",
             data={"folder_uuid": other_uuid, "subject": "수학"},
         )
         self.assertEqual(response.status_code, 400)
