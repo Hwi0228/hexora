@@ -1,7 +1,6 @@
 import base64
 import hashlib
 import os
-import re
 import tempfile
 import unittest
 from pathlib import Path
