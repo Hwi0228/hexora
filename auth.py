@@ -30,12 +30,14 @@ def load_user_and_protect_forms():
             session.clear()
 
     is_mcp_endpoint = (request.endpoint or "").startswith("mcp_api.")
+    is_actions_api_endpoint = (request.endpoint or "").startswith("actions_api.")
     oauth_public_endpoints = {
         "oauth.authorization_metadata", "oauth.protected_resource_metadata",
         "oauth.register_client", "oauth.token", "oauth.revoke", "oauth.introspect",
+        "actions_oauth.token",
     }
     is_oauth_protocol_endpoint = request.endpoint in oauth_public_endpoints
-    if not is_mcp_endpoint and not is_oauth_protocol_endpoint:
+    if not is_mcp_endpoint and not is_actions_api_endpoint and not is_oauth_protocol_endpoint:
         if request.method == "POST":
             submitted_token = request.form.get("_csrf_token") or request.headers.get(
                 "X-CSRF-Token", ""
@@ -50,6 +52,7 @@ def load_user_and_protect_forms():
 
     public_endpoints = {"login", "signup", "static", "terms", "privacy", "report_request"}
     if (request.endpoint not in public_endpoints and not is_mcp_endpoint
+            and not is_actions_api_endpoint
             and not is_oauth_protocol_endpoint and g.user is None):
         return redirect(url_for("login", next=request.full_path.rstrip("?")))
 
