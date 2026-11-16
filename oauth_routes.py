@@ -17,7 +17,7 @@ from database import get_db
 
 oauth = Blueprint("oauth", __name__)
 ISSUER = "https://hexora.kro.kr"
-RESOURCE = "https://mcp.hexora.kro.kr/mcp"
+RESOURCE = os.environ.get("MCP_PUBLIC_URL", "https://hexora-mcp.onrender.com").rstrip("/") + "/mcp"
 ALLOWED_SCOPES = {"questions:read", "questions:write"}
 
 
