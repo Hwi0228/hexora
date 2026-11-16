@@ -123,8 +123,12 @@ def authorize():
     if not session.get("user_uuid"):
         return redirect("/login?" + urlencode({"next": request.full_path.rstrip("?")}))
     if request.method == "GET":
-        safe_state = state.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace('"', "&quot;")
-        safe_name = str(client["client_name"]).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+        safe_state = escape(state)
+        safe_name = escape(str(client["client_name"]))
+        safe_client_id = escape(client_id)
+        safe_redirect_uri = escape(redirect_uri)
+        safe_challenge = escape(challenge)
+        safe_scope = escape(scope)
         html = f"""<!doctype html><meta charset=utf-8><title>HEXORA 연결 승인</title>
         <main style="max-width:520px;margin:10vh auto;font:16px system-ui;padding:24px">
         <h1>HEXORA 계정 연결</h1><p><b>{safe_name}</b> 앱이 HEXORA 계정에 접근하려고 합니다.</p>
