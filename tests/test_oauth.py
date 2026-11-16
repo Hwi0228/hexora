@@ -37,6 +37,7 @@ class OAuthTests(unittest.TestCase):
         self.assertEqual(response.status_code, 302)
         with self.client.session_transaction() as session:
             self.user_uuid = session["user_uuid"]
+            session["csrf_token"] = "oauth-test-csrf"
             self.csrf = session["csrf_token"]
 
     def tearDown(self):
