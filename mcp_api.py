@@ -4,15 +4,14 @@ import hmac
 import json
 import os
 
-from flask import Blueprint, abort, g, jsonify, request
-from werkzeug.datastructures import MultiDict
-
 from database import begin_write_transaction, get_db
+from flask import Blueprint, abort, g, jsonify, request
 from question_ids import format_question_number, parse_question_number
 from question_repository import _question_row
 from question_revisions import _insert_question_revision, _question_snapshot
 from question_validation import _collect_question_data
 from rich_text import sanitize_rich_html
+from werkzeug.datastructures import MultiDict
 
 mcp_api = Blueprint("mcp_api", __name__, url_prefix="/api/integrations/mcp")
 
@@ -159,9 +158,11 @@ def collect(payload):
     data, errors = _collect_question_data(form)
     data["passage"] = sanitize_rich_html(str(payload.get("passage") or ""))
     data["examples"] = sanitize_rich_html(str(payload.get("examples") or ""))
+    data["summary"] = str(payload.get("summary") or "ChatGPT MCP 최초 등록")
     for field, label, maximum in (
         ("passage", "지문", 50000),
         ("examples", "보기", 20000),
+        ("summary", "수정 요약", 200),
     ):
         if len(data[field]) > maximum:
             errors.append(f"{label}은 {maximum}자 이내로 입력해 주세요.")
@@ -252,7 +253,7 @@ def create_question():
             question_id,
             1,
             g.user["uuid"],
-            data["summary"] or "ChatGPT MCP 최초 등록",
+            data["summary"],
             _question_snapshot(row),
         )
         connection.commit()

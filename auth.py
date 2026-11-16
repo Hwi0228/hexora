@@ -29,20 +29,21 @@ def load_user_and_protect_forms():
         if g.user is None:
             session.clear()
 
-    if request.method == "POST":
-        submitted_token = request.form.get("_csrf_token") or request.headers.get(
-            "X-CSRF-Token", ""
-        )
-        expected_token = session.get("csrf_token")
-        if not expected_token or not hmac.compare_digest(
-            expected_token, submitted_token
-        ):
-            abort(400, description="요청을 확인할 수 없습니다. 페이지를 새로고침해 주세요.")
-    else:
-        csrf_token()
+    is_mcp_endpoint = (request.endpoint or "").startswith("mcp_api.")
+    if not is_mcp_endpoint:
+        if request.method == "POST":
+            submitted_token = request.form.get("_csrf_token") or request.headers.get(
+                "X-CSRF-Token", ""
+            )
+            expected_token = session.get("csrf_token")
+            if not expected_token or not hmac.compare_digest(
+                expected_token, submitted_token
+            ):
+                abort(400, description="요청을 확인할 수 없습니다. 페이지를 새로고침해 주세요.")
+        else:
+            csrf_token()
 
     public_endpoints = {"login", "signup", "static", "terms", "privacy", "report_request"}
-    is_mcp_endpoint = (request.endpoint or "").startswith("mcp_api.")
     if request.endpoint not in public_endpoints and not is_mcp_endpoint and g.user is None:
         return redirect(url_for("login", next=request.full_path.rstrip("?")))
 
