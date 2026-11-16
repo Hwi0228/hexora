@@ -12,6 +12,7 @@ import time
 from urllib.parse import urlencode
 
 from flask import Blueprint, abort, jsonify, redirect, request, session
+from markupsafe import escape
 from database import get_db
 
 oauth = Blueprint("oauth", __name__)
@@ -128,11 +129,11 @@ def authorize():
         <main style="max-width:520px;margin:10vh auto;font:16px system-ui;padding:24px">
         <h1>HEXORA 계정 연결</h1><p><b>{safe_name}</b> 앱이 HEXORA 계정에 접근하려고 합니다.</p>
         <p>허용 권한: {", ".join(scope.split())}</p>
-        <form method=post><input type=hidden name=client_id value="{client_id}">
-        <input type=hidden name=redirect_uri value="{redirect_uri}">
+        <form method=post><input type=hidden name=client_id value="{safe_client_id}">
+        <input type=hidden name=redirect_uri value="{safe_redirect_uri}">
         <input type=hidden name=state value="{safe_state}">
-        <input type=hidden name=code_challenge value="{challenge}">
-        <input type=hidden name=scope value="{scope}">
+        <input type=hidden name=code_challenge value="{safe_challenge}">
+        <input type=hidden name=scope value="{safe_scope}">
         <input type=hidden name=_csrf_token value="{session.get('csrf_token','')}">
         <button name=decision value=allow>허용</button>
         <button name=decision value=deny>거부</button></form></main>"""
