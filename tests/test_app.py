@@ -77,6 +77,7 @@ class QuestionRegistrationTests(unittest.TestCase):
             "subject": "수학",
             "grade": "고2",
             "course": "수학Ⅱ",
+            "curriculum": "2015 개정 교육과정",
             "unit": "미분",
             "difficulty": "중",
             "question_type": "단답형",
