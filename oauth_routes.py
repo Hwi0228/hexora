@@ -122,27 +122,41 @@ def authorize():
         return jsonify({"error": "invalid_request"}), 400
     if not session.get("user_uuid"):
         return redirect("/login?" + urlencode({"next": request.full_path.rstrip("?")}))
-    if request.method == "GET":
-        safe_state = escape(state)
-        safe_name = escape(str(client["client_name"]))
-        safe_client_id = escape(client_id)
-        safe_redirect_uri = escape(redirect_uri)
-        safe_challenge = escape(challenge)
-        safe_scope = escape(scope)
-        html = f"""<!doctype html><meta charset=utf-8><title>HEXORA 연결 승인</title>
-        <main style="max-width:520px;margin:10vh auto;font:16px system-ui;padding:24px">
-        <h1>HEXORA 계정 연결</h1><p><b>{safe_name}</b> 앱이 HEXORA 계정에 접근하려고 합니다.</p>
-        <p>허용 권한: {", ".join(scope.split())}</p>
-        <form method=post><input type=hidden name=client_id value="{safe_client_id}">
-        <input type=hidden name=redirect_uri value="{safe_redirect_uri}">
-        <input type=hidden name=state value="{safe_state}">
-        <input type=hidden name=code_challenge value="{safe_challenge}">
-        <input type=hidden name=scope value="{safe_scope}">
-        <input type=hidden name=_csrf_token value="{session.get('csrf_token','')}">
-        <button name=decision value=allow>허용</button>
-        <button name=decision value=deny>거부</button></form></main>"""
-        return html
-    return _authorize_post(db)
+
+    # Bind the consent form to the exact authorization request. Never trust
+    # hidden form fields for client, redirect, state, PKCE, or granted scopes.
+    now = int(time.time())
+    pending_requests = session.get("oauth_pending_authorizations", {})
+    if not isinstance(pending_requests, dict):
+        pending_requests = {}
+    pending_requests = {
+        key: value for key, value in pending_requests.items()
+        if isinstance(value, dict) and value.get("expires_at", 0) >= now
+    }
+    request_id = secrets.token_urlsafe(24)
+    pending_requests[request_id] = {
+        "client_id": client_id,
+        "redirect_uri": redirect_uri,
+        "state": state,
+        "code_challenge": challenge,
+        "scope": scope,
+        "expires_at": now + 600,
+    }
+    while len(pending_requests) > 5:
+        pending_requests.pop(next(iter(pending_requests)))
+    session["oauth_pending_authorizations"] = pending_requests
+
+    safe_name = escape(str(client["client_name"]))
+    safe_request_id = escape(request_id)
+    html = f"""<!doctype html><meta charset=utf-8><title>HEXORA 연결 승인</title>
+    <main style="max-width:520px;margin:10vh auto;font:16px system-ui;padding:24px">
+    <h1>HEXORA 계정 연결</h1><p><b>{safe_name}</b> 앱이 HEXORA 계정에 접근하려고 합니다.</p>
+    <p>허용 권한: {", ".join(scope.split())}</p>
+    <form method=post><input type=hidden name=request_id value="{safe_request_id}">
+    <input type=hidden name=_csrf_token value="{session.get('csrf_token','')}">
+    <button name=decision value=allow>허용</button>
+    <button name=decision value=deny>거부</button></form></main>"""
+    return html
 
 
 @oauth.post("/oauth/authorize")
@@ -157,22 +171,37 @@ def _authorize_post(db):
         str(session.get("csrf_token", "")), str(request.form.get("_csrf_token", ""))
     ):
         abort(400)
-    client_id = request.form.get("client_id", "")
-    redirect_uri = request.form.get("redirect_uri", "")
-    state = request.form.get("state", "")
+
+    request_id = request.form.get("request_id", "")
+    pending_requests = session.get("oauth_pending_authorizations", {})
+    pending = pending_requests.get(request_id) if isinstance(pending_requests, dict) else None
+    now = int(time.time())
+    if not isinstance(pending, dict) or pending.get("expires_at", 0) < now:
+        abort(400)
+
+    client_id = pending["client_id"]
+    redirect_uri = pending["redirect_uri"]
+    state = pending["state"]
+    code_challenge = pending["code_challenge"]
+    scope = pending["scope"]
     client = db.execute("SELECT * FROM oauth_clients WHERE client_id = ?", (client_id,)).fetchone()
     if client is None or redirect_uri not in json.loads(client["redirect_uris"]):
         abort(400)
+
+    # Consume this consent request exactly once, regardless of allow/deny.
+    pending_requests.pop(request_id, None)
+    session["oauth_pending_authorizations"] = pending_requests
+
     if request.form.get("decision") != "allow":
         return redirect(redirect_uri + ("&" if "?" in redirect_uri else "?") + urlencode({"error": "access_denied", "state": state}))
+
     code = secrets.token_urlsafe(32)
     db.execute(
         """INSERT INTO oauth_codes
         (code_hash, client_id, user_uuid, redirect_uri, code_challenge, scope, expires_at, created_at)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
         (digest(code), client_id, session["user_uuid"], redirect_uri,
-         request.form.get("code_challenge", ""), request.form.get("scope", "questions:read"),
-         int(time.time()) + 300, int(time.time())),
+         code_challenge, scope, now + 300, now),
     )
     db.commit()
     return redirect(redirect_uri + ("&" if "?" in redirect_uri else "?") + urlencode({"code": code, "state": state}))
