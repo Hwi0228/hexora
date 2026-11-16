@@ -100,6 +100,16 @@ def authorize():
     if not session.get("user_uuid"):
         return redirect("/login?" + urlencode({"next": request.full_path.rstrip("?")}))
 
+    # Bind the consent form to the exact authorization request shown to the user.
+    # Flask's signed session prevents clients from editing these values.
+    session["actions_oauth_pending"] = {
+        "client_id": client_id,
+        "redirect_uri": redirect_uri,
+        "state": state,
+        "scope": scope,
+        "created_at": int(time.time()),
+    }
+
     safe_client_id = escape(client_id)
     safe_redirect_uri = escape(redirect_uri)
     safe_state = escape(state)
@@ -144,6 +154,15 @@ def authorize_post():
     redirect_uri = request.form.get("redirect_uri", "")
     state = request.form.get("state", "")
     scope = request.form.get("scope", "questions:read")
+    pending = session.get("actions_oauth_pending")
+    valid_pending = (
+        isinstance(pending, dict)
+        and pending.get("created_at", 0) >= int(time.time()) - 600
+        and pending.get("client_id") == client_id
+        and pending.get("redirect_uri") == redirect_uri
+        and pending.get("state") == state
+        and pending.get("scope") == scope
+    )
     if (
         not configured_client_id
         or not hmac.compare_digest(configured_client_id, client_id)
@@ -152,9 +171,12 @@ def authorize_post():
         or len(state) > 512
         or not set(scope.split()).issubset(ALLOWED_SCOPES)
         or not scope.split()
+        or not valid_pending
     ):
         abort(400)
 
+    # Consume the pending request before either denying or issuing a code.
+    session.pop("actions_oauth_pending", None)
     query = {"state": state}
     if request.form.get("decision") != "allow":
         query["error"] = "access_denied"
@@ -209,7 +231,13 @@ def token():
             or record["redirect_uri"] != body.get("redirect_uri")
         ):
             return jsonify({"error": "invalid_grant"}), 400
-        db.execute("DELETE FROM actions_oauth_codes WHERE code_hash = ?", (code_hash,))
+        consumed = db.execute(
+            """DELETE FROM actions_oauth_codes
+            WHERE code_hash = ? AND client_id = ? AND redirect_uri = ? AND expires_at >= ?""",
+            (code_hash, client_id, body.get("redirect_uri"), now),
+        )
+        if consumed.rowcount != 1:
+            return jsonify({"error": "invalid_grant"}), 400
         user_uuid, scope = record["user_uuid"], record["scope"]
     elif grant_type == "refresh_token":
         refresh = str(body.get("refresh_token", ""))
@@ -225,7 +253,14 @@ def token():
             or record["client_id"] != client_id
         ):
             return jsonify({"error": "invalid_grant"}), 400
-        db.execute("DELETE FROM actions_oauth_tokens WHERE token_hash = ?", (token_hash,))
+        consumed = db.execute(
+            """DELETE FROM actions_oauth_tokens
+            WHERE token_hash = ? AND token_type = 'refresh_token'
+              AND client_id = ? AND expires_at >= ?""",
+            (token_hash, client_id, now),
+        )
+        if consumed.rowcount != 1:
+            return jsonify({"error": "invalid_grant"}), 400
         user_uuid, scope = record["user_uuid"], record["scope"]
     else:
         return jsonify({"error": "unsupported_grant_type"}), 400
@@ -243,13 +278,16 @@ def token():
             (_digest(value), kind, client_id, user_uuid, scope, now + lifetime, now),
         )
     db.commit()
-    return jsonify({
+    response = jsonify({
         "access_token": access_token,
         "token_type": "Bearer",
         "expires_in": 3600,
         "refresh_token": refresh_token,
         "scope": scope,
     })
+    response.headers["Cache-Control"] = "no-store"
+    response.headers["Pragma"] = "no-cache"
+    return response
 
 
 def register_actions_oauth_routes(app):
