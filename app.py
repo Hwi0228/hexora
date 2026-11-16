@@ -18,6 +18,7 @@ from legal_routes import register_legal_routes
 from admin_database_routes import register_admin_database_routes
 from rich_text import render_rich_html
 from sidebar import render_sidebar
+from mcp_api import mcp_api
 
 
 def _is_production_environment():
@@ -194,6 +195,7 @@ def create_app():
     register_hwp_routes(app)
     register_legal_routes(app)
     register_admin_database_routes(app)
+    app.register_blueprint(mcp_api)
 
     @app.cli.command("create-admin")
     @click.option("--email", prompt=True, help="최초 관리자 계정 이메일")
@@ -277,6 +279,51 @@ def create_app():
             raise
 
         click.echo(action)
+
+
+    @app.cli.command("create-mcp-service-user")
+    @click.option("--email", default="hexora-mcp@service.invalid")
+    @click.option("--display-name", default="HEXORA MCP")
+    def create_mcp_service_user(email, display_name):
+        """Create the non-interactive author identity used by the MCP integration."""
+        import uuid
+
+        from database import begin_write_transaction, get_db
+
+        normalized_email = email.strip().lower()
+        if (
+            len(normalized_email) > 254
+            or "@" not in normalized_email
+            or not display_name.strip()
+            or len(display_name.strip()) > 80
+        ):
+            raise click.ClickException("서비스 계정 이메일 또는 표시 이름이 올바르지 않습니다.")
+
+        connection = get_db()
+        existing = connection.execute(
+            "SELECT uuid FROM users WHERE email = ?", (normalized_email,)
+        ).fetchone()
+        if existing:
+            click.echo(existing["uuid"])
+            return
+
+        service_uuid = str(uuid.uuid4())
+        random_password_hash = generate_password_hash(secrets.token_urlsafe(48))
+        try:
+            begin_write_transaction(connection, lock_table="users")
+            connection.execute(
+                """
+                INSERT INTO users (uuid, email, display_name, password_hash, role)
+                VALUES (?, ?, ?, ?, 'user')
+                """,
+                (service_uuid, normalized_email, display_name.strip(), random_password_hash),
+            )
+            connection.commit()
+        except Exception:
+            connection.rollback()
+            raise
+
+        click.echo(service_uuid)
 
     @app.cli.command("db-backup")
     @click.option("--output", type=click.Path(path_type=Path), default=None)

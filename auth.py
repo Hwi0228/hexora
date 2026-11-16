@@ -42,7 +42,8 @@ def load_user_and_protect_forms():
         csrf_token()
 
     public_endpoints = {"login", "signup", "static", "terms", "privacy", "report_request"}
-    if request.endpoint not in public_endpoints and g.user is None:
+    is_mcp_endpoint = (request.endpoint or "").startswith("mcp_api.")
+    if request.endpoint not in public_endpoints and not is_mcp_endpoint and g.user is None:
         return redirect(url_for("login", next=request.full_path.rstrip("?")))
 
 def inject_template_context():
