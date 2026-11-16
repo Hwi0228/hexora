@@ -30,7 +30,12 @@ def load_user_and_protect_forms():
             session.clear()
 
     is_mcp_endpoint = (request.endpoint or "").startswith("mcp_api.")
-    if not is_mcp_endpoint:
+    oauth_public_endpoints = {
+        "authorization_metadata", "protected_resource_metadata",
+        "register_client", "token", "revoke", "introspect",
+    }
+    is_oauth_protocol_endpoint = request.endpoint in oauth_public_endpoints
+    if not is_mcp_endpoint and not is_oauth_protocol_endpoint:
         if request.method == "POST":
             submitted_token = request.form.get("_csrf_token") or request.headers.get(
                 "X-CSRF-Token", ""
@@ -44,7 +49,8 @@ def load_user_and_protect_forms():
             csrf_token()
 
     public_endpoints = {"login", "signup", "static", "terms", "privacy", "report_request"}
-    if request.endpoint not in public_endpoints and not is_mcp_endpoint and g.user is None:
+    if (request.endpoint not in public_endpoints and not is_mcp_endpoint
+            and not is_oauth_protocol_endpoint and g.user is None):
         return redirect(url_for("login", next=request.full_path.rstrip("?")))
 
 def inject_template_context():
