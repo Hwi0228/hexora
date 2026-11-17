@@ -174,10 +174,25 @@ def _authorize_post(db):
 
     request_id = request.form.get("request_id", "")
     pending_requests = session.get("oauth_pending_authorizations", {})
-    pending = pending_requests.get(request_id) if isinstance(pending_requests, dict) else None
+    completed_requests = session.get("oauth_completed_authorizations", {})
     now = int(time.time())
+    if not isinstance(pending_requests, dict):
+        pending_requests = {}
+    if not isinstance(completed_requests, dict):
+        completed_requests = {}
+    completed_requests = {
+        key: value for key, value in completed_requests.items()
+        if isinstance(value, dict) and value.get("expires_at", 0) >= now
+    }
+    pending = pending_requests.get(request_id)
+
+    # A browser may submit the same consent form twice. Retain the request
+    # briefly so a duplicate POST can be handled as an idempotent retry.
     if not isinstance(pending, dict) or pending.get("expires_at", 0) < now:
-        abort(400)
+        completed = completed_requests.get(request_id)
+        if not isinstance(completed, dict):
+            abort(400)
+        pending = completed
 
     client_id = pending["client_id"]
     redirect_uri = pending["redirect_uri"]
@@ -188,13 +203,30 @@ def _authorize_post(db):
     if client is None or redirect_uri not in json.loads(client["redirect_uris"]):
         abort(400)
 
-    # Consume this consent request exactly once, regardless of allow/deny.
-    pending_requests.pop(request_id, None)
-    session["oauth_pending_authorizations"] = pending_requests
+    decision = request.form.get("decision")
+    if request_id in pending_requests:
+        pending_requests.pop(request_id, None)
+        completed_requests[request_id] = {
+            "client_id": client_id,
+            "redirect_uri": redirect_uri,
+            "state": state,
+            "code_challenge": code_challenge,
+            "scope": scope,
+            "decision": decision,
+            "expires_at": now + 120,
+        }
+        while len(completed_requests) > 5:
+            completed_requests.pop(next(iter(completed_requests)))
+        session["oauth_pending_authorizations"] = pending_requests
+        session["oauth_completed_authorizations"] = completed_requests
+    elif pending.get("decision") != decision:
+        abort(400)
 
-    if request.form.get("decision") != "allow":
+    if decision != "allow":
         return redirect(redirect_uri + ("&" if "?" in redirect_uri else "?") + urlencode({"error": "access_denied", "state": state}))
 
+    # Issue a fresh single-use code for each retry; a code from an earlier
+    # response may already have been consumed by the token endpoint.
     code = secrets.token_urlsafe(32)
     db.execute(
         """INSERT INTO oauth_codes

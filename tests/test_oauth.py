@@ -92,11 +92,18 @@ class OAuthTests(unittest.TestCase):
         self.assertEqual(approved.status_code, 302)
         returned = parse_qs(urlparse(approved.location).query)
         self.assertEqual(returned["state"][0], "test-state")
+
+        replayed = self.client.post("/oauth/authorize", data=form)
+        self.assertEqual(replayed.status_code, 302)
+        replay_returned = parse_qs(urlparse(replayed.location).query)
+        self.assertEqual(replay_returned["state"][0], "test-state")
+        self.assertNotEqual(replay_returned["code"][0], returned["code"][0])
+
         exchanged = self.client.post("/oauth/token", data={
             "grant_type": "authorization_code",
             "client_id": client_id,
             "redirect_uri": "https://client.example/callback",
-            "code": returned["code"][0],
+            "code": replay_returned["code"][0],
             "code_verifier": verifier,
         })
         self.assertEqual(exchanged.status_code, 200)
