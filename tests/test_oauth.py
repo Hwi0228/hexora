@@ -89,12 +89,12 @@ class OAuthTests(unittest.TestCase):
             "_csrf_token": self.csrf,
         }
         approved = self.client.post("/oauth/authorize", data=form)
-        self.assertEqual(approved.status_code, 302)
+        self.assertEqual(approved.status_code, 303)
         returned = parse_qs(urlparse(approved.location).query)
         self.assertEqual(returned["state"][0], "test-state")
 
         replayed = self.client.post("/oauth/authorize", data=form)
-        self.assertEqual(replayed.status_code, 302)
+        self.assertEqual(replayed.status_code, 303)
         replay_returned = parse_qs(urlparse(replayed.location).query)
         self.assertEqual(replay_returned["state"][0], "test-state")
         self.assertNotEqual(replay_returned["code"][0], returned["code"][0])
