@@ -223,7 +223,7 @@ def _authorize_post(db):
         abort(400)
 
     if decision != "allow":
-        return redirect(redirect_uri + ("&" if "?" in redirect_uri else "?") + urlencode({"error": "access_denied", "state": state}))
+        return redirect(redirect_uri + ("&" if "?" in redirect_uri else "?") + urlencode({"error": "access_denied", "state": state}), code=303)
 
     # Issue a fresh single-use code for each retry; a code from an earlier
     # response may already have been consumed by the token endpoint.
@@ -236,7 +236,7 @@ def _authorize_post(db):
          code_challenge, scope, now + 300, now),
     )
     db.commit()
-    return redirect(redirect_uri + ("&" if "?" in redirect_uri else "?") + urlencode({"code": code, "state": state}))
+    return redirect(redirect_uri + ("&" if "?" in redirect_uri else "?") + urlencode({"code": code, "state": state}), code=303)
 
 
 @oauth.post("/oauth/token")
