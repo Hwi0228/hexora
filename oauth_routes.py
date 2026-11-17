@@ -152,10 +152,10 @@ def authorize():
     <main style="max-width:520px;margin:10vh auto;font:16px system-ui;padding:24px">
     <h1>HEXORA 계정 연결</h1><p><b>{safe_name}</b> 앱이 HEXORA 계정에 접근하려고 합니다.</p>
     <p>허용 권한: {", ".join(scope.split())}</p>
-    <form method=post><input type=hidden name=request_id value="{safe_request_id}">
+    <form action="/oauth/authorize" method="post" autocomplete="off"><input type=hidden name=request_id value="{safe_request_id}">
     <input type=hidden name=_csrf_token value="{session.get('csrf_token','')}">
-    <button name=decision value=allow>허용</button>
-    <button name=decision value=deny>거부</button></form></main>"""
+    <button type=submit name=decision value=allow>허용</button>
+    <button type=submit name=decision value=deny>거부</button></form></main>"""
     return html
 
 

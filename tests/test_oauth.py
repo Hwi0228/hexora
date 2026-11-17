@@ -79,8 +79,15 @@ class OAuthTests(unittest.TestCase):
         }
         page = self.client.get("/oauth/authorize", query_string=query)
         self.assertEqual(page.status_code, 200)
-        form = dict(query)
-        form.update({"decision": "allow", "_csrf_token": self.csrf})
+        self.assertIn('action="/oauth/authorize"', page.get_data(as_text=True))
+        self.assertIn('type=submit name=decision value=allow', page.get_data(as_text=True))
+        with self.client.session_transaction() as session:
+            request_id = next(iter(session["oauth_pending_authorizations"]))
+        form = {
+            "request_id": request_id,
+            "decision": "allow",
+            "_csrf_token": self.csrf,
+        }
         approved = self.client.post("/oauth/authorize", data=form)
         self.assertEqual(approved.status_code, 302)
         returned = parse_qs(urlparse(approved.location).query)
