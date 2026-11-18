@@ -7,6 +7,7 @@ historical imports and URL registration entry point stable.
 from auth import admin_required, login_required
 from question_validation import _collect_question_data
 from question_revisions import _insert_question_revision, _question_snapshot
+from question_repository import _question_row
 from rich_text import sanitize_rich_html
 
 from question_browse_routes import (
@@ -85,11 +86,11 @@ def register_question_routes(app):
     )
     app.add_url_rule(
         "/questions/<int:question_id>/delete", endpoint="delete_question",
-        view_func=_question_acl_required("questions.delete.own", "questions.delete.any")(delete_question), methods=["POST"],
+        view_func=_question_acl_required("questions.delete.own", "questions.delete.any")(_delete_question_acl), methods=["POST"],
     )
     app.add_url_rule(
         "/questions/<int:question_id>/undelete", endpoint="restore_deleted_question",
-        view_func=_question_acl_required("questions.restore.own", "questions.restore.any")(restore_deleted_question), methods=["POST"],
+        view_func=_question_acl_required("questions.restore.own", "questions.restore.any")(_restore_deleted_question_acl), methods=["POST"],
     )
     app.add_url_rule(
         "/admin/users",
@@ -258,6 +259,28 @@ def _acl_required(permission_code):
             return view(*args, **kwargs)
         return wrapped
     return decorate
+
+
+def _delete_question_acl(question_id):
+    question = _question_row(question_id)
+    connection = get_db()
+    connection.execute(
+        "UPDATE questions SET deleted_at = CURRENT_TIMESTAMP "
+        "WHERE id = ? AND deleted_at IS NULL",
+        (question_id,),
+    )
+    connection.commit()
+    return redirect(url_for("main", subject=question["subject"]))
+
+def _restore_deleted_question_acl(question_id):
+    _question_row(question_id)
+    connection = get_db()
+    connection.execute(
+        "UPDATE questions SET deleted_at = NULL WHERE id = ?",
+        (question_id,),
+    )
+    connection.commit()
+    return redirect(url_for("question_by_code", code=format_question_number(question_id)))
 
 def _question_acl_required(own_permission, any_permission):
     def decorate(view):
@@ -451,6 +474,7 @@ _ACL_TEMPLATE = r"""
 {% for row in assignments %}<tr><td>{{ row.display_name }}</td><td><code>{{ row.permission_code }}</code></td><td>{{ '허용' if row.effect == 'allow' else '거부' }}</td></tr>{% else %}<tr><td colspan="3">개별 설정이 없습니다.</td></tr>{% endfor %}
 </tbody></table></section>
 <section class="card" style="padding:20px"><h2>역할 기본 정책</h2><table><thead><tr><th>역할</th><th>권한</th><th>정책</th></tr></thead><tbody>{% for row in role_assignments %}<tr><td>{{ row.role }}</td><td><code>{{ row.permission_code }}</code></td><td>{{ "허용" if row.effect == "allow" else "거부" }}</td></tr>{% else %}<tr><td colspan="3">별도 역할 정책이 없습니다.</td></tr>{% endfor %}</tbody></table></section>
+<section class="card" style="padding:20px"><h2>권한 변경 이력</h2><table><thead><tr><th>관리자</th><th>대상</th><th>권한</th><th>변경</th><th>시각</th></tr></thead><tbody>{% for row in audit_rows %}<tr><td>{{ row.actor_name or "삭제된 계정" }}</td><td>{{ row.target_name or row.target_role or "—" }}</td><td><code>{{ row.permission_code }}</code></td><td>{{ row.action }}</td><td>{{ row.created_at }}</td></tr>{% else %}<tr><td colspan="5">기록이 없습니다.</td></tr>{% endfor %}</tbody></table></section>
 </main></div></body></html>
 """
 
@@ -536,10 +560,18 @@ def _register_bulk_and_acl_routes(app):
         role_assignments = connection.execute(
             "SELECT role,permission_code,effect FROM acl_role_permissions ORDER BY role,permission_code"
         ).fetchall()
+        audit_rows = connection.execute(
+            """SELECT a.permission_code,a.action,a.target_role,a.created_at,
+            actor.display_name AS actor_name,target.display_name AS target_name
+            FROM acl_audit_log a
+            LEFT JOIN users actor ON actor.uuid=a.actor_uuid
+            LEFT JOIN users target ON target.uuid=a.target_user_uuid
+            ORDER BY a.created_at DESC LIMIT 100"""
+        ).fetchall()
         return render_template_string(
             _ACL_TEMPLATE, users=users, permissions=permissions,
             assignments=assignments, role_assignments=role_assignments,
-            saved=request.args.get("saved") == "1",
+            audit_rows=audit_rows, saved=request.args.get("saved") == "1",
         )
 
     @app.route("/questions/bulk", methods=["GET", "POST"])
