@@ -169,7 +169,7 @@ ACL_PERMISSIONS = (
     ("mcp.questions.write", "MCP 문항 작성", "연동"),
 )
 ACL_DEFAULT_USER_PERMISSIONS = (
-    "questions.view", "questions.create", "questions.edit.own",
+    "questions.view", "questions.create", "questions.edit.own", "questions.edit.any",
     "questions.delete.own", "questions.restore.own",
 )
 ACL_SCHEMA_STATEMENTS = (
