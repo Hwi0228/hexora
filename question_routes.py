@@ -18,13 +18,14 @@ from question_edit_routes import render_question_form, new_question, edit_questi
 from question_history_routes import question_history, restore_question
 from question_folder_routes import new_folder, save_question_note, move_question
 import question_conversion_routes as _conversion_routes
-from flask import Response, abort, g, jsonify, render_template_string, request, url_for
+from flask import Response, abort, g, jsonify, redirect, render_template_string, request, url_for
 from werkzeug.datastructures import MultiDict
 import html
 import json
 import re
 import unicodedata
 import uuid
+from functools import wraps
 from hmleq_converter import (
     HmleqConversionError, HmleqUnavailable,
     convert_hancom_to_latex as run_hmleq,
@@ -72,23 +73,23 @@ def register_question_routes(app):
     app.add_url_rule(
         "/curriculum/standards",
         endpoint="curriculum_standards",
-        view_func=login_required(curriculum_standards),
+        view_func=_acl_required("questions.view")(curriculum_standards),
         methods=["GET"],
     )
     app.add_url_rule(
-        "/questions", endpoint="main", view_func=login_required(main), methods=["GET"]
+        "/questions", endpoint="main", view_func=_acl_required("questions.view")(main), methods=["GET"]
     )
     app.add_url_rule(
         "/questions/code", endpoint="question_by_code",
-        view_func=login_required(question_by_code), methods=["GET"],
+        view_func=_acl_required("questions.view")(question_by_code), methods=["GET"],
     )
     app.add_url_rule(
         "/questions/<int:question_id>/delete", endpoint="delete_question",
-        view_func=login_required(delete_question), methods=["POST"],
+        view_func=_question_acl_required("questions.delete.own", "questions.delete.any")(delete_question), methods=["POST"],
     )
     app.add_url_rule(
         "/questions/<int:question_id>/undelete", endpoint="restore_deleted_question",
-        view_func=login_required(restore_deleted_question), methods=["POST"],
+        view_func=_question_acl_required("questions.restore.own", "questions.restore.any")(restore_deleted_question), methods=["POST"],
     )
     app.add_url_rule(
         "/admin/users",
@@ -105,7 +106,7 @@ def register_question_routes(app):
     app.add_url_rule(
         "/questions/new",
         endpoint="new_question",
-        view_func=login_required(new_question),
+        view_func=_acl_required("questions.create")(new_question),
         methods=["GET", "POST"],
     )
     app.add_url_rule(
@@ -123,19 +124,19 @@ def register_question_routes(app):
     app.add_url_rule(
         "/questions/<int:question_id>/edit",
         endpoint="edit_question",
-        view_func=login_required(edit_question),
+        view_func=_question_acl_required("questions.edit.own", "questions.edit.any")(edit_question),
         methods=["GET", "POST"],
     )
     app.add_url_rule(
         "/questions/<int:question_id>/history",
         endpoint="question_history",
-        view_func=login_required(question_history),
+        view_func=_acl_required("questions.view")(question_history),
         methods=["GET"],
     )
     app.add_url_rule(
         "/questions/<int:question_id>/restore/<int:revision_number>",
         endpoint="restore_question",
-        view_func=login_required(restore_question),
+        view_func=_question_acl_required("questions.edit.own", "questions.edit.any")(restore_question),
         methods=["POST"],
     )
     _register_bulk_and_acl_routes(app)
@@ -245,6 +246,40 @@ def _has_acl_permission(user, permission_code):
 def _require_acl(permission_code):
     if not _has_acl_permission(g.get("user"), permission_code):
         abort(403, description="이 기능을 사용할 권한이 없습니다.")
+
+
+def _acl_required(permission_code):
+    def decorate(view):
+        @wraps(view)
+        def wrapped(*args, **kwargs):
+            if g.get("user") is None:
+                return redirect(url_for("login", next=request.full_path.rstrip("?")))
+            _require_acl(permission_code)
+            return view(*args, **kwargs)
+        return wrapped
+    return decorate
+
+def _question_acl_required(own_permission, any_permission):
+    def decorate(view):
+        @wraps(view)
+        def wrapped(*args, **kwargs):
+            if g.get("user") is None:
+                return redirect(url_for("login", next=request.full_path.rstrip("?")))
+            question_id = kwargs.get("question_id")
+            question = get_db().execute(
+                "SELECT user_uuid FROM questions WHERE id = ?", (question_id,)
+            ).fetchone()
+            if question is None:
+                abort(404)
+            is_owner = question["user_uuid"] == g.user["uuid"]
+            if not (
+                (is_owner and _has_acl_permission(g.user, own_permission))
+                or _has_acl_permission(g.user, any_permission)
+            ):
+                abort(403, description="이 문항을 수정할 권한이 없습니다.")
+            return view(*args, **kwargs)
+        return wrapped
+    return decorate
 
 def _normalize_duplicate_text(value):
     text = html.unescape(re.sub(r"<[^>]*>", " ", str(value or "")))
@@ -356,7 +391,16 @@ _BULK_TEMPLATE = r"""
 <link rel="stylesheet" href="{{ url_for('static', filename='styles/math-rendering.css') }}">
 </head><body><div class="app app-standard">{{ render_sidebar() }}<main>
 <header class="page-header"><p>QUESTION BANK / DATA TOOLS</p><h1>JSON 일괄 등록</h1>
-<p>HEXORA 문항 스키마 v1.0 · 최대 500문항</p></header>
+<p>HEXORA 문항 스키마 v1.0 · 최대 500문항</p><details><summary>JSON 형식 예시</summary><pre>{
+  "version": "1.0",
+  "questions": [{
+    "subject": "수학", "grade": "고2", "course": "수학Ⅱ",
+    "curriculum": "2015 개정 교육과정", "unit": "적분",
+    "prompt": "다음 적분을 계산하시오. $\\int x\\,dx$",
+    "answer": "$\\frac{x^2}{2}+C$", "explanation": "",
+    "choices": [], "source_type": "직접 제작", "license": "ORIGINAL"
+  }]
+}</pre></details></header>
 {% if errors %}<section class="notice warning"><strong>검증 결과</strong><ul>{% for e in errors %}<li>{{ e }}</li>{% endfor %}</ul></section>{% endif %}
 {% if imported is not none %}<section class="notice success">등록 완료: {{ imported }}개 문항</section>{% endif %}
 {% if prepared is none %}
@@ -396,7 +440,9 @@ _ACL_TEMPLATE = r"""
 {% if saved %}<div class="notice success">권한 변경이 저장되었습니다.</div>{% endif %}
 <section class="card" style="padding:20px"><h2>사용자별 권한</h2>
 <form method="post"><input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
-<label>대상 유형 <select name="target_type"><option value="user">사용자별 권한</option><option value="role">역할 기본 권한</option></select></label>\n<label>사용자 <select name="user_uuid"><option value="">선택 안 함</option>{% for user in users %}<option value="{{ user.uuid }}">{{ user.display_name }} ({{ user.email }}) · {{ user.role }}</option>{% endfor %}</select></label>\n<label>역할 <select name="target_role"><option value="user">일반 사용자</option></select></label>
+<label>대상 유형 <select name="target_type"><option value="user">사용자별 권한</option><option value="role">역할 기본 권한</option></select></label>
+<label>사용자 <select name="user_uuid"><option value="">선택 안 함</option>{% for user in users %}<option value="{{ user.uuid }}">{{ user.display_name }} ({{ user.email }}) · {{ user.role }}</option>{% endfor %}</select></label>
+<label>역할 <select name="target_role"><option value="user">일반 사용자</option></select></label>
 <label>권한 <select name="permission_code" required>{% for p in permissions %}<option value="{{ p.code }}">{{ p.category }} · {{ p.label }} ({{ p.code }})</option>{% endfor %}</select></label>
 <label>정책 <select name="effect"><option value="allow">허용</option><option value="deny">명시적 거부</option><option value="none">개별 설정 제거</option></select></label>
 <button type="submit">권한 저장</button></form></section>
