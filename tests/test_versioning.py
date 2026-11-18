@@ -5,8 +5,9 @@ from pathlib import Path
 class VersionMetadataTests(unittest.TestCase):
     def test_current_version_and_changelog_baseline_are_consistent(self):
         root = Path(__file__).resolve().parents[1]
-        self.assertEqual((root / "VERSION").read_text(encoding="utf-8").strip(), "0.2.1")
+        self.assertEqual((root / "VERSION").read_text(encoding="utf-8").strip(), "0.2.2")
         changelog = (root / "CHANGELOG.md").read_text(encoding="utf-8")
+        self.assertIn("## [0.2.2] - Not Released", changelog)
         self.assertIn("## [0.2.1] - 2026-11-14", changelog)
         self.assertIn("## [0.2.0] - 2026-11-11", changelog)
         self.assertIn("## [0.1.3] - 2026-11-08", changelog)
