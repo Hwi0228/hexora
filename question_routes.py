@@ -430,7 +430,7 @@ _BULK_TEMPLATE = r"""
 <form method="post" enctype="multipart/form-data" class="card" style="padding:24px">
 <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
 <label for="file">questions.json</label><input id="file" name="file" type="file" accept=".json,application/json" required>
-<p>문항을 검증하고 미리보기를 확인한 뒤 등록할 수 있습니다.</p><button type="submit">검증 및 미리보기</button>
+<p>문항을 검증하고 미리보기를 확인한 뒤 등록할 수 있습니다. 수식은 구분자 검증 후 KaTeX 미리보기로 확인하세요.</p><button type="submit">검증 및 미리보기</button>
 </form>
 {% else %}
 <section class="card" style="padding:20px"><h2>등록 미리보기</h2>
@@ -659,6 +659,13 @@ def _register_bulk_and_acl_routes(app):
                     connection, question_id, 1, g.user["uuid"], "JSON 일괄 등록",
                     _question_snapshot(question),
                 )
+                if data.get("base_question_id") is not None:
+                    connection.execute(
+                        "INSERT INTO question_links "
+                        "(question_id, related_question_id, relation_type, created_by) "
+                        "VALUES (?, ?, 'variant', ?)",
+                        (question_id, data["base_question_id"], g.user["uuid"]),
+                    )
                 inserted += 1
             connection.commit()
         except Exception:
