@@ -242,7 +242,7 @@ def _normalize_duplicate_text(value):
     return " ".join(unicodedata.normalize("NFKC", text).casefold().split())
 
 def _check_math_delimiters(value):
-    tokens = re.findall(r"(?<!\\)\\$\\$|(?<!\\)\\$|\\\(|\\\)|\\\[|\\\]", str(value or ""))
+    tokens = re.findall(r"(?<!\\)\$\$|(?<!\\)\$|\\\(|\\\)|\\\[|\\\]", str(value or ""))
     stack = []
     pairs = {"\\)": "\\(", "\\]": "\\["}
     for token in tokens:
@@ -387,7 +387,7 @@ _ACL_TEMPLATE = r"""
 {% if saved %}<div class="notice success">권한 변경이 저장되었습니다.</div>{% endif %}
 <section class="card" style="padding:20px"><h2>사용자별 권한</h2>
 <form method="post"><input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
-<label>사용자 <select name="user_uuid" required>{% for user in users %}<option value="{{ user.uuid }}">{{ user.display_name }} ({{ user.email }}) · {{ user.role }}</option>{% endfor %}</select></label>
+<label>대상 유형 <select name="target_type"><option value="user">사용자별 권한</option><option value="role">역할 기본 권한</option></select></label>\n<label>사용자 <select name="user_uuid"><option value="">선택 안 함</option>{% for user in users %}<option value="{{ user.uuid }}">{{ user.display_name }} ({{ user.email }}) · {{ user.role }}</option>{% endfor %}</select></label>\n<label>역할 <select name="target_role"><option value="user">일반 사용자</option></select></label>
 <label>권한 <select name="permission_code" required>{% for p in permissions %}<option value="{{ p.code }}">{{ p.category }} · {{ p.label }} ({{ p.code }})</option>{% endfor %}</select></label>
 <label>정책 <select name="effect"><option value="allow">허용</option><option value="deny">명시적 거부</option><option value="none">개별 설정 제거</option></select></label>
 <button type="submit">권한 저장</button></form></section>
@@ -405,41 +405,61 @@ def _register_bulk_and_acl_routes(app):
         connection = get_db()
         _ensure_acl_schema(connection)
         if request.method == "POST":
+            target_type = request.form.get("target_type", "user")
             target_uuid = request.form.get("user_uuid", "")
+            target_role = request.form.get("target_role", "")
             code = request.form.get("permission_code", "")
             effect = request.form.get("effect", "")
             target = connection.execute(
                 "SELECT uuid, role FROM users WHERE uuid = ?", (target_uuid,)
-            ).fetchone()
+            ).fetchone() if target_type == "user" else None
             known = {item[0] for item in ACL_PERMISSIONS}
-            if target is None or code not in known or effect not in {"allow", "deny", "none"}:
+            valid_target = (target is not None) if target_type == "user" else (target_type == "role" and target_role == "user")
+            if not valid_target or code not in known or effect not in {"allow", "deny", "none"}:
                 abort(400, description="권한 변경 요청이 올바르지 않습니다.")
             if code == "permissions.manage":
                 abort(400, description="권한 관리자 권한은 사용자에게 직접 부여할 수 없습니다.")
             try:
                 begin_write_transaction(connection)
-                if effect == "none":
-                    connection.execute(
-                        "DELETE FROM acl_user_permissions WHERE user_uuid = ? AND permission_code = ?",
-                        (target_uuid, code),
-                    )
-                    action = "remove"
+                if target_type == "role":
+                    if effect == "none":
+                        connection.execute(
+                            "DELETE FROM acl_role_permissions WHERE role = ? AND permission_code = ?",
+                            (target_role, code),
+                        )
+                    else:
+                        connection.execute(
+                            """INSERT INTO acl_role_permissions(role,permission_code,effect,updated_at)
+                            VALUES (?,?,?,CURRENT_TIMESTAMP)
+                            ON CONFLICT(role,permission_code) DO UPDATE SET
+                            effect=excluded.effect, updated_at=CURRENT_TIMESTAMP""",
+                            (target_role, code, effect),
+                        )
+                    target_uuid = None
+                    audit_role = target_role
                 else:
-                    connection.execute(
-                        """INSERT INTO acl_user_permissions
-                        (user_uuid, permission_code, effect, granted_by, updated_at)
-                        VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
-                        ON CONFLICT(user_uuid, permission_code) DO UPDATE SET
-                        effect=excluded.effect, granted_by=excluded.granted_by,
-                        updated_at=CURRENT_TIMESTAMP""",
-                        (target_uuid, code, effect, g.user["uuid"]),
-                    )
-                    action = effect
+                    if effect == "none":
+                        connection.execute(
+                            "DELETE FROM acl_user_permissions WHERE user_uuid = ? AND permission_code = ?",
+                            (target_uuid, code),
+                        )
+                    else:
+                        connection.execute(
+                            """INSERT INTO acl_user_permissions
+                            (user_uuid, permission_code, effect, granted_by, updated_at)
+                            VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
+                            ON CONFLICT(user_uuid, permission_code) DO UPDATE SET
+                            effect=excluded.effect, granted_by=excluded.granted_by,
+                            updated_at=CURRENT_TIMESTAMP""",
+                            (target_uuid, code, effect, g.user["uuid"]),
+                        )
+                    audit_role = None
+                action = "remove" if effect == "none" else effect
                 connection.execute(
                     """INSERT INTO acl_audit_log
-                    (id, actor_uuid, target_user_uuid, permission_code, action)
-                    VALUES (?, ?, ?, ?, ?)""",
-                    (str(uuid.uuid4()), g.user["uuid"], target_uuid, code, action),
+                    (id, actor_uuid, target_user_uuid, target_role, permission_code, action)
+                    VALUES (?, ?, ?, ?, ?, ?)""",
+                    (str(uuid.uuid4()), g.user["uuid"], target_uuid, audit_role, code, action),
                 )
                 connection.commit()
             except Exception:
@@ -457,9 +477,13 @@ def _register_bulk_and_acl_routes(app):
             FROM acl_user_permissions p JOIN users u ON u.uuid=p.user_uuid
             ORDER BY u.display_name,p.permission_code"""
         ).fetchall()
+        role_assignments = connection.execute(
+            "SELECT role,permission_code,effect FROM acl_role_permissions ORDER BY role,permission_code"
+        ).fetchall()
         return render_template_string(
             _ACL_TEMPLATE, users=users, permissions=permissions,
-            assignments=assignments, saved=request.args.get("saved") == "1",
+            assignments=assignments, role_assignments=role_assignments,
+            saved=request.args.get("saved") == "1",
         )
 
     @app.route("/questions/bulk", methods=["GET", "POST"])
