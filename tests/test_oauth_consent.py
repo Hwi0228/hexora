@@ -79,7 +79,7 @@ class OAuthConsentBindingTests(unittest.TestCase):
             "decision": "allow",
             "scope": "questions:read questions:write",
         })
-        self.assertEqual(approved.status_code, 302)
+        self.assertEqual(approved.status_code, 303)
         callback = urlsplit(approved.location)
         callback_params = parse_qs(callback.query)
         self.assertEqual(callback_params["state"], ["state-from-client"])
@@ -123,7 +123,7 @@ class OAuthConsentBindingTests(unittest.TestCase):
             "decision": "allow",
         })
 
-        self.assertEqual(first.status_code, 302)
+        self.assertEqual(first.status_code, 303)
         self.assertEqual(second.status_code, 400)
 
 
