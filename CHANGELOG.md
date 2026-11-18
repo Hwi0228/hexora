@@ -20,16 +20,20 @@
 - HWP 가져오기가 문항·정답 영역을 독립적으로 탐지하고 구조 근거 및 모호성 정보를 사용하도록 개선
 - 구조 검증에 실패한 HWP 가져오기 결과는 저장되지 않도록 처리
 - PostgreSQL 백업·복구 도구 탐색 시 명시된 클라이언트 버전을 우선 사용하도록 개선
+- Auth0 OAuth 2.1 기반 MCP 인증으로 전환하고 검증된 이메일로 기존 HEXORA 계정을 연결
+- MCP 문항 조회·작성 권한을 `questions:read` 및 `questions:write` scope로 분리
 
 ### Security
 - 운영 환경의 비밀키 누락 또는 취약한 설정에서 애플리케이션 시작을 차단
 - 파일 업로드 및 HWPX 압축 해제·XML 처리 경계에 자원 제한 적용
 - 관리자 권한 자동 부여를 제거하고 명시적 초기 관리자 생성 절차 사용
+- Auth0 JWT 서명·issuer·audience·만료를 검증하고 이메일 인증이 완료된 기존 계정만 연결
 
 ### Verification
 - GitHub Actions 전체 테스트 통과 (165개 테스트)
 - Render PR Preview Check 통과
 - SQLite/PostgreSQL 백업·복구 및 HWP 파서 회귀 테스트 포함
+- Auth0 계정 연결 및 MCP 권한 검증 테스트 추가
 
 ### Known Limitations
 - 실제 한컴오피스에서 생성된 HWP/HWPX의 재배포 권한이 확인된 회귀 코퍼스는 아직 확보되지 않음. 현재는 자체 제작 HWPX smoke fixture만 포함
