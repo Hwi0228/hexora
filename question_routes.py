@@ -194,6 +194,7 @@ ACL_SCHEMA_STATEMENTS = (
         target_role TEXT, permission_code TEXT NOT NULL, action TEXT NOT NULL,
         created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
     )""",
+    "CREATE TABLE IF NOT EXISTS acl_meta (key TEXT PRIMARY KEY, value TEXT NOT NULL)",
 )
 
 def _ensure_acl_schema(connection):
@@ -205,11 +206,19 @@ def _ensure_acl_schema(connection):
             "ON CONFLICT(code) DO NOTHING",
             (code, label, category),
         )
-    for code in ACL_DEFAULT_USER_PERMISSIONS:
+    seeded = connection.execute(
+        "SELECT value FROM acl_meta WHERE key = ?", ("default_policies_seeded",)
+    ).fetchone()
+    if seeded is None:
+        for code in ACL_DEFAULT_USER_PERMISSIONS:
+            connection.execute(
+                "INSERT INTO acl_role_permissions(role,permission_code,effect) "
+                "VALUES ('user',?,'allow') ON CONFLICT(role,permission_code) DO NOTHING",
+                (code,),
+            )
         connection.execute(
-            "INSERT INTO acl_role_permissions(role,permission_code,effect) "
-            "VALUES ('user',?,'allow') ON CONFLICT(role,permission_code) DO NOTHING",
-            (code,),
+            "INSERT INTO acl_meta(key,value) VALUES (?,?)",
+            ("default_policies_seeded", "1"),
         )
     connection.commit()
 
@@ -395,6 +404,7 @@ _ACL_TEMPLATE = r"""
 <table><thead><tr><th>사용자</th><th>권한</th><th>정책</th></tr></thead><tbody>
 {% for row in assignments %}<tr><td>{{ row.display_name }}</td><td><code>{{ row.permission_code }}</code></td><td>{{ '허용' if row.effect == 'allow' else '거부' }}</td></tr>{% else %}<tr><td colspan="3">개별 설정이 없습니다.</td></tr>{% endfor %}
 </tbody></table></section>
+<section class="card" style="padding:20px"><h2>역할 기본 정책</h2><table><thead><tr><th>역할</th><th>권한</th><th>정책</th></tr></thead><tbody>{% for row in role_assignments %}<tr><td>{{ row.role }}</td><td><code>{{ row.permission_code }}</code></td><td>{{ "허용" if row.effect == "allow" else "거부" }}</td></tr>{% else %}<tr><td colspan="3">별도 역할 정책이 없습니다.</td></tr>{% endfor %}</tbody></table></section>
 </main></div></body></html>
 """
 
