@@ -20,6 +20,7 @@ class McpApiTests(unittest.TestCase):
         self.client = app.test_client()
         self.environment = patch.dict(os.environ, {
             "HEXORA_MCP_API_TOKEN": "test-api-token",
+            "HEXORA_MCP_SERVICE_USER_UUID": "",
         })
         self.environment.start()
 
@@ -37,14 +38,9 @@ class McpApiTests(unittest.TestCase):
         })
         self.assertEqual(response.status_code, 302)
         with self.client.session_transaction() as session:
-            self.user_uuid = session["user_uuid"]
-        self.headers = {
-            "Authorization": "Bearer test-api-token",
-            "X-HEXORA-Auth0-Sub": "auth0|mcp-test-user",
-            "X-HEXORA-Auth0-Email": "mcp-owner@example.com",
-            "X-HEXORA-Auth0-Email-Verified": "true",
-            "X-HEXORA-Scopes": "questions:read questions:write",
-        }
+            self.service_user_uuid = session["user_uuid"]
+        os.environ["HEXORA_MCP_SERVICE_USER_UUID"] = self.service_user_uuid
+        self.headers = {"Authorization": "Bearer test-api-token"}
 
     def tearDown(self):
         self.environment.stop()
@@ -83,7 +79,8 @@ class McpApiTests(unittest.TestCase):
         )
 
 
-    def test_verified_email_links_to_existing_account_without_service_user(self):
+    def test_service_user_is_provisioned_without_render_shell(self):
+        os.environ["HEXORA_MCP_SERVICE_USER_UUID"] = ""
         response = self.client.get(
             "/api/integrations/mcp/health",
             headers=self.headers,
@@ -91,34 +88,18 @@ class McpApiTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(
             self.query_one(
-                "SELECT uuid FROM users WHERE email = ?",
-                ("mcp-owner@example.com",),
-            ),
-            self.user_uuid,
-        )
-        self.assertEqual(
-            self.query_one(
                 "SELECT COUNT(*) FROM users WHERE email = ?",
                 ("hexora-mcp@service.invalid",),
             ),
-            0,
+            1,
         )
-
-    def test_verified_email_without_existing_account_is_rejected(self):
-        headers = {**self.headers, "X-HEXORA-Auth0-Email": "missing@example.com"}
-        response = self.client.get(
-            "/api/integrations/mcp/health",
-            headers=headers,
+        self.assertEqual(
+            self.query_one(
+                "SELECT role FROM users WHERE email = ?",
+                ("hexora-mcp@service.invalid",),
+            ),
+            "user",
         )
-        self.assertEqual(response.status_code, 403)
-
-    def test_unverified_email_is_rejected(self):
-        headers = {**self.headers, "X-HEXORA-Auth0-Email-Verified": "false"}
-        response = self.client.get(
-            "/api/integrations/mcp/health",
-            headers=headers,
-        )
-        self.assertEqual(response.status_code, 401)
 
     def test_question_can_be_validated_and_created_with_revision(self):
         payload = self.question()
@@ -137,7 +118,6 @@ class McpApiTests(unittest.TestCase):
         )
         self.assertEqual(created.status_code, 201)
         self.assertEqual(created.json["code"], "000001")
-        self.assertEqual(self.query_one("SELECT user_uuid FROM questions"), self.user_uuid)
         self.assertEqual(self.query_one("SELECT COUNT(*) FROM question_revisions"), 1)
         self.assertEqual(self.query_one("SELECT passage FROM questions"), "<p>함수 $f(x)=x^2$</p>")
         self.assertEqual(self.query_one("SELECT examples FROM questions"), "<p>보기</p>")
@@ -174,15 +154,6 @@ class McpApiTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertGreater(response.json["count"], 0)
         self.assertEqual(response.json["standards"][0]["course"], "수학Ⅱ")
-
-    def test_write_scope_is_required_for_validation_and_creation(self):
-        headers = {**self.headers, "X-HEXORA-Scopes": "questions:read"}
-        response = self.client.post(
-            "/api/integrations/mcp/questions/validate",
-            json=self.question(),
-            headers=headers,
-        )
-        self.assertEqual(response.status_code, 403)
 
     def test_invalid_payload_is_rejected(self):
         response = self.client.post(
