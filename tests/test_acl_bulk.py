@@ -44,7 +44,12 @@ class BulkAclTests(unittest.TestCase):
 
     def csrf(self, client):
         with client.session_transaction() as session:
-            return session["csrf_token"]
+            token = session.get("csrf_token")
+        if token is None:
+            client.get("/questions")
+            with client.session_transaction() as session:
+                token = session["csrf_token"]
+        return token
 
     def login(self, client, email):
         client.get("/login")
