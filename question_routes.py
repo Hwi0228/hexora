@@ -242,16 +242,16 @@ def _normalize_duplicate_text(value):
     return " ".join(unicodedata.normalize("NFKC", text).casefold().split())
 
 def _check_math_delimiters(value):
-    tokens = re.findall(r"(?<!\\\\)\\$\\$|(?<!\\\\)\\$|\\\\\\(|\\\\\\)|\\\\\\[|\\\\\\]", str(value or ""))
+    tokens = re.findall(r"(?<!\\)\\$\\$|(?<!\\)\\$|\\\(|\\\)|\\\[|\\\]", str(value or ""))
     stack = []
-    pairs = {"\\\\)": "\\\\(", "\\\\]": "\\\\["}
+    pairs = {"\\)": "\\(", "\\]": "\\["}
     for token in tokens:
         if token in ("$", "$$"):
             if stack and stack[-1] == token:
                 stack.pop()
             else:
                 stack.append(token)
-        elif token in ("\\\\(", "\\\\["):
+        elif token in ("\\(", "\\["):
             stack.append(token)
         elif token in pairs:
             if not stack or stack[-1] != pairs[token]:
@@ -326,8 +326,6 @@ def _validate_bulk_document(document):
         if data is not None:
             key = (data["subject"], _normalize_duplicate_text(data["prompt"]))
             duplicate = key in existing or key in incoming
-            if duplicate:
-                item_errors.append("기존 문항 또는 이번 파일의 다른 문항과 중복 가능성이 있습니다.")
             incoming.add(key)
             prepared.append({"index": index, "data": data, "errors": item_errors,
                              "duplicate": duplicate})
@@ -482,7 +480,10 @@ def _register_bulk_and_acl_routes(app):
             uploaded = request.files.get("file")
             if uploaded is None or not uploaded.filename.lower().endswith(".json"):
                 abort(400, description="JSON 파일을 선택해 주세요.")
-            raw = uploaded.read(8 * 1024 * 1024 + 1).decode("utf-8-sig", errors="strict")
+            try:
+                raw = uploaded.read(8 * 1024 * 1024 + 1).decode("utf-8-sig", errors="strict")
+            except UnicodeDecodeError:
+                abort(400, description="JSON 파일은 UTF-8 인코딩이어야 합니다.")
         if len(raw.encode("utf-8")) > 8 * 1024 * 1024:
             abort(413, description="JSON 파일은 8 MiB 이하여야 합니다.")
         try:
