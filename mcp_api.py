@@ -3,8 +3,11 @@
 import hmac
 import json
 import os
+import secrets
+import uuid
 
 from database import begin_write_transaction, get_db
+from werkzeug.security import generate_password_hash
 from flask import Blueprint, abort, g, jsonify, request
 from question_ids import format_question_number, parse_question_number
 from question_repository import _question_row
@@ -18,39 +21,73 @@ mcp_api = Blueprint("mcp_api", __name__, url_prefix="/api/integrations/mcp")
 
 @mcp_api.before_request
 def authorize():
-    """Authenticate the private MCP bridge and bind a verified Auth0 user."""
     expected = os.environ.get("HEXORA_MCP_API_TOKEN", "")
     authorization = request.headers.get("Authorization", "")
     supplied = authorization[7:] if authorization.startswith("Bearer ") else ""
     if not expected or not supplied or not hmac.compare_digest(expected, supplied):
         abort(401)
 
-    email = request.headers.get("X-HEXORA-Auth0-Email", "").strip().lower()
-    email_verified = request.headers.get("X-HEXORA-Auth0-Email-Verified", "").strip().lower()
-    auth0_sub = request.headers.get("X-HEXORA-Auth0-Sub", "").strip()
-    if not email or email_verified != "true" or not auth0_sub:
-        abort(401, description="A verified Auth0 identity is required")
-
-    # The MCP service verifies the Auth0 JWT signature, issuer, audience and expiry.
-    # Only its private server-to-server credential can reach this bridge, so these
-    # identity headers are accepted only after that upstream verification.
     connection = get_db()
-    user = connection.execute(
-        """SELECT uuid, email, display_name, role
-        FROM users WHERE LOWER(email) = ?""",
-        (email,),
-    ).fetchone()
-    if user is None:
-        abort(
-            403,
-            description="No existing HEXORA account matches this verified Auth0 email",
-        )
-
+    user_token = request.headers.get("X-HEXORA-User-Token", "").strip()
+    if user_token:
+        import hashlib
+        record = connection.execute(
+            """SELECT t.user_uuid, t.scope, t.expires_at
+            FROM oauth_tokens t WHERE t.token_hash = ? AND t.token_type = 'access_token'""",
+            (hashlib.sha256(user_token.encode("utf-8")).hexdigest(),),
+        ).fetchone()
+        import time
+        if record is None or record["expires_at"] < int(time.time()):
+            abort(401)
+        g.user = connection.execute(
+            "SELECT uuid, email, display_name, role FROM users WHERE uuid = ?",
+            (record["user_uuid"],),
+        ).fetchone()
+        if g.user is None:
+            abort(401)
+        g.oauth_scopes = set(record["scope"].split())
+        return
+    service_user_uuid = os.environ.get("HEXORA_MCP_SERVICE_USER_UUID", "").strip()
+    if service_user_uuid:
+        user = connection.execute(
+            "SELECT uuid, email, display_name, role FROM users WHERE uuid = ?",
+            (service_user_uuid,),
+        ).fetchone()
+        if user is None:
+            abort(503, description="Configured MCP service user does not exist")
+    else:
+        # Render Shell is not required: provision the technical author identity
+        # on the first request authenticated with the private server-to-server token.
+        service_email = "hexora-mcp@service.invalid"
+        try:
+            begin_write_transaction(connection, lock_table="users")
+            user = connection.execute(
+                "SELECT uuid, email, display_name, role FROM users WHERE email = ?",
+                (service_email,),
+            ).fetchone()
+            if user is None:
+                service_user_uuid = str(uuid.uuid4())
+                connection.execute(
+                    """
+                    INSERT INTO users (uuid, email, display_name, password_hash, role)
+                    VALUES (?, ?, ?, ?, 'user')
+                    """,
+                    (
+                        service_user_uuid,
+                        service_email,
+                        "HEXORA MCP",
+                        generate_password_hash(secrets.token_urlsafe(48)),
+                    ),
+                )
+                user = connection.execute(
+                    "SELECT uuid, email, display_name, role FROM users WHERE uuid = ?",
+                    (service_user_uuid,),
+                ).fetchone()
+            connection.commit()
+        except Exception:
+            connection.rollback()
+            raise
     g.user = user
-    g.auth0_sub = auth0_sub
-    g.oauth_scopes = set(
-        request.headers.get("X-HEXORA-Scopes", "").strip().split()
-    )
 
 
 @mcp_api.get("/health")
