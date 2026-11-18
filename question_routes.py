@@ -219,7 +219,7 @@ def _ensure_acl_schema(connection):
                 (code,),
             )
         connection.execute(
-            "INSERT INTO acl_meta(key,value) VALUES (?,?)",
+            "INSERT INTO acl_meta(key,value) VALUES (?,?) ON CONFLICT(key) DO NOTHING",
             ("default_policies_seeded", "1"),
         )
     connection.commit()
