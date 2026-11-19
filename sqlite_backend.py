@@ -54,6 +54,14 @@ def _create_question_revision_table(connection):
         "ON question_revisions(question_id, revision_number DESC)"
     )
 
+def _drop_obsolete_question_columns(connection):
+    """Remove legacy question metadata that is no longer part of the question model."""
+    columns = _table_columns(connection, "questions")
+    for name in ("title", "difficulty", "points"):
+        if name in columns:
+            connection.execute(f"ALTER TABLE questions DROP COLUMN {name}")
+
+
 def _ensure_question_additional_columns(connection):
     columns = _table_columns(connection, "questions")
     for name, definition in QUESTION_ADDITIONAL_COLUMNS.items():
@@ -139,6 +147,7 @@ def initialize_database(connection):
                 "ALTER TABLE questions ADD COLUMN explanation TEXT NOT NULL DEFAULT ''"
             )
         _ensure_question_additional_columns(connection)
+        _drop_obsolete_question_columns(connection)
         _create_indexes(connection)
         _create_question_revision_table(connection)
         _create_question_drafts_table(connection)
