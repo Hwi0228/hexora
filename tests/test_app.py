@@ -808,7 +808,7 @@ class QuestionRegistrationTests(unittest.TestCase):
 
         stored_prompt = self.query_one("SELECT prompt FROM questions LIMIT 1")
         self.assertIn("$x^2 + 1$", stored_prompt)
-        self.assertIn("$y = x + 2$", stored_prompt)
+        self.assertIn("$$y = x + 2$$", stored_prompt)
         self.assertNotIn("data-latex", stored_prompt)
         self.assertNotIn("data-input-format", stored_prompt)
         self.assertNotIn("rendered inline markup", stored_prompt)
@@ -817,7 +817,7 @@ class QuestionRegistrationTests(unittest.TestCase):
         question_response = self.client.get("/questions")
         self.assertEqual(question_response.status_code, 200)
         self.assertIn(b"$x^2 + 1$", question_response.data)
-        self.assertIn(b"$y = x + 2$", question_response.data)
+        self.assertIn(b"$$y = x + 2$$", question_response.data)
         self.assertIn(b"scripts/katex-render.js", question_response.data)
         self.assertIn(b'class="math-content"', question_response.data)
 
