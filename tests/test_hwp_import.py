@@ -51,7 +51,7 @@ class HwpImportValidationTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "16MB"):
             _get_section_xml("section0.xml", b"x" * (MAX_SECTION_XML_SIZE + 1))
 
-    def test_import_sanitizes_and_preserves_math_embed_metadata(self):
+    def test_import_sanitizes_math_embeds_to_dollar_delimited_latex(self):
         math = '<span class="ql-math-inline" data-latex="x^2" data-input-format="hancom" data-input-source="x ^ 2" data-math-object="inline"></span>'
         form = MultiDict([
             ("questions_json", json.dumps({"questions": [{
@@ -65,9 +65,10 @@ class HwpImportValidationTests(unittest.TestCase):
         questions, selection, errors, error = _validated_import(form)
         self.assertIsNone(error)
         self.assertEqual(errors, [])
-        self.assertIn('class="ql-math-inline"', questions[0]["question"])
-        self.assertIn('data-latex="x^2"', questions[0]["answer"])
-        self.assertIn('data-input-format="hancom"', questions[0]["answer"])
+        self.assertIn("$x^2$", questions[0]["question"])
+        self.assertNotIn("ql-math-inline", questions[0]["question"])
+        self.assertIn("$x^2$", questions[0]["answer"])
+        self.assertNotIn("data-latex", questions[0]["answer"])
 
     def test_structural_validation_failure_is_rejected_before_persistence(self):
         form = MultiDict([
