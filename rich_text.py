@@ -43,20 +43,16 @@ class _RichTextSanitizer(HTMLParser):
             math_type = "block-math"
 
         if tag in {"span", "div"} and math_type in {"inline-math", "block-math"}:
-            latex = attr_map.get("data-latex", "") or ""
-            input_format = "hancom" if attr_map.get("data-input-format") == "hancom" else "latex"
-            input_source = attr_map.get("data-input-source") or latex
-            safe_class = "ql-math-block" if math_type == "block-math" else "ql-math-inline"
-            safe_tag = "div" if math_type == "block-math" else "span"
+            latex = attr_map.get("data-latex", "") or attr_map.get("data-tex", "") or ""
+            delimiter = "$" if math_type == "block-math" else "$"
+            # Persist equations as plain LaTeX delimiters. Quill's HTML embed is
+            # an editor-only representation and must never become the DB format.
             self.parts.append(
-                f'<{safe_tag} class="{safe_class}" '
-                f'data-latex="{html.escape(latex, quote=True)}" '
-                f'data-input-format="{input_format}" '
-                f'data-input-source="{html.escape(input_source, quote=True)}">'
+                f"{delimiter}{html.escape(latex)}{delimiter}"
             )
-            # Keep only safe equation data. Drop any embedded KaTeX markup.
+            # Drop the editor/KaTeX presentation subtree entirely.
             self.math_skip_depth = 1
-            self.math_close_tag = safe_tag
+            self.math_close_tag = None
             return
 
         self.parts.append(f"<{tag}>")
@@ -73,9 +69,7 @@ class _RichTextSanitizer(HTMLParser):
             self.math_skip_depth -= 1
             if self.math_skip_depth == 0:
                 self.math_skip_depth = None
-                if self.math_close_tag:
-                    self.parts.append(f"</{self.math_close_tag}>")
-                    self.math_close_tag = None
+                self.math_close_tag = None
             return
         if self.stack and self.stack[-1].startswith("__literal__:"):
             literal_tag = self.stack[-1].split(":", 1)[1]
