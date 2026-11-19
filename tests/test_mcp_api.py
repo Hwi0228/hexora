@@ -145,6 +145,10 @@ class McpApiTests(unittest.TestCase):
         )
         self.assertEqual(detail.status_code, 200)
         self.assertEqual(detail.json["question"]["answer"], "$2x$")
+        for removed_field in ("title", "difficulty", "points"):
+            self.assertNotIn(removed_field, detail.json["question"])
+        for removed_field in ("title", "difficulty", "points"):
+            self.assertNotIn(removed_field, search.json["questions"][0])
 
     def test_standards_endpoint_filters_by_course(self):
         response = self.client.get(
