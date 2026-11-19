@@ -20,17 +20,17 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           python - <<'PY'
-          import re
           from pathlib import Path
 
           version = Path("VERSION").read_text(encoding="utf-8").strip()
           changelog = Path("CHANGELOG.md").read_text(encoding="utf-8")
-          heading = re.search(rf"(?m)^## \\[{re.escape(version)}\\][^\\n]*(?:\\n|$)", changelog)
-          if heading is None:
+          heading = f"## [{version}]"
+          start = changelog.find(heading)
+          if start < 0:
               raise SystemExit(f"No changelog section found for {version}")
-          remaining = changelog[heading.end():]
-          next_heading = re.search(r"(?m)^## \\[", remaining)
-          notes = remaining[:next_heading.start() if next_heading else len(remaining)].strip()
+          body_start = changelog.find("\\n", start) + 1
+          next_heading = changelog.find("\\n## [", body_start)
+          notes = changelog[body_start:next_heading if next_heading >= 0 else len(changelog)].strip()
           if not notes:
               raise SystemExit(f"Changelog section for {version} is empty")
           Path("release-notes.md").write_text(notes + "\\n", encoding="utf-8")
