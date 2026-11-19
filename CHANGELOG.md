@@ -2,6 +2,25 @@
 
 이 프로젝트는 Semantic Versioning을 따릅니다.
 
+## [0.2.3] - 2026-11-19
+
+### Added
+- JSON 문항 일괄 등록 기능 추가: 파일·텍스트 입력, 스키마 검증 및 등록 전 미리보기 지원
+- JSON 일괄 등록 시 문항과 최초 수정 이력을 단일 트랜잭션으로 저장하고, 최대 200개·5 MiB 제한 적용
+
+### Changed
+- 문제 본문·선택지·정답·해설의 수식 저장 형식을 LaTeX 구분자(`$...# Changelog
+
+이 프로젝트는 Semantic Versioning을 따릅니다.
+
+, `$...$`)로 정규화하고 기존 편집기 수식 임베드 호환 처리
+- 데이터베이스 초기화 시 SQLite 및 PostgreSQL의 문항 자동 증가 ID 시퀀스도 초기화하도록 수정
+- 문제 목록 화면의 콘텐츠 폭과 레이아웃 정렬 개선
+
+### Verification
+- GitHub Actions unittest 전체 테스트 통과
+- Render Preview 검증은 Render CLI 설치 단계의 외부 오류로 완료되지 않음
+
 ## [0.2.2] - Not Released
 
 ### Added
