@@ -274,7 +274,7 @@ const editorConfig = configNode
         };
         if (clone.matches && clone.matches(".ql-math-inline, .ql-math-block")) {
           const displayMode = clone.classList.contains("ql-math-block");
-          const delimiter = displayMode ? "$" : "$";
+          const delimiter = displayMode ? "$$" : "$";
           return delimiter + (clone.dataset.latex || "") + delimiter;
         }
         clone.querySelectorAll(".ql-math-inline, .ql-math-block").forEach(replaceMath);
@@ -298,7 +298,7 @@ const editorConfig = configNode
             continue;
           }
           const displayMode = text.startsWith("$", index);
-          const delimiter = displayMode ? "$" : "$";
+          const delimiter = displayMode ? "$$" : "$";
           const contentStart = index + delimiter.length;
           let closing = contentStart;
           while (closing < text.length) {
