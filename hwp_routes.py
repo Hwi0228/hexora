@@ -17,6 +17,7 @@ from hwp_engine.core import HwpCoreExtractor
 from hwp_engine.detection import detect_templates
 from hwp_engine.models import QuestionTemplate
 from exam_export_routes import export_exam_hwpx, register_exam_export_routes
+from rich_text import sanitize_rich_html
 
 
 def _render_page(questions=None, result_json=None, error=None, form_data=None):
@@ -189,12 +190,31 @@ def hwp_parser_page():
                 else:
                     raise ValueError("HWP, HWPX 또는 HWPML section0.xml 파일만 업로드할 수 있습니다.")
 
+                # Normalize parser-produced Quill/TeX HTML to the same
+                # dollar-delimited storage format used by JSON question import.
+                for question in questions or []:
+                    if not isinstance(question, dict):
+                        continue
+                    for field in ("question", "answer", "explanation", "passage", "examples"):
+                        value = question.get(field)
+                        if isinstance(value, str):
+                            question[field] = sanitize_rich_html(value)
+                    choices = question.get("choices")
+                    if isinstance(choices, list):
+                        question["choices"] = [
+                            sanitize_rich_html(choice) if isinstance(choice, str) else choice
+                            for choice in choices
+                        ]
+
                 if result_json is None:
-                    result_json = json.dumps(
-                        {"questions": questions},
-                        ensure_ascii=False,
-                        indent=2,
-                    )
+                    payload = {"questions": questions}
+                else:
+                    payload = json.loads(result_json)
+                    if isinstance(payload, dict):
+                        payload["questions"] = questions
+                result_json = json.dumps(
+                    payload, ensure_ascii=False, indent=2
+                )
             except (ValueError, RuntimeError, ET.ParseError, DefusedXmlException) as exc:
                 error = str(exc)
 
