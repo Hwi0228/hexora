@@ -22,7 +22,7 @@
         {% if question.deleted_at %}<span class="tag">삭제된 문제</span>{% endif %}
       </header>
       <article class="question-card">
-        <h1>{{ question.title or question.display_id }}</h1>
+        <h1>문항 {{ question.display_id }}</h1>
         <p>{{ question.subject }} · {{ question.grade }} · {{ question.course or question.unit }}</p>
         {% if question.deleted_at %}
         <p role="status">이 문제는 일반 목록에서 숨겨진 상태입니다. 문제 내용과 코드는 보존되어 있습니다.</p>
