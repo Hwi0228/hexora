@@ -102,14 +102,13 @@ def search_questions():
     query = request.args.get("query", "").strip()
     filters = {
         key: request.args.get(key, "").strip()
-        for key in ("subject", "grade", "course", "achievement_standard", "difficulty")
+        for key in ("subject", "grade", "course", "achievement_standard")
     }
     limit = min(max(request.args.get("limit", 10, type=int), 1), 50)
     sql = """
-        SELECT questions.id, questions.title, questions.subject, questions.grade,
+        SELECT questions.id, questions.subject, questions.grade,
                questions.course, questions.curriculum, questions.unit,
-               questions.achievement_standard, questions.difficulty,
-               questions.question_type, questions.points, questions.passage,
+               questions.achievement_standard, questions.question_type, questions.passage,
                questions.prompt, questions.examples, questions.choices,
                questions.answer, questions.explanation, questions.source_type,
                questions.source, questions.year, questions.exam,
@@ -128,12 +127,11 @@ def search_questions():
     if query:
         sql += """
             AND (
-                questions.title LIKE ? OR questions.prompt LIKE ?
-                OR questions.passage LIKE ? OR questions.explanation LIKE ?
-                OR questions.achievement_standard LIKE ?
+                questions.prompt LIKE ? OR questions.passage LIKE ?
+                OR questions.explanation LIKE ? OR questions.achievement_standard LIKE ?
             )
         """
-        parameters.extend([f"%{query}%"] * 5)
+        parameters.extend([f"%{query}%"] * 4)
     sql += " ORDER BY questions.id DESC LIMIT ?"
     parameters.append(limit)
 
@@ -263,13 +261,13 @@ def create_question():
             INSERT INTO questions (
                 user_uuid, folder_uuid, subject, grade, unit, passage, prompt,
                 examples, choices, answer, explanation, source, year, page,
-                difficulty, question_type, points, course, curriculum,
+                question_type, course, curriculum,
                 achievement_standard, source_type, exam, original_question_number,
-                source_url, license, title
+                source_url, license
             )
             VALUES (
                 ?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
-                ?, ?, ?, ?, ?, ?
+                ?, ?, ?
             )
             RETURNING id
             """,
@@ -278,10 +276,10 @@ def create_question():
                 data["passage"], data["prompt"], data["examples"],
                 json.dumps(data["choices"], ensure_ascii=False), data["answer"],
                 data["explanation"], data["source"], data["year"], data["page"],
-                data["difficulty"], data["question_type"], data["points"],
+                data["question_type"],
                 data["course"], data["curriculum"], data["achievement_standard"],
                 data["source_type"], data["exam"], data["original_question_number"],
-                data["source_url"], data["license"], data["title"],
+                data["source_url"], data["license"],
             ),
         )
         question_id = cursor.fetchone()["id"]
