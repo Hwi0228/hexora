@@ -22,7 +22,7 @@ from hmleq_converter import (
 )
 from constants import NAV_ITEMS, SUBJECTS, LICENSE_CHOICES, SOURCE_TYPES
 from question_constants import (
-    QUESTION_CONTENT_FIELDS, QUESTION_FIELD_LABELS, QUESTION_TYPES, DIFFICULTIES,
+    QUESTION_CONTENT_FIELDS, QUESTION_FIELD_LABELS, QUESTION_TYPES,
     COURSE_OPTIONS, SUBJECT_COURSE_OPTIONS, CURRICULUM_STANDARDS,
 )
 from database import begin_write_transaction, get_db
