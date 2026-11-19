@@ -44,7 +44,7 @@ class _RichTextSanitizer(HTMLParser):
 
         if tag in {"span", "div"} and math_type in {"inline-math", "block-math"}:
             latex = attr_map.get("data-latex", "") or attr_map.get("data-tex", "") or ""
-            delimiter = "$" if math_type == "block-math" else "$"
+            delimiter = "$$" if math_type == "block-math" else "$"
             # Persist equations as plain LaTeX delimiters. Quill's HTML embed is
             # an editor-only representation and must never become the DB format.
             self.parts.append(
