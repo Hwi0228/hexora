@@ -48,7 +48,7 @@ class _RichTextSanitizer(HTMLParser):
             # Persist equations as plain LaTeX delimiters. Quill's HTML embed is
             # an editor-only representation and must never become the DB format.
             self.parts.append(
-                f"{delimiter}{html.escape(latex)}{delimiter}"
+                f"{delimiter}{html.escape(latex, quote=False)}{delimiter}"
             )
             # Drop the editor/KaTeX presentation subtree entirely.
             self.math_skip_depth = 1
