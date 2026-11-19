@@ -102,13 +102,10 @@ def restore_question(question_id, revision_number):
             abort(404)
         snapshot = json.loads(target["snapshot_json"])
         defaults = {
-            "title": "",
             "course": "",
             "curriculum": "2015 개정 교육과정",
             "achievement_standard": "",
-            "difficulty": "중",
             "question_type": "단답형",
-            "points": 4,
             "source_type": "기타",
             "exam": "",
             "original_question_number": "",
