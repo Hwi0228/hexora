@@ -4,7 +4,7 @@ from flask import abort
 
 from constants import SOURCE_TYPES
 from database import get_db
-from question_constants import COURSE_OPTIONS, DIFFICULTIES, QUESTION_TYPES, QUESTION_CONTENT_FIELDS
+from question_constants import COURSE_OPTIONS, QUESTION_TYPES, QUESTION_CONTENT_FIELDS
 from question_ids import format_question_number
 
 
@@ -40,8 +40,6 @@ def _question_form_values(question):
     values["base_question_number"] = (
         format_question_number(base_link["related_question_id"]) if base_link else ""
     )
-    if values.get("difficulty") not in DIFFICULTIES:
-        values["difficulty"] = "중"
     if values.get("question_type") not in QUESTION_TYPES:
         values["question_type"] = "단답형"
     if values.get("curriculum") not in COURSE_OPTIONS:
