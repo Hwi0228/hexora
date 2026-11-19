@@ -261,30 +261,108 @@ const editorConfig = configNode
         });
       }
 
-      // Serialize the editor's source HTML, never KaTeX's rendered SVG.
-      // Quill embeds keep the original TeX in data-latex; their inner DOM is
-      // presentation-only and contains SVG path commands that must not be saved.
+      // Persist math as $...$ / $...$. Quill's HTML embeds are only
+      // an editing representation; no editor markup is stored in the database.
       function serializeEditorNode(node) {
         const clone = node.cloneNode(true);
-        clone.querySelectorAll(".ql-math-inline, .ql-math-block").forEach((mathNode) => {
+        const replaceMath = (mathNode) => {
           const displayMode = mathNode.classList.contains("ql-math-block");
-          const cleanNode = document.createElement(displayMode ? "div" : "span");
-          cleanNode.className = displayMode ? "ql-math-block" : "ql-math-inline";
-          cleanNode.setAttribute("data-latex", mathNode.dataset.latex || "");
-          cleanNode.setAttribute("data-input-format", mathNode.dataset.inputFormat || "latex");
-          cleanNode.setAttribute("data-input-source", mathNode.dataset.inputSource || mathNode.dataset.latex || "");
-          cleanNode.setAttribute("data-math-object", displayMode ? "block" : "inline");
-          cleanNode.setAttribute("aria-label", displayMode ? "블록 수식" : "인라인 수식");
-          mathNode.replaceWith(cleanNode);
-        });
+          const delimiter = displayMode ? "$" : "$";
+          mathNode.replaceWith(document.createTextNode(
+            delimiter + (mathNode.dataset.latex || "") + delimiter
+          ));
+        };
+        if (clone.matches && clone.matches(".ql-math-inline, .ql-math-block")) {
+          const displayMode = clone.classList.contains("ql-math-block");
+          const delimiter = displayMode ? "$" : "$";
+          return delimiter + (clone.dataset.latex || "") + delimiter;
+        }
+        clone.querySelectorAll(".ql-math-inline, .ql-math-block").forEach(replaceMath);
         return clone.outerHTML;
+      }
+
+      function splitDelimitedMath(text) {
+        const parts = [];
+        let plainStart = 0;
+        let index = 0;
+        const escapedAt = (position) => {
+          let slashes = 0;
+          for (let cursor = position - 1; cursor >= 0 && text[cursor] === "\\\\"; cursor--) {
+            slashes += 1;
+          }
+          return slashes % 2 === 1;
+        };
+        while (index < text.length) {
+          if (text[index] !== "$" || escapedAt(index)) {
+            index += 1;
+            continue;
+          }
+          const displayMode = text.startsWith("$", index);
+          const delimiter = displayMode ? "$" : "$";
+          const contentStart = index + delimiter.length;
+          let closing = contentStart;
+          while (closing < text.length) {
+            if (text.startsWith(delimiter, closing) && !escapedAt(closing)) break;
+            closing += 1;
+          }
+          if (closing >= text.length || !text.slice(contentStart, closing).trim()) {
+            index += delimiter.length;
+            continue;
+          }
+          if (index > plainStart) parts.push({ text: text.slice(plainStart, index) });
+          parts.push({
+            latex: text.slice(contentStart, closing),
+            displayMode
+          });
+          index = closing + delimiter.length;
+          plainStart = index;
+        }
+        if (plainStart < text.length) parts.push({ text: text.slice(plainStart) });
+        return parts;
+      }
+
+      // Convert canonical dollar-delimited LaTeX into Quill embeds only while
+      // loading the editor. Text in code/pre blocks remains literal.
+      function convertDelimitedMathForQuill(html) {
+        const documentNode = new DOMParser().parseFromString(html || "", "text/html");
+        const walker = documentNode.createTreeWalker(documentNode.body, NodeFilter.SHOW_TEXT);
+        const textNodes = [];
+        while (walker.nextNode()) {
+          const node = walker.currentNode;
+          if (node.parentElement && node.parentElement.closest(
+            "code, pre, script, style, .ql-math-inline, .ql-math-block"
+          )) continue;
+          if (node.nodeValue.includes("$")) textNodes.push(node);
+        }
+        textNodes.forEach((node) => {
+          const parts = splitDelimitedMath(node.nodeValue);
+          if (!parts.some((part) => Object.prototype.hasOwnProperty.call(part, "latex"))) return;
+          const fragment = documentNode.createDocumentFragment();
+          parts.forEach((part) => {
+            if (Object.prototype.hasOwnProperty.call(part, "latex")) {
+              const embed = documentNode.createElement("span");
+              embed.className = part.displayMode ? "ql-math-block" : "ql-math-inline";
+              embed.dataset.latex = part.latex;
+              embed.dataset.inputFormat = "latex";
+              embed.dataset.inputSource = part.latex;
+              embed.dataset.mathObject = part.displayMode ? "block" : "inline";
+              embed.setAttribute("aria-label", part.displayMode ? "블록 수식" : "인라인 수식");
+              fragment.appendChild(embed);
+            } else {
+              fragment.appendChild(documentNode.createTextNode(part.text));
+            }
+          });
+          node.replaceWith(fragment);
+        });
+        return documentNode.body.innerHTML;
       }
 
       function serializeChoices(quill) {
         return Array.from(quill.root.children)
           .filter((node) => node.textContent.trim() ||
+            node.matches(".ql-math-inline, .ql-math-block") ||
             node.querySelector(".ql-math-inline, .ql-math-block"))
-          .map(serializeEditorNode).join("\n");
+          .map(serializeEditorNode).join("\\n");
       }
 
       function serializeEditor(quill) {
@@ -342,6 +420,8 @@ const editorConfig = configNode
           legacyMathEmbed(node, false));
         quill.clipboard.addMatcher("div.ql-math-block", (node) =>
           legacyMathEmbed(node, true));
+        quill.clipboard.addMatcher("span.ql-math-block", (node) =>
+          legacyMathEmbed(node, true));
 
         // Migrate previously stored TipTap math nodes into native Quill math objects.
         quill.clipboard.addMatcher('span[data-type="inline-math"]', (node) =>
@@ -349,7 +429,10 @@ const editorConfig = configNode
         quill.clipboard.addMatcher('div[data-type="block-math"]', (node) =>
           legacyMathEmbed(node, true));
         const initialHtml = source.value.trim();
-        if (initialHtml) quill.setContents(quill.clipboard.convert({ html: initialHtml }), "silent");
+        if (initialHtml) {
+          const editorHtml = convertDelimitedMathForQuill(initialHtml);
+          quill.setContents(quill.clipboard.convert({ html: editorHtml }), "silent");
+        }
         quill.on("text-change", () => {
           source.value = key === "choices"
             ? serializeChoices(quill)
