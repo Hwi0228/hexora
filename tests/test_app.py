@@ -73,13 +73,11 @@ class QuestionRegistrationTests(unittest.TestCase):
 
     def valid_question(self, **overrides):
         form = {
-            "title": "테스트 문항",
             "subject": "수학",
             "grade": "고2",
             "course": "수학Ⅱ",
             "curriculum": "2015 개정 교육과정",
             "unit": "미분",
-            "difficulty": "중",
             "question_type": "단답형",
             "license": "ORIGINAL",
             "prompt": "<p>지문 $x^2$</p><p>문제 내용 \\(x^2\\)</p><p>보기 $$x + 1$$</p>",
@@ -246,17 +244,14 @@ class QuestionRegistrationTests(unittest.TestCase):
         self.assertEqual(other_response.status_code, 200)
         self.assertNotIn("나만 보는 복습 메모".encode(), other_response.data)
 
-    def test_published_question_records_new_metadata_and_revision_snapshot(self):
+    def test_question_schema_excludes_unused_metadata_and_keeps_revision_fields(self):
         self.csrf_post(
             self.client,
             "/questions/new",
             data=self.valid_question(
-                title="미분계수 문항",
                 course="수학Ⅱ",
                 curriculum="2015 개정 교육과정",
-                difficulty="상",
                 question_type="서술형",
-                points="6",
                 achievement_standard="[12수학Ⅱ02-01] 미분계수의 뜻을 알고, 그 값을 구할 수 있다.",
                 source_type="수능 및 모의평가",
                 exam="2026학년도 6월 모의평가",
@@ -267,11 +262,13 @@ class QuestionRegistrationTests(unittest.TestCase):
         )
         connection = sqlite3.connect(self.database)
         try:
+            columns = {
+                row[1] for row in connection.execute("PRAGMA table_info(questions)")
+            }
             row = connection.execute(
                 """
-                SELECT title, course, curriculum, difficulty, question_type,
-                       points, achievement_standard, source_type, exam,
-                       original_question_number, source_url, license
+                SELECT course, curriculum, question_type, achievement_standard,
+                       source_type, exam, original_question_number, source_url, license
                 FROM questions WHERE id = 1
                 """
             ).fetchone()
@@ -280,12 +277,12 @@ class QuestionRegistrationTests(unittest.TestCase):
             ).fetchone()[0])
         finally:
             connection.close()
-        self.assertEqual(row[0], "미분계수 문항")
-        self.assertEqual(row[3], "상")
-        self.assertEqual(row[4], "서술형")
-        self.assertEqual(row[5], 6)
-        self.assertEqual(row[11], "CC-BY-4.0")
-        self.assertEqual(snapshot["title"], "미분계수 문항")
+        self.assertTrue({"title", "difficulty", "points"}.isdisjoint(columns))
+        self.assertEqual(row[2], "서술형")
+        self.assertEqual(row[3], "[12수학Ⅱ02-01] 미분계수의 뜻을 알고, 그 값을 구할 수 있다.")
+        self.assertEqual(row[-1], "CC-BY-4.0")
+        for removed_field in ("title", "difficulty", "points"):
+            self.assertNotIn(removed_field, snapshot)
         self.assertEqual(snapshot["license"], "CC-BY-4.0")
 
     def test_bootstrapped_admin_and_login_required(self):
@@ -498,10 +495,8 @@ class QuestionRegistrationTests(unittest.TestCase):
             "unit",
             "course",
             "curriculum",
-            "difficulty",
             "question_type",
             "achievement_standard",
-            "title",
             "prompt",
             "choices",
             "answer",
@@ -933,6 +928,7 @@ class QuestionRegistrationTests(unittest.TestCase):
             self.assertIn("uuid", columns)
             self.assertNotIn("id", columns)
             self.assertIn("explanation", question_columns)
+            self.assertTrue({"title", "difficulty", "points"}.isdisjoint(question_columns))
         finally:
             app.config["DATABASE"] = original_database
 
@@ -1041,6 +1037,32 @@ class QuestionRegistrationTests(unittest.TestCase):
             "첫 번째 편집",
         )
 
+    def test_existing_question_metadata_columns_are_removed_on_database_initialization(self):
+        self.csrf_post(self.client, "/questions/new", data=self.valid_question())
+        connection = sqlite3.connect(self.database)
+        try:
+            connection.execute("ALTER TABLE questions ADD COLUMN title TEXT NOT NULL DEFAULT ''")
+            connection.execute("ALTER TABLE questions ADD COLUMN difficulty TEXT NOT NULL DEFAULT '중'")
+            connection.execute("ALTER TABLE questions ADD COLUMN points INTEGER NOT NULL DEFAULT 4")
+            connection.execute(
+                "UPDATE questions SET title = ?, difficulty = ?, points = ? WHERE id = 1",
+                ("legacy title", "상", 8),
+            )
+            connection.commit()
+        finally:
+            connection.close()
+
+        response = self.client.get("/questions")
+        self.assertEqual(response.status_code, 200)
+        connection = sqlite3.connect(self.database)
+        try:
+            columns = {
+                row[1] for row in connection.execute("PRAGMA table_info(questions)")
+            }
+        finally:
+            connection.close()
+        self.assertTrue({"title", "difficulty", "points"}.isdisjoint(columns))
+
     def test_existing_question_rows_are_not_migrated_for_public_wiki(self):
         connection = sqlite3.connect(self.database)
         try:
@@ -1100,11 +1122,12 @@ class QuestionRegistrationTests(unittest.TestCase):
         self.assertIsNotNone(self.query_one(
             "SELECT deleted_at FROM questions WHERE id = 1"
         ))
-        self.assertNotIn("테스트 문항".encode(), self.client.get("/questions").data)
+        self.assertNotIn("문제 내용".encode(), self.client.get("/questions").data)
 
         archived = self.client.get("/questions/code?code=" + code)
         self.assertEqual(archived.status_code, 200)
-        self.assertIn("테스트 문항".encode(), archived.data)
+        self.assertIn("문항 000001".encode(), archived.data)
+        self.assertIn("문제 내용".encode(), archived.data)
         self.assertIn("삭제된 문제".encode(), archived.data)
         self.assertIn("문제 내용".encode(), self.query_one(
             "SELECT prompt FROM questions WHERE id = 1"
@@ -1113,7 +1136,7 @@ class QuestionRegistrationTests(unittest.TestCase):
         restored = self.csrf_post(self.client, "/questions/1/undelete")
         self.assertEqual(restored.status_code, 302)
         self.assertIsNone(self.query_one("SELECT deleted_at FROM questions WHERE id = 1"))
-        self.assertIn("테스트 문항".encode(), self.client.get("/questions").data)
+        self.assertIn("문제 내용".encode(), self.client.get("/questions").data)
 
 
 class EditorFrontendRegressionTests(unittest.TestCase):
