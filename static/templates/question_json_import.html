@@ -43,12 +43,12 @@
 {% if errors %}<section class="json-import-error" role="alert"><strong>검증에 실패했습니다.</strong><ul>{% for error in errors %}<li>{{ error }}</li>{% endfor %}</ul></section>{% endif %}
 {% if preview and not errors %}<section class="json-import-card"><strong>미리보기 · {{ preview|length }}개 문항</strong>
 <p class="json-import-help">아래 항목을 확인한 뒤 등록 버튼을 눌러 주세요. 현재 로그인한 계정이 최초 작성자로 기록됩니다.</p>
-<div class="json-preview-list">{% for question in preview %}<article class="json-preview-item"><strong>{{ question.title or question.prompt|striptags|truncate(70) }}</strong>
-<p>{{ question.subject }} · {{ question.grade }} · {{ question.unit or '단원 미지정' }}</p><p>{{ question.difficulty }} · {{ question.question_type }} · {{ question.points }}점</p></article>{% endfor %}</div>
+<div class="json-preview-list">{% for question in preview %}<article class="json-preview-item"><strong>{{ question.prompt|striptags|truncate(70) }}</strong>
+<p>{{ question.subject }} · {{ question.grade }} · {{ question.unit or '단원 미지정' }}</p><p>{{ question.question_type }}</p></article>{% endfor %}</div>
 </section>{% endif %}
 <section class="json-import-card json-schema"><strong>필드 안내</strong>
 <p><code>subject</code>, <code>grade</code>, <code>prompt</code>, <code>answer</code>, <code>license</code>는 필수입니다. <code>choices</code>는 문자열 배열이며, <code>year</code>와 <code>page</code>는 정수 또는 null입니다.</p>
-<p><code>curriculum</code>: 2015 개정 교육과정 / 2022 개정 교육과정 · <code>difficulty</code>: 하 / 중 / 상 · <code>question_type</code>: 객관식 / 복수 선택 / 단답형 / 서술형</p>
+<p><code>curriculum</code>: 2015 개정 교육과정 / 2022 개정 교육과정 · <code>question_type</code>: 객관식 / 복수 선택 / 단답형 / 서술형</p>
 <p><code>license</code>: ORIGINAL / CC-BY-4.0 / CC-BY-SA-4.0 / CC0-1.0 / PERMISSION</p></section>
 </div></main></div>
 <script>
