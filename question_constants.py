@@ -1,15 +1,14 @@
 QUESTION_CONTENT_FIELDS = (
-    "title", "subject", "grade", "course", "curriculum", "unit",
-    "achievement_standard", "difficulty", "question_type", "points",
+    "subject", "grade", "course", "curriculum", "unit",
+    "achievement_standard", "question_type",
     "passage", "prompt", "examples", "choices", "answer", "explanation",
     "source_type", "source", "year", "exam", "original_question_number",
     "page", "source_url", "license",
 )
 QUESTION_FIELD_LABELS = {
-    "title": "문항 제목", "subject": "과목", "grade": "학년", "course": "교과목",
+    "subject": "과목", "grade": "학년", "course": "교과목",
     "curriculum": "교육과정", "unit": "단원",
-    "achievement_standard": "성취기준", "difficulty": "난이도",
-    "question_type": "문항 유형", "points": "배점", "passage": "지문",
+    "achievement_standard": "성취기준", "question_type": "문항 유형", "passage": "지문",
     "prompt": "문제 내용", "examples": "보기", "choices": "선택지",
     "answer": "정답", "explanation": "해설", "source_type": "출처 유형",
     "source": "출처명", "year": "연도", "exam": "시험 / 회차",
@@ -18,7 +17,6 @@ QUESTION_FIELD_LABELS = {
 }
 
 QUESTION_TYPES = ("객관식", "복수 선택", "단답형", "서술형")
-DIFFICULTIES = ("하", "중", "상")
 COURSE_OPTIONS = {
     "2015 개정 교육과정": ["수학", "수학Ⅰ", "수학Ⅱ", "미적분", "확률과 통계", "기하"],
     "2022 개정 교육과정": ["공통수학1", "공통수학2", "대수", "미적분Ⅰ", "미적분Ⅱ", "확률과 통계", "기하"],
