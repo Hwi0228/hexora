@@ -26,9 +26,9 @@
 .json-preview-item strong{display:block;overflow-wrap:anywhere}.json-preview-item p{font-size:12px;color:var(--muted,#64748b);margin:6px 0 0}
 .json-schema{font-size:12px;color:var(--muted,#64748b);line-height:1.7}.json-schema code{color:#245c9b}
 @media(max-width:700px){.json-import-page{padding:22px 14px 40px}.json-import-card{padding:16px}.json-import-editor{min-height:260px}}
-</style></head><body><div class="app">
+</style></head><body><div class="app app-standard">
 {{ render_sidebar() }}
-<main class="results"><div class="json-import-page">
+<main class="main-area"><div class="json-import-page">
 <header class="json-import-heading"><div class="json-import-eyebrow">QUESTION BANK · DATA TOOLS</div><h1>JSON 일괄 등록</h1>
 <p>JSON 파일을 불러와 문항을 미리 검증한 뒤 공개 문제 은행에 한 번에 등록합니다.</p></header>
 {% if imported_count %}<div class="json-import-success" role="status">{{ imported_count }}개 문항을 등록했습니다. 각 문항의 최초 수정 이력도 함께 생성했습니다.</div>{% endif %}
