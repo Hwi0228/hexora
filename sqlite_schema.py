@@ -60,9 +60,7 @@ CREATE TABLE questions (
     source TEXT NOT NULL,
     year INTEGER,
     page INTEGER,
-    difficulty TEXT NOT NULL DEFAULT '중',
     question_type TEXT NOT NULL DEFAULT '단답형',
-    points INTEGER NOT NULL DEFAULT 4,
     course TEXT NOT NULL DEFAULT '',
     curriculum TEXT NOT NULL DEFAULT '2015 개정 교육과정',
     achievement_standard TEXT NOT NULL DEFAULT '',
@@ -71,7 +69,6 @@ CREATE TABLE questions (
     original_question_number TEXT NOT NULL DEFAULT '',
     source_url TEXT NOT NULL DEFAULT '',
     license TEXT NOT NULL DEFAULT '',
-    title TEXT NOT NULL DEFAULT '',
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 )
 """
@@ -92,9 +89,7 @@ CREATE TABLE IF NOT EXISTS question_drafts (
 """
 
 QUESTION_ADDITIONAL_COLUMNS = {
-    "difficulty": "TEXT NOT NULL DEFAULT '중'",
     "question_type": "TEXT NOT NULL DEFAULT '단답형'",
-    "points": "INTEGER NOT NULL DEFAULT 4",
     "course": "TEXT NOT NULL DEFAULT ''",
     "curriculum": "TEXT NOT NULL DEFAULT '2015 개정 교육과정'",
     "achievement_standard": "TEXT NOT NULL DEFAULT ''",
@@ -103,7 +98,6 @@ QUESTION_ADDITIONAL_COLUMNS = {
     "original_question_number": "TEXT NOT NULL DEFAULT ''",
     "source_url": "TEXT NOT NULL DEFAULT ''",
     "license": "TEXT NOT NULL DEFAULT ''",
-    "title": "TEXT NOT NULL DEFAULT ''",
     "deleted_at": "TEXT",
 }
 
