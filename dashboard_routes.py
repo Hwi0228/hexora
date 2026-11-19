@@ -41,7 +41,7 @@ def dashboard():
 
     recent_questions = connection.execute(
         """
-        SELECT id, title, subject, grade, unit, passage, prompt, examples,
+        SELECT id, subject, grade, unit, passage, prompt, examples,
                choices, source, year, page
         FROM questions
         WHERE deleted_at IS NULL
