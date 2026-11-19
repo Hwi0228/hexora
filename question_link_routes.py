@@ -92,7 +92,7 @@ def question_links(question_id):
 
     related = connection.execute(
         """SELECT question_links.*, workbooks.id AS book_id,
-                  related.id AS related_id, related.title AS related_title,
+                  related.id AS related_id,
                   related.subject AS related_subject, related.prompt AS related_prompt,
                   workbooks.title AS workbook_title, workbooks.publisher,
                   workbook_entries.unit AS source_unit, workbook_entries.page AS source_page,
@@ -105,7 +105,7 @@ def question_links(question_id):
         (question_id,),
     ).fetchall()
     bases = connection.execute(
-        """SELECT question_links.relation_type, questions.id, questions.title,
+        """SELECT question_links.relation_type, questions.id,
                   questions.subject FROM question_links
            JOIN questions ON questions.id = question_links.question_id
            WHERE question_links.related_question_id = ? ORDER BY question_links.id DESC""",
