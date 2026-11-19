@@ -33,8 +33,8 @@ def export_exam_hwpx():
     placeholders = ", ".join("?" for _ in selected_ids)
     rows = get_db().execute(
         f"""
-        SELECT id, subject, grade, title, passage, prompt, examples, choices,
-               answer, explanation, points
+        SELECT id, subject, grade, passage, prompt, examples, choices,
+               answer, explanation
         FROM questions
         WHERE id IN ({placeholders}) AND deleted_at IS NULL
         """,
