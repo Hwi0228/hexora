@@ -5,8 +5,9 @@ from pathlib import Path
 class VersionMetadataTests(unittest.TestCase):
     def test_current_version_and_changelog_baseline_are_consistent(self):
         root = Path(__file__).resolve().parents[1]
-        self.assertEqual((root / "VERSION").read_text(encoding="utf-8").strip(), "0.2.2")
+        self.assertEqual((root / "VERSION").read_text(encoding="utf-8").strip(), "0.2.3")
         changelog = (root / "CHANGELOG.md").read_text(encoding="utf-8")
+        self.assertIn("## [0.2.3] - 2026-11-19", changelog)
         self.assertIn("## [0.2.2] - Not Released", changelog)
         self.assertIn("## [0.2.1] - 2026-11-14", changelog)
         self.assertIn("## [0.2.0] - 2026-11-11", changelog)
@@ -18,7 +19,7 @@ class VersionMetadataTests(unittest.TestCase):
     def test_release_workflow_publishes_new_versions_after_master_merge(self):
         root = Path(__file__).resolve().parents[1]
         workflow = (root / ".github/workflows/release.yml").read_text(encoding="utf-8")
-        self.assertIn("branches: [master]", workflow)
+        self.assertIn("branches: [master, dev]", workflow)
         self.assertIn("VERSION", workflow)
         self.assertIn("CHANGELOG.md", workflow)
         self.assertIn("contents: write", workflow)
