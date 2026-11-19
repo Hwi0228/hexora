@@ -343,8 +343,8 @@ class QuestionRegistrationTests(unittest.TestCase):
             self.assertIn(b"styles/math-rendering.css", response.data)
             self.assertIn(b"scripts/katex-render.js", response.data)
             self.assertNotIn(b"katex@0.16.22/dist/katex.min.js", response.data)
-            self.assertIn(r"\(x^2 + 1\)".encode("utf-8"), response.data)
-            self.assertIn(r"$$\frac{1}{2}$$".encode("utf-8"), response.data)
+            self.assertIn(b"$x^2 + 1$", response.data)
+            self.assertIn(b"$\\frac{1}{2}$", response.data)
 
         root = Path(__file__).resolve().parents[1]
         renderer = (root / "static/scripts/katex-render.js").read_text(encoding="utf-8")
@@ -1245,7 +1245,10 @@ class EditorFrontendRegressionTests(unittest.TestCase):
         self.assertIn('quill.clipboard.addMatcher(\'span[data-type="inline-math"]\'', self.editor_script)
         self.assertIn('quill.clipboard.addMatcher(\'div[data-type="block-math"]\'', self.editor_script)
         self.assertIn('quill.deleteText(index, 1, "user")', self.editor_script)
-        self.assertIn("quill.clipboard.convert({ html: initialHtml })", self.editor_script)
+        self.assertIn("quill.clipboard.convert({ html: editorHtml })", self.editor_script)
+        self.assertIn("convertDelimitedMathForQuill(initialHtml)", self.editor_script)
+        self.assertIn('text.startsWith("$", index)', self.editor_script)
+        self.assertIn('const delimiter = displayMode ? "$" : "$";', self.editor_script)
         self.assertNotIn('quill.insertText(range.index, insertion, "user")', self.editor_script)
 
     def test_prompt_editor_has_an_editable_viewing_box_tool(self):
