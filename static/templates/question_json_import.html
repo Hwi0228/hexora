@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="ko"><head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#f6f7f8"><title>JSON 일괄 등록 | HEXORA</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='styles/shared.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='styles/tokens.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='styles/base.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='styles/layout.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='styles/components.css') }}">
+<style>
+.json-import-page{box-sizing:border-box;width:100%;max-width:1120px;min-width:0;margin:0 auto;padding:34px clamp(18px,4vw,48px) 56px}
+.json-import-heading{margin-bottom:24px}.json-import-eyebrow{font-size:11px;letter-spacing:.13em;font-weight:750;color:var(--muted,#64748b)}
+.json-import-heading h1{font-size:clamp(25px,3vw,34px);letter-spacing:-.04em;margin:8px 0}.json-import-heading p{color:var(--muted,#64748b);margin:0;line-height:1.65}
+.json-import-card{background:var(--surface,#fff);border:1px solid var(--border,#dce3eb);border-radius:16px;padding:22px;box-shadow:0 5px 20px #172b4d08;margin:18px 0}
+.json-import-toolbar{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:12px}
+.json-import-toolbar label{font-weight:700}.json-import-toolbar input[type=file]{max-width:100%;font-size:13px}
+.json-import-editor{display:block;box-sizing:border-box;width:100%;min-width:0;max-width:100%;min-height:340px;resize:vertical;border:1px solid var(--border,#dce3eb);border-radius:10px;padding:14px;background:#fbfcfe;color:#1e293b;font:13px/1.65 ui-monospace,SFMono-Regular,Consolas,monospace}
+.json-import-actions{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:16px}
+.json-import-button{border:1px solid #245c9b;border-radius:9px;padding:10px 16px;background:#245c9b;color:white;font-weight:700;cursor:pointer}
+.json-import-button.secondary{background:white;color:#245c9b}
+.json-import-help{font-size:13px;color:var(--muted,#64748b);line-height:1.7;margin:12px 0 0}
+.json-import-error{border:1px solid #efcaca;background:#fff7f7;color:#9b3030;border-radius:10px;padding:14px 16px;margin:16px 0}
+.json-import-success{border:1px solid #b8dfc5;background:#f2fbf5;color:#17643a;border-radius:10px;padding:14px 16px;margin:16px 0}
+.json-preview-list{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:10px;margin-top:14px}
+.json-preview-item{border:1px solid var(--border,#dce3eb);border-radius:10px;padding:13px;min-width:0}
+.json-preview-item strong{display:block;overflow-wrap:anywhere}.json-preview-item p{font-size:12px;color:var(--muted,#64748b);margin:6px 0 0}
+.json-schema{font-size:12px;color:var(--muted,#64748b);line-height:1.7}.json-schema code{color:#245c9b}
+@media(max-width:700px){.json-import-page{padding:22px 14px 40px}.json-import-card{padding:16px}.json-import-editor{min-height:260px}}
+</style></head><body><div class="app app-standard">
+{{ render_sidebar() }}
+<main class="main-area"><div class="json-import-page">
+<header class="json-import-heading"><div class="json-import-eyebrow">QUESTION BANK · DATA TOOLS</div><h1>JSON 일괄 등록</h1>
+<p>JSON 파일을 불러와 문항을 미리 검증한 뒤 공개 문제 은행에 한 번에 등록합니다.</p></header>
+{% if imported_count %}<div class="json-import-success" role="status">{{ imported_count }}개 문항을 등록했습니다. 각 문항의 최초 수정 이력도 함께 생성했습니다.</div>{% endif %}
+<section class="json-import-card"><form method="post" action="{{ url_for('json_question_import') }}">
+<input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
+<div class="json-import-toolbar"><label for="json-data">JSON 데이터</label><input id="json-file" type="file" accept=".json,application/json" aria-label="JSON 파일 선택"></div>
+<textarea class="json-import-editor" id="json-data" name="json_data" spellcheck="false" placeholder='{"questions":[...]}' required>{{ raw_json }}</textarea>
+<p class="json-import-help">최대 {{ max_questions }}개 문항 · 파일 최대 5 MiB · 미리보기 단계에서는 DB에 저장하지 않습니다. 등록은 전체 문항이 검증된 경우에만 한 트랜잭션으로 처리됩니다.</p>
+<div class="json-import-actions"><button class="json-import-button secondary" type="submit" name="action" value="preview">JSON 검증 및 미리보기</button>
+{% if preview and not errors %}<button class="json-import-button" type="submit" name="action" value="import" onclick="return confirm('{{ preview|length }}개 문항을 문제 은행에 등록할까요?')">{{ preview|length }}개 문항 등록</button>{% endif %}</div>
+</form></section>
+{% if errors %}<section class="json-import-error" role="alert"><strong>검증에 실패했습니다.</strong><ul>{% for error in errors %}<li>{{ error }}</li>{% endfor %}</ul></section>{% endif %}
+{% if preview and not errors %}<section class="json-import-card"><strong>미리보기 · {{ preview|length }}개 문항</strong>
+<p class="json-import-help">아래 항목을 확인한 뒤 등록 버튼을 눌러 주세요. 현재 로그인한 계정이 최초 작성자로 기록됩니다.</p>
+<div class="json-preview-list">{% for question in preview %}<article class="json-preview-item"><strong>{{ question.prompt|striptags|truncate(70) }}</strong>
+<p>{{ question.subject }} · {{ question.grade }} · {{ question.unit or '단원 미지정' }}</p><p>{{ question.question_type }}</p></article>{% endfor %}</div>
+</section>{% endif %}
+<section class="json-import-card json-schema"><strong>필드 안내</strong>
+<p><code>subject</code>, <code>grade</code>, <code>prompt</code>, <code>answer</code>, <code>license</code>는 필수입니다. <code>choices</code>는 문자열 배열이며, <code>year</code>와 <code>page</code>는 정수 또는 null입니다.</p>
+<p><code>curriculum</code>: 2015 개정 교육과정 / 2022 개정 교육과정 · <code>question_type</code>: 객관식 / 복수 선택 / 단답형 / 서술형</p>
+<p><code>license</code>: ORIGINAL / CC-BY-4.0 / CC-BY-SA-4.0 / CC0-1.0 / PERMISSION</p></section>
+</div></main></div>
+<script>
+const fileInput=document.getElementById("json-file"),jsonEditor=document.getElementById("json-data");
+fileInput.addEventListener("change",async()=>{const file=fileInput.files&&fileInput.files[0];if(!file)return;
+if(file.size>5*1024*1024){alert("JSON 파일은 5 MiB 이하여야 합니다.");fileInput.value="";return;}
+jsonEditor.value=await file.text();});
+</script></body></html>

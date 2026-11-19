@@ -2,23 +2,20 @@ from flask import g
 
 from constants import SUBJECTS, LICENSE_CHOICES, SOURCE_TYPES
 from database import get_db
-from question_constants import COURSE_OPTIONS, DIFFICULTIES, QUESTION_TYPES
+from question_constants import COURSE_OPTIONS, QUESTION_TYPES
 from question_ids import parse_question_number
 from rich_text import sanitize_rich_html, _rich_text_has_content
 
 
 def _collect_question_data(form):
     data = {
-        "title": form.get("title", "").strip(),
         "subject": form.get("subject", "").strip(),
         "grade": form.get("grade", "").strip(),
         "course": form.get("course", "").strip(),
         "curriculum": form.get("curriculum", "").strip(),
         "unit": form.get("unit", "").strip(),
         "achievement_standard": form.get("achievement_standard", "").strip(),
-        "difficulty": form.get("difficulty", "중").strip(),
         "question_type": form.get("question_type", "단답형").strip(),
-        "points": None,
         "passage": "",
         "prompt": sanitize_rich_html(form.get("prompt", "")),
         "examples": "",
@@ -47,8 +44,6 @@ def _collect_question_data(form):
         errors.append("과목을 선택해 주세요.")
     if data["curriculum"] not in COURSE_OPTIONS:
         errors.append("교육과정을 선택해 주세요.")
-    if data["difficulty"] not in DIFFICULTIES:
-        errors.append("난이도를 선택해 주세요.")
     if data["question_type"] not in QUESTION_TYPES:
         errors.append("문항 유형을 선택해 주세요.")
     if data["source_type"] not in SOURCE_TYPES:
@@ -72,7 +67,7 @@ def _collect_question_data(form):
         errors.append("정답을 입력해 주세요.")
 
     for field, label, maximum in (
-        ("title", "문항 제목", 200), ("grade", "학년", 50), ("course", "교과목", 100),
+        ("grade", "학년", 50), ("course", "교과목", 100),
         ("unit", "단원", 200), ("achievement_standard", "성취기준", 4000),
         ("prompt", "문제 내용", 50000), ("answer", "정답", 10000),
         ("explanation", "해설", 20000), ("source", "출처명", 300),
@@ -87,11 +82,9 @@ def _collect_question_data(form):
         errors.append("각 선택지는 2,000자 이내로 입력해 주세요.")
 
     for field, label, maximum in (
-        ("year", "연도", 2200), ("page", "페이지", 10000), ("points", "배점", 100)
+        ("year", "연도", 2200), ("page", "페이지", 10000)
     ):
         value = form.get(field, "").strip()
-        if field == "points" and not value:
-            value = "4"
         if not value:
             continue
         try:

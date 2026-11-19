@@ -104,7 +104,6 @@
               <button class="detail-button" type="button" aria-expanded="false">자세히</button>
             </div>
             <div class="question-content">
-              {% if question.title %}<h3 class="question-card-title">{{ question.title }}</h3>{% endif %}
               <div class="math-content">{{ question.prompt|safe }}</div>
               <div class="choices">
                 {% for choice in question.choices %}

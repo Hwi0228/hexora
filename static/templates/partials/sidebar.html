@@ -11,6 +11,9 @@
     <a class="nav-link{% if request.endpoint == 'hwp_parser_page' %} active{% endif %}" href="{{ url_for('hwp_parser_page') }}"{% if request.endpoint == 'hwp_parser_page' %} aria-current="page"{% endif %}><span class="nav-icon" aria-hidden="true">◇</span><span class="nav-label-text">HWP 파싱</span></a>
     <a class="nav-link{% if request.endpoint == 'new_question' %} active{% endif %}" href="{{ url_for('new_question') }}"{% if request.endpoint == 'new_question' %} aria-current="page"{% endif %}><span class="nav-icon" aria-hidden="true">＋</span><span class="nav-label-text">문제 등록</span></a>
   </nav>
+  <nav class="nav-section" aria-label="문항 데이터 도구">
+    <a class="nav-link{% if request.endpoint == 'json_question_import' %} active{% endif %}" href="{{ url_for('json_question_import') }}"{% if request.endpoint == 'json_question_import' %} aria-current="page"{% endif %}><span class="nav-icon" aria-hidden="true">{ }</span><span class="nav-label-text">JSON 일괄 등록</span></a>
+  </nav>
   <div class="nav-label">PROJECT</div>
   <nav class="nav-section" aria-label="프로젝트">
     <a class="nav-link{% if request.endpoint == 'changelog' %} active{% endif %}" href="{{ url_for('changelog') }}"{% if request.endpoint == 'changelog' %} aria-current="page"{% endif %}><span class="nav-icon" aria-hidden="true">◷</span><span class="nav-label-text">변경 이력</span></a>

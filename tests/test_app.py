@@ -73,16 +73,14 @@ class QuestionRegistrationTests(unittest.TestCase):
 
     def valid_question(self, **overrides):
         form = {
-            "title": "테스트 문항",
             "subject": "수학",
             "grade": "고2",
             "course": "수학Ⅱ",
             "curriculum": "2015 개정 교육과정",
             "unit": "미분",
-            "difficulty": "중",
             "question_type": "단답형",
             "license": "ORIGINAL",
-            "prompt": "<p>지문 $x^2$</p><p>문제 내용 \\(x^2\\)</p><p>보기 $$x + 1$$</p>",
+            "prompt": "<p>지문 $x^2$</p><p>문제 내용 $x^2$</p><p>보기 $$x + 1$$</p>",
             "choices": "첫 번째 $x$\n두 번째\n세 번째",
             "answer": "$x = 2$",
             "source": "직접 등록한 출처",
@@ -175,7 +173,7 @@ class QuestionRegistrationTests(unittest.TestCase):
         self.assertEqual(self.query_one("SELECT COUNT(*) FROM question_revisions WHERE question_id = 1"), 1)
         self.assertEqual(
             self.query_one("SELECT prompt FROM questions WHERE id = 1"),
-            "<p>지문 $x^2$</p><p>문제 내용 \\(x^2\\)</p><p>보기 $$x + 1$$</p>",
+            "<p>지문 $x^2$</p><p>문제 내용 $x^2$</p><p>보기 $$x + 1$$</p>",
         )
         self.assertEqual(self.query_one("SELECT COUNT(*) FROM question_drafts"), 1)
 
@@ -246,17 +244,14 @@ class QuestionRegistrationTests(unittest.TestCase):
         self.assertEqual(other_response.status_code, 200)
         self.assertNotIn("나만 보는 복습 메모".encode(), other_response.data)
 
-    def test_published_question_records_new_metadata_and_revision_snapshot(self):
+    def test_question_schema_excludes_unused_metadata_and_keeps_revision_fields(self):
         self.csrf_post(
             self.client,
             "/questions/new",
             data=self.valid_question(
-                title="미분계수 문항",
                 course="수학Ⅱ",
                 curriculum="2015 개정 교육과정",
-                difficulty="상",
                 question_type="서술형",
-                points="6",
                 achievement_standard="[12수학Ⅱ02-01] 미분계수의 뜻을 알고, 그 값을 구할 수 있다.",
                 source_type="수능 및 모의평가",
                 exam="2026학년도 6월 모의평가",
@@ -267,11 +262,13 @@ class QuestionRegistrationTests(unittest.TestCase):
         )
         connection = sqlite3.connect(self.database)
         try:
+            columns = {
+                row[1] for row in connection.execute("PRAGMA table_info(questions)")
+            }
             row = connection.execute(
                 """
-                SELECT title, course, curriculum, difficulty, question_type,
-                       points, achievement_standard, source_type, exam,
-                       original_question_number, source_url, license
+                SELECT course, curriculum, question_type, achievement_standard,
+                       source_type, exam, original_question_number, source_url, license
                 FROM questions WHERE id = 1
                 """
             ).fetchone()
@@ -280,12 +277,12 @@ class QuestionRegistrationTests(unittest.TestCase):
             ).fetchone()[0])
         finally:
             connection.close()
-        self.assertEqual(row[0], "미분계수 문항")
-        self.assertEqual(row[3], "상")
-        self.assertEqual(row[4], "서술형")
-        self.assertEqual(row[5], 6)
-        self.assertEqual(row[11], "CC-BY-4.0")
-        self.assertEqual(snapshot["title"], "미분계수 문항")
+        self.assertTrue({"title", "difficulty", "points"}.isdisjoint(columns))
+        self.assertEqual(row[2], "서술형")
+        self.assertEqual(row[3], "[12수학Ⅱ02-01] 미분계수의 뜻을 알고, 그 값을 구할 수 있다.")
+        self.assertEqual(row[-1], "CC-BY-4.0")
+        for removed_field in ("title", "difficulty", "points"):
+            self.assertNotIn(removed_field, snapshot)
         self.assertEqual(snapshot["license"], "CC-BY-4.0")
 
     def test_bootstrapped_admin_and_login_required(self):
@@ -346,8 +343,8 @@ class QuestionRegistrationTests(unittest.TestCase):
             self.assertIn(b"styles/math-rendering.css", response.data)
             self.assertIn(b"scripts/katex-render.js", response.data)
             self.assertNotIn(b"katex@0.16.22/dist/katex.min.js", response.data)
-            self.assertIn(r"\(x^2 + 1\)".encode("utf-8"), response.data)
-            self.assertIn(r"$$\frac{1}{2}$$".encode("utf-8"), response.data)
+            self.assertIn(b"$x^2 + 1$", response.data)
+            self.assertIn(b"$\\frac{1}{2}$", response.data)
 
         root = Path(__file__).resolve().parents[1]
         renderer = (root / "static/scripts/katex-render.js").read_text(encoding="utf-8")
@@ -365,7 +362,7 @@ class QuestionRegistrationTests(unittest.TestCase):
         self.assertIn("지문 수식".encode("utf-8"), dashboard_response.data)
         self.assertIn("보기 수식".encode("utf-8"), dashboard_response.data)
         self.assertIn("선택지 수식".encode("utf-8"), dashboard_response.data)
-        self.assertIn(b'data-latex="x^2"', dashboard_response.data)
+        self.assertIn(b"$x^2$", dashboard_response.data)
         self.assertIn(b'class="question-choice math-content"', dashboard_response.data)
         self.assertNotIn(b"&lt;span class=\"ql-math-inline\"", dashboard_response.data)
 
@@ -498,10 +495,8 @@ class QuestionRegistrationTests(unittest.TestCase):
             "unit",
             "course",
             "curriculum",
-            "difficulty",
             "question_type",
             "achievement_standard",
-            "title",
             "prompt",
             "choices",
             "answer",
@@ -710,7 +705,7 @@ class QuestionRegistrationTests(unittest.TestCase):
             "고2",
             "미분",
             "",
-            "<p>지문 $x^2$</p><p>문제 내용 \\(x^2\\)</p><p>보기 $$x + 1$$</p>",
+            "<p>지문 $x^2$</p><p>문제 내용 $x^2$</p><p>보기 $$x + 1$$</p>",
             "",
         ))
         self.assertEqual(json.loads(row[7]), ["첫 번째 $x$", "두 번째", "세 번째"])
@@ -796,11 +791,12 @@ class QuestionRegistrationTests(unittest.TestCase):
         self.assertIn(r'{ left: "\\[", right: "\\]", display: true }', renderer)
 
 
-    def test_quill_math_embeds_preserve_source_format_and_render_in_question_bank(self):
+    def test_quill_math_embeds_are_persisted_as_dollar_delimited_latex(self):
         prompt_html = (
             '<p>인라인 수식 '
             '<span class="ql-math-inline" data-latex="x^2 + 1" data-input-format="hancom" data-input-source="{x} over {y}">'
-            '<span class="katex">rendered inline markup</span></span></p>'
+            '<span class="katex">rendered inline markup</span></span> '
+            '<span class="ql-math-inline" data-latex="f&#x27;(2)"></span></p>'
             '<div class="ql-math-block" data-latex="y = x + 2">'
             '<span class="katex-display">rendered block markup</span></div>'
         )
@@ -812,19 +808,74 @@ class QuestionRegistrationTests(unittest.TestCase):
         self.assertEqual(response.status_code, 302)
 
         stored_prompt = self.query_one("SELECT prompt FROM questions LIMIT 1")
-        self.assertIn('data-latex="x^2 + 1"', stored_prompt)
-        self.assertIn('data-input-format="hancom"', stored_prompt)
-        self.assertIn('data-input-source="{x} over {y}"', stored_prompt)
-        self.assertIn('data-input-format="latex"', stored_prompt)
+        self.assertIn("$x^2 + 1$", stored_prompt)
+        self.assertIn("$f'(2)$", stored_prompt)
+        self.assertIn("$$y = x + 2$$", stored_prompt)
+        self.assertNotIn("data-latex", stored_prompt)
+        self.assertNotIn("data-input-format", stored_prompt)
         self.assertNotIn("rendered inline markup", stored_prompt)
         self.assertNotIn("rendered block markup", stored_prompt)
 
         question_response = self.client.get("/questions")
         self.assertEqual(question_response.status_code, 200)
-        self.assertIn('data-latex="x^2 + 1"'.encode(), question_response.data)
-        self.assertIn('data-input-source="{x} over {y}"'.encode(), question_response.data)
+        self.assertIn(b"$x^2 + 1$", question_response.data)
+        self.assertIn(b"$$y = x + 2$$", question_response.data)
         self.assertIn(b"scripts/katex-render.js", question_response.data)
         self.assertIn(b'class="math-content"', question_response.data)
+
+    def test_plain_latex_delimiters_survive_sanitization_and_rendering(self):
+        response = self.csrf_post(
+            self.client,
+            "/questions/new",
+            data=self.valid_question(
+                prompt="<p>함수 $f(x)=x^3-3x^2+2$에 대하여 $f'(2)$를 구하시오.</p>"
+            ),
+        )
+        self.assertEqual(response.status_code, 302)
+        stored = self.query_one("SELECT prompt FROM questions LIMIT 1")
+        self.assertIn("$f(x)=x^3-3x^2+2$", stored)
+        self.assertIn("$f'(2)$", stored)
+        self.assertNotIn("ql-math", stored)
+
+    def test_json_import_accepts_simple_dollar_delimited_latex(self):
+        payload = {
+            "questions": [{
+                "subject": "수학",
+                "grade": "고2",
+                "course": "수학Ⅱ",
+                "curriculum": "2015 개정 교육과정",
+                "question_type": "단답형",
+                "prompt": "다항함수 $f(x)=x^3-3x^2+2$에 대하여 $f'(2)$의 값을 구하시오.",
+                "answer": "$0$",
+                "source_type": "직접 제작",
+                "license": "ORIGINAL",
+            }]
+        }
+        response = self.csrf_post(
+            self.client,
+            "/questions/import-json",
+            data={"json_data": json.dumps(payload, ensure_ascii=False), "action": "import"},
+        )
+        self.assertEqual(response.status_code, 200)
+        stored = self.query_one("SELECT prompt FROM questions LIMIT 1")
+        self.assertIn("$f(x)=x^3-3x^2+2$", stored)
+        self.assertIn("$f'(2)$", stored)
+        self.assertNotIn("ql-math", stored)
+
+    def test_alternate_math_delimiters_are_normalized_to_dollars(self):
+        response = self.csrf_post(
+            self.client,
+            "/questions/new",
+            data=self.valid_question(
+                prompt=r"<p>인라인 \(x+1\) 블록 \[x+2\]</p>"
+            ),
+        )
+        self.assertEqual(response.status_code, 302)
+        stored = self.query_one("SELECT prompt FROM questions LIMIT 1")
+        self.assertIn("$x+1$", stored)
+        self.assertIn("$$x+2$$", stored)
+        self.assertNotIn(r"\(", stored)
+        self.assertNotIn(r"\[", stored)
 
     def test_question_text_is_html_escaped(self):
         self.csrf_post(
@@ -933,6 +984,7 @@ class QuestionRegistrationTests(unittest.TestCase):
             self.assertIn("uuid", columns)
             self.assertNotIn("id", columns)
             self.assertIn("explanation", question_columns)
+            self.assertTrue({"title", "difficulty", "points"}.isdisjoint(question_columns))
         finally:
             app.config["DATABASE"] = original_database
 
@@ -1041,6 +1093,32 @@ class QuestionRegistrationTests(unittest.TestCase):
             "첫 번째 편집",
         )
 
+    def test_existing_question_metadata_columns_are_removed_on_database_initialization(self):
+        self.csrf_post(self.client, "/questions/new", data=self.valid_question())
+        connection = sqlite3.connect(self.database)
+        try:
+            connection.execute("ALTER TABLE questions ADD COLUMN title TEXT NOT NULL DEFAULT ''")
+            connection.execute("ALTER TABLE questions ADD COLUMN difficulty TEXT NOT NULL DEFAULT '중'")
+            connection.execute("ALTER TABLE questions ADD COLUMN points INTEGER NOT NULL DEFAULT 4")
+            connection.execute(
+                "UPDATE questions SET title = ?, difficulty = ?, points = ? WHERE id = 1",
+                ("legacy title", "상", 8),
+            )
+            connection.commit()
+        finally:
+            connection.close()
+
+        response = self.client.get("/questions")
+        self.assertEqual(response.status_code, 200)
+        connection = sqlite3.connect(self.database)
+        try:
+            columns = {
+                row[1] for row in connection.execute("PRAGMA table_info(questions)")
+            }
+        finally:
+            connection.close()
+        self.assertTrue({"title", "difficulty", "points"}.isdisjoint(columns))
+
     def test_existing_question_rows_are_not_migrated_for_public_wiki(self):
         connection = sqlite3.connect(self.database)
         try:
@@ -1100,11 +1178,12 @@ class QuestionRegistrationTests(unittest.TestCase):
         self.assertIsNotNone(self.query_one(
             "SELECT deleted_at FROM questions WHERE id = 1"
         ))
-        self.assertNotIn("테스트 문항".encode(), self.client.get("/questions").data)
+        self.assertNotIn("문제 내용".encode(), self.client.get("/questions").data)
 
         archived = self.client.get("/questions/code?code=" + code)
         self.assertEqual(archived.status_code, 200)
-        self.assertIn("테스트 문항".encode(), archived.data)
+        self.assertIn("문항 000001".encode(), archived.data)
+        self.assertIn("문제 내용".encode(), archived.data)
         self.assertIn("삭제된 문제".encode(), archived.data)
         self.assertIn("문제 내용".encode(), self.query_one(
             "SELECT prompt FROM questions WHERE id = 1"
@@ -1113,7 +1192,7 @@ class QuestionRegistrationTests(unittest.TestCase):
         restored = self.csrf_post(self.client, "/questions/1/undelete")
         self.assertEqual(restored.status_code, 302)
         self.assertIsNone(self.query_one("SELECT deleted_at FROM questions WHERE id = 1"))
-        self.assertIn("테스트 문항".encode(), self.client.get("/questions").data)
+        self.assertIn("문제 내용".encode(), self.client.get("/questions").data)
 
 
 class EditorFrontendRegressionTests(unittest.TestCase):
@@ -1165,10 +1244,14 @@ class EditorFrontendRegressionTests(unittest.TestCase):
         self.assertIn('data-input-source', self.editor_script)
         self.assertIn('quill.clipboard.addMatcher("span.ql-math-inline"', self.editor_script)
         self.assertIn('quill.clipboard.addMatcher("div.ql-math-block"', self.editor_script)
+        self.assertIn('quill.clipboard.addMatcher("span.ql-math-block"', self.editor_script)
         self.assertIn('quill.clipboard.addMatcher(\'span[data-type="inline-math"]\'', self.editor_script)
         self.assertIn('quill.clipboard.addMatcher(\'div[data-type="block-math"]\'', self.editor_script)
         self.assertIn('quill.deleteText(index, 1, "user")', self.editor_script)
-        self.assertIn("quill.clipboard.convert({ html: initialHtml })", self.editor_script)
+        self.assertIn("quill.clipboard.convert({ html: editorHtml })", self.editor_script)
+        self.assertIn("convertDelimitedMathForQuill(initialHtml)", self.editor_script)
+        self.assertIn('text.startsWith("$$", index)', self.editor_script)
+        self.assertIn('const delimiter = displayMode ? "$$" : "$";', self.editor_script)
         self.assertNotIn('quill.insertText(range.index, insertion, "user")', self.editor_script)
 
     def test_prompt_editor_has_an_editable_viewing_box_tool(self):

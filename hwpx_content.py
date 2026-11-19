@@ -85,9 +85,6 @@ def _question_paragraphs(questions, title, include_answers):
 
     for number, question in enumerate(questions, start=1):
         add(f"QUESTION {number:02d}", char_style="45")
-        if question.get("title"):
-            add(str(question["title"]).strip(), char_style="23")
-
         passage_lines = rich_text_to_lines(question.get("passage"))
         if passage_lines:
             add("〈지문〉", char_style="23")
@@ -95,15 +92,8 @@ def _question_paragraphs(questions, title, include_answers):
                 add(line)
 
         prompt_lines = rich_text_to_lines(question.get("prompt"))
-        point_label = ""
-        try:
-            if question.get("points") is not None and int(question["points"]) > 0:
-                point_label = f"  ({int(question['points'])}점)"
-        except (TypeError, ValueError):
-            pass
-
         first_line = prompt_lines.pop(0) if prompt_lines else ""
-        add(f"{first_line}{point_label}", char_style="17")
+        add(first_line, char_style="17")
         for line in prompt_lines:
             add(line)
 

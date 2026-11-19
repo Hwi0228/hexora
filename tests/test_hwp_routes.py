@@ -169,8 +169,10 @@ class HwpParserRouteTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertIn("추출 결과 · 1문항".encode(), response.data)
         self.assertIn("문제 본문".encode(), response.data)
-        self.assertIn(b'class="ql-math-inline"', response.data)
-        self.assertRegex(response.data.decode("utf-8"), r'data-latex="1(?:&#32;|\s)*\+(?:&#32;|\s)*1"')
+        self.assertIn(b"$1 + 1$", response.data)
+        self.assertNotIn(b'class="ql-math-inline"', response.data)
+        self.assertNotIn(b"data-latex=", response.data)
+        
         self.assertIn("JSON 다운로드".encode(), response.data)
 
     def test_uploading_hwpx_uses_rhwp_parser(self):

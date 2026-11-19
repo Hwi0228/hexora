@@ -22,7 +22,7 @@ from hmleq_converter import (
 )
 from constants import NAV_ITEMS, SUBJECTS, LICENSE_CHOICES, SOURCE_TYPES
 from question_constants import (
-    QUESTION_CONTENT_FIELDS, QUESTION_FIELD_LABELS, QUESTION_TYPES, DIFFICULTIES,
+    QUESTION_CONTENT_FIELDS, QUESTION_FIELD_LABELS, QUESTION_TYPES,
     COURSE_OPTIONS, SUBJECT_COURSE_OPTIONS, CURRICULUM_STANDARDS,
 )
 from database import begin_write_transaction, get_db
@@ -37,6 +37,7 @@ from question_ids import (
 )
 from rich_text import sanitize_rich_html, _rich_text_has_content, render_rich_html
 from parse_hwp import normalize_katex_markup, strip_choice_label
+from json_import_routes import register_json_import_routes
 
 
 def hancom_to_latex():
@@ -48,6 +49,7 @@ def convert_hancom_math():
 
 
 def register_question_routes(app):
+    register_json_import_routes(app)
     app.add_url_rule(
         "/api/math/hancom-to-latex",
         endpoint="hancom_to_latex",

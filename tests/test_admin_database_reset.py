@@ -210,5 +210,47 @@ class AdminDatabaseResetTests(unittest.TestCase):
         self.assertIn("초기화 관리자".encode(), page.data)
 
 
+    def test_reset_restarts_question_number_sequence(self):
+        self.seed_service_data()
+        with sqlite3.connect(app.config["DATABASE"]) as connection:
+            for index in range(4):
+                connection.execute(
+                    """
+                    INSERT INTO questions (
+                        subject, grade, unit, prompt, answer, source
+                    ) VALUES (?, ?, ?, ?, ?, ?)
+                    """,
+                    ("수학", "고2", "미분", f"추가 문항 {index}", "정답", "테스트"),
+                )
+            self.assertEqual(
+                connection.execute("SELECT MAX(id) FROM questions").fetchone()[0],
+                5,
+            )
+
+        response = self.csrf_post(
+            self.admin,
+            "/admin/database-reset",
+            {
+                "confirmation": "초기화 실행",
+                "acknowledge_irreversible": "1",
+            },
+        )
+        self.assertEqual(response.status_code, 302)
+
+        with sqlite3.connect(app.config["DATABASE"]) as connection:
+            cursor = connection.execute(
+                """
+                INSERT INTO questions (
+                    subject, grade, unit, prompt, answer, source
+                ) VALUES (?, ?, ?, ?, ?, ?)
+                """,
+                ("수학", "고1", "함수", "초기화 후 첫 문항", "정답", "테스트"),
+            )
+            self.assertEqual(cursor.lastrowid, 1)
+
+        from question_ids import format_question_number
+        self.assertEqual(format_question_number(1), "000001")
+
+
 if __name__ == "__main__":
     unittest.main()

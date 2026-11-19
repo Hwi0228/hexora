@@ -42,9 +42,9 @@ def get_question_page_data():
 
     query = """
         SELECT questions.id, questions.user_uuid, questions.folder_uuid,
-               questions.subject, questions.grade, questions.unit, questions.title,
+               questions.subject, questions.grade, questions.unit,
                questions.course, questions.curriculum, questions.achievement_standard,
-               questions.difficulty, questions.question_type, questions.points,
+               questions.question_type,
                questions.source_type, questions.exam, questions.original_question_number,
                questions.source_url, questions.license,
                questions.passage, questions.prompt, questions.examples,
