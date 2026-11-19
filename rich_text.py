@@ -102,18 +102,17 @@ class _RichTextSanitizer(HTMLParser):
 def _canonicalize_math_delimiters(value):
     """Normalize alternate TeX wrappers to the database's dollar format."""
     value = re.sub(
-        r"\\\\\\((.*?)\\\\\\)",
+        r"\\\((.*?)\\\)",
         lambda match: "$" + match.group(1) + "$",
         value,
         flags=re.DOTALL,
     )
     return re.sub(
-        r"\\\\\\[(.*?)\\\\\\]",
-        lambda match: "$" + match.group(1) + "$",
+        r"\\\[(.*?)\\\]",
+        lambda match: "$$" + match.group(1) + "$$",
         value,
         flags=re.DOTALL,
     )
-
 
 def sanitize_rich_html(value):
     parser = _RichTextSanitizer()
