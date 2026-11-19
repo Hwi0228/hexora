@@ -297,7 +297,7 @@ const editorConfig = configNode
             index += 1;
             continue;
           }
-          const displayMode = text.startsWith("$", index);
+          const displayMode = text.startsWith("$$", index);
           const delimiter = displayMode ? "$$" : "$";
           const contentStart = index + delimiter.length;
           let closing = contentStart;
