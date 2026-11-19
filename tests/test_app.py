@@ -80,7 +80,7 @@ class QuestionRegistrationTests(unittest.TestCase):
             "unit": "미분",
             "question_type": "단답형",
             "license": "ORIGINAL",
-            "prompt": "<p>지문 $x^2$</p><p>문제 내용 \\(x^2\\)</p><p>보기 $$x + 1$$</p>",
+            "prompt": "<p>지문 $x^2$</p><p>문제 내용 $x^2$</p><p>보기 $$x + 1$$</p>",
             "choices": "첫 번째 $x$\n두 번째\n세 번째",
             "answer": "$x = 2$",
             "source": "직접 등록한 출처",
@@ -173,7 +173,7 @@ class QuestionRegistrationTests(unittest.TestCase):
         self.assertEqual(self.query_one("SELECT COUNT(*) FROM question_revisions WHERE question_id = 1"), 1)
         self.assertEqual(
             self.query_one("SELECT prompt FROM questions WHERE id = 1"),
-            "<p>지문 $x^2$</p><p>문제 내용 \\(x^2\\)</p><p>보기 $$x + 1$$</p>",
+            "<p>지문 $x^2$</p><p>문제 내용 $x^2$</p><p>보기 $$x + 1$$</p>",
         )
         self.assertEqual(self.query_one("SELECT COUNT(*) FROM question_drafts"), 1)
 
@@ -705,7 +705,7 @@ class QuestionRegistrationTests(unittest.TestCase):
             "고2",
             "미분",
             "",
-            "<p>지문 $x^2$</p><p>문제 내용 \\(x^2\\)</p><p>보기 $$x + 1$$</p>",
+            "<p>지문 $x^2$</p><p>문제 내용 $x^2$</p><p>보기 $$x + 1$$</p>",
             "",
         ))
         self.assertEqual(json.loads(row[7]), ["첫 번째 $x$", "두 번째", "세 번째"])
@@ -1248,8 +1248,8 @@ class EditorFrontendRegressionTests(unittest.TestCase):
         self.assertIn('quill.deleteText(index, 1, "user")', self.editor_script)
         self.assertIn("quill.clipboard.convert({ html: editorHtml })", self.editor_script)
         self.assertIn("convertDelimitedMathForQuill(initialHtml)", self.editor_script)
-        self.assertIn('text.startsWith("$", index)', self.editor_script)
-        self.assertIn('const delimiter = displayMode ? "$" : "$";', self.editor_script)
+        self.assertIn('text.startsWith("$$", index)', self.editor_script)
+        self.assertIn('const delimiter = displayMode ? "$$" : "$";', self.editor_script)
         self.assertNotIn('quill.insertText(range.index, insertion, "user")', self.editor_script)
 
     def test_prompt_editor_has_an_editable_viewing_box_tool(self):
