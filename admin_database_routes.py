@@ -23,6 +23,21 @@ def _database_counts(connection):
     return counts
 
 
+
+def _reset_question_id_sequence(connection):
+    """Make the next question inserted after a reset receive ID 1."""
+    if getattr(connection, "backend", "sqlite") == "postgresql":
+        # Identity restart is transactional and resets the sequence atomically.
+        connection.execute(
+            "ALTER TABLE questions ALTER COLUMN id RESTART WITH 1"
+        )
+    else:
+        # questions.id uses SQLite AUTOINCREMENT, whose counter lives here.
+        connection.execute(
+            "DELETE FROM sqlite_sequence WHERE name = 'questions'"
+        )
+
+
 def _reset_database(connection):
     """Delete service data and non-admin accounts in one transaction."""
     begin_write_transaction(connection)
@@ -42,6 +57,7 @@ def _reset_database(connection):
     # Parent deletes cascade into revisions, links, workbook entries, and drafts.
     connection.execute("DELETE FROM workbooks")
     connection.execute("DELETE FROM questions")
+    _reset_question_id_sequence(connection)
 
     # folders.parent_uuid is RESTRICT; detach the hierarchy before deletion.
     connection.execute("UPDATE folders SET parent_uuid = NULL")
