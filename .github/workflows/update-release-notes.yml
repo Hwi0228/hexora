@@ -23,16 +23,15 @@ jobs:
           from pathlib import Path
 
           version = Path("VERSION").read_text(encoding="utf-8").strip()
-          changelog = Path("CHANGELOG.md").read_text(encoding="utf-8")
+          lines = Path("CHANGELOG.md").read_text(encoding="utf-8").splitlines()
           heading = f"## [{version}]"
-          start = changelog.find(heading)
-          if start < 0:
+          start = next((i for i, line in enumerate(lines) if line.startswith(heading)), None)
+          if start is None:
               raise SystemExit(f"No changelog section found for {version}")
-          body_start = changelog.find("\\n", start) + 1
-          next_heading = changelog.find("\\n## [", body_start)
-          notes = changelog[body_start:next_heading if next_heading >= 0 else len(changelog)].strip()
+          end = next((i for i in range(start + 1, len(lines)) if lines[i].startswith("## [")), len(lines))
+          notes = "\n".join(lines[start + 1:end]).strip()
           if not notes:
               raise SystemExit(f"Changelog section for {version} is empty")
-          Path("release-notes.md").write_text(notes + "\\n", encoding="utf-8")
+          Path("release-notes.md").write_text(notes + chr(10), encoding="utf-8")
           PY
           gh release edit "v$(cat VERSION)" --title "HEXORA v$(cat VERSION)" --notes-file release-notes.md
