@@ -809,7 +809,7 @@ class QuestionRegistrationTests(unittest.TestCase):
 
         stored_prompt = self.query_one("SELECT prompt FROM questions LIMIT 1")
         self.assertIn("$x^2 + 1$", stored_prompt)
-        self.assertIn("$f&#x27;(2)$", stored_prompt)
+        self.assertIn("$f'(2)$", stored_prompt)
         self.assertIn("$$y = x + 2$$", stored_prompt)
         self.assertNotIn("data-latex", stored_prompt)
         self.assertNotIn("data-input-format", stored_prompt)
