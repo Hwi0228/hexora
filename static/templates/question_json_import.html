@@ -8,13 +8,13 @@
 <link rel="stylesheet" href="{{ url_for('static', filename='styles/layout.css') }}">
 <link rel="stylesheet" href="{{ url_for('static', filename='styles/components.css') }}">
 <style>
-.json-import-page{width:min(1120px,100%);margin:0 auto;padding:34px clamp(18px,4vw,48px) 56px}
+.json-import-page{box-sizing:border-box;width:100%;max-width:1120px;min-width:0;margin:0 auto;padding:34px clamp(18px,4vw,48px) 56px}
 .json-import-heading{margin-bottom:24px}.json-import-eyebrow{font-size:11px;letter-spacing:.13em;font-weight:750;color:var(--muted,#64748b)}
 .json-import-heading h1{font-size:clamp(25px,3vw,34px);letter-spacing:-.04em;margin:8px 0}.json-import-heading p{color:var(--muted,#64748b);margin:0;line-height:1.65}
 .json-import-card{background:var(--surface,#fff);border:1px solid var(--border,#dce3eb);border-radius:16px;padding:22px;box-shadow:0 5px 20px #172b4d08;margin:18px 0}
 .json-import-toolbar{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:12px}
 .json-import-toolbar label{font-weight:700}.json-import-toolbar input[type=file]{max-width:100%;font-size:13px}
-.json-import-editor{display:block;width:100%;min-height:340px;resize:vertical;border:1px solid var(--border,#dce3eb);border-radius:10px;padding:14px;background:#fbfcfe;color:#1e293b;font:13px/1.65 ui-monospace,SFMono-Regular,Consolas,monospace}
+.json-import-editor{display:block;box-sizing:border-box;width:100%;min-width:0;max-width:100%;min-height:340px;resize:vertical;border:1px solid var(--border,#dce3eb);border-radius:10px;padding:14px;background:#fbfcfe;color:#1e293b;font:13px/1.65 ui-monospace,SFMono-Regular,Consolas,monospace}
 .json-import-actions{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:16px}
 .json-import-button{border:1px solid #245c9b;border-radius:9px;padding:10px 16px;background:#245c9b;color:white;font-weight:700;cursor:pointer}
 .json-import-button.secondary{background:white;color:#245c9b}
