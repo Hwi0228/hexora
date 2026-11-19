@@ -835,6 +835,46 @@ class QuestionRegistrationTests(unittest.TestCase):
         self.assertIn("$f'(2)$", stored)
         self.assertNotIn("ql-math", stored)
 
+    def test_json_import_accepts_simple_dollar_delimited_latex(self):
+        payload = {
+            "questions": [{
+                "subject": "수학",
+                "grade": "고2",
+                "course": "수학Ⅱ",
+                "curriculum": "2015 개정 교육과정",
+                "question_type": "단답형",
+                "prompt": "다항함수 $f(x)=x^3-3x^2+2$에 대하여 $f'(2)$의 값을 구하시오.",
+                "answer": "$0$",
+                "source_type": "직접 제작",
+                "license": "ORIGINAL",
+            }]
+        }
+        response = self.csrf_post(
+            self.client,
+            "/questions/import-json",
+            data={"json_data": json.dumps(payload, ensure_ascii=False), "action": "import"},
+        )
+        self.assertEqual(response.status_code, 200)
+        stored = self.query_one("SELECT prompt FROM questions LIMIT 1")
+        self.assertIn("$f(x)=x^3-3x^2+2$", stored)
+        self.assertIn("$f'(2)$", stored)
+        self.assertNotIn("ql-math", stored)
+
+    def test_alternate_math_delimiters_are_normalized_to_dollars(self):
+        response = self.csrf_post(
+            self.client,
+            "/questions/new",
+            data=self.valid_question(
+                prompt=r"<p>인라인 \\(x+1\\) 블록 \\[x+2\\]</p>"
+            ),
+        )
+        self.assertEqual(response.status_code, 302)
+        stored = self.query_one("SELECT prompt FROM questions LIMIT 1")
+        self.assertIn("$x+1$", stored)
+        self.assertIn("$x+2$", stored)
+        self.assertNotIn(r"\\(", stored)
+        self.assertNotIn(r"\\[", stored)
+
     def test_question_text_is_html_escaped(self):
         self.csrf_post(
             self.client,
