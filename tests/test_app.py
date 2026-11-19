@@ -791,7 +791,7 @@ class QuestionRegistrationTests(unittest.TestCase):
         self.assertIn(r'{ left: "\\[", right: "\\]", display: true }', renderer)
 
 
-    def test_quill_math_embeds_preserve_source_format_and_render_in_question_bank(self):
+    def test_quill_math_embeds_are_persisted_as_dollar_delimited_latex(self):
         prompt_html = (
             '<p>인라인 수식 '
             '<span class="ql-math-inline" data-latex="x^2 + 1" data-input-format="hancom" data-input-source="{x} over {y}">'
@@ -807,19 +807,33 @@ class QuestionRegistrationTests(unittest.TestCase):
         self.assertEqual(response.status_code, 302)
 
         stored_prompt = self.query_one("SELECT prompt FROM questions LIMIT 1")
-        self.assertIn('data-latex="x^2 + 1"', stored_prompt)
-        self.assertIn('data-input-format="hancom"', stored_prompt)
-        self.assertIn('data-input-source="{x} over {y}"', stored_prompt)
-        self.assertIn('data-input-format="latex"', stored_prompt)
+        self.assertIn("$x^2 + 1$", stored_prompt)
+        self.assertIn("$y = x + 2$", stored_prompt)
+        self.assertNotIn("data-latex", stored_prompt)
+        self.assertNotIn("data-input-format", stored_prompt)
         self.assertNotIn("rendered inline markup", stored_prompt)
         self.assertNotIn("rendered block markup", stored_prompt)
 
         question_response = self.client.get("/questions")
         self.assertEqual(question_response.status_code, 200)
-        self.assertIn('data-latex="x^2 + 1"'.encode(), question_response.data)
-        self.assertIn('data-input-source="{x} over {y}"'.encode(), question_response.data)
+        self.assertIn(b"$x^2 + 1$", question_response.data)
+        self.assertIn(b"$y = x + 2$", question_response.data)
         self.assertIn(b"scripts/katex-render.js", question_response.data)
         self.assertIn(b'class="math-content"', question_response.data)
+
+    def test_plain_latex_delimiters_survive_sanitization_and_rendering(self):
+        response = self.csrf_post(
+            self.client,
+            "/questions/new",
+            data=self.valid_question(
+                prompt="<p>함수 $f(x)=x^3-3x^2+2$에 대하여 $f'(2)$를 구하시오.</p>"
+            ),
+        )
+        self.assertEqual(response.status_code, 302)
+        stored = self.query_one("SELECT prompt FROM questions LIMIT 1")
+        self.assertIn("$f(x)=x^3-3x^2+2$", stored)
+        self.assertIn("$f'(2)$", stored)
+        self.assertNotIn("ql-math", stored)
 
     def test_question_text_is_html_escaped(self):
         self.csrf_post(
