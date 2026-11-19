@@ -4,14 +4,14 @@ from flask import g, render_template, request
 from auth import login_required
 from constants import LICENSE_CHOICES, SOURCE_TYPES, SUBJECTS
 from database import begin_write_transaction, get_db
-from question_constants import COURSE_OPTIONS, DIFFICULTIES, QUESTION_CONTENT_FIELDS, QUESTION_TYPES
+from question_constants import COURSE_OPTIONS, QUESTION_CONTENT_FIELDS, QUESTION_TYPES
 from question_revisions import _insert_question_revision
 from rich_text import _rich_text_has_content, sanitize_rich_html
 
 MAX_IMPORT_BYTES = 5 * 1024 * 1024
 MAX_IMPORT_QUESTIONS = 200
 MAX_FIELD_LENGTHS = {
-    "title": 200, "grade": 50, "course": 100, "unit": 200,
+    "grade": 50, "course": 100, "unit": 200,
     "achievement_standard": 4000, "passage": 50000, "prompt": 50000,
     "examples": 20000, "answer": 10000, "explanation": 20000,
     "source": 300, "exam": 200, "original_question_number": 50, "source_url": 1000,
@@ -28,12 +28,12 @@ def _normalize_question(item, index):
     if unknown:
         errors.append(f"{prefix}: 알 수 없는 필드: {', '.join(unknown)}")
     data = {
-        "title": item.get("title", ""), "subject": item.get("subject", ""),
+        "subject": item.get("subject", ""),
         "grade": item.get("grade", ""), "course": item.get("course", ""),
         "curriculum": item.get("curriculum", "2015 개정 교육과정"),
         "unit": item.get("unit", ""), "achievement_standard": item.get("achievement_standard", ""),
-        "difficulty": item.get("difficulty", "중"), "question_type": item.get("question_type", "단답형"),
-        "points": item.get("points", 4), "passage": item.get("passage", ""),
+        "question_type": item.get("question_type", "단답형"),
+        "passage": item.get("passage", ""),
         "prompt": item.get("prompt", ""), "examples": item.get("examples", ""),
         "choices": item.get("choices", []), "answer": item.get("answer", ""),
         "explanation": item.get("explanation", ""), "source_type": item.get("source_type", "기타"),
@@ -41,14 +41,13 @@ def _normalize_question(item, index):
         "original_question_number": item.get("original_question_number", ""),
         "page": item.get("page"), "source_url": item.get("source_url", ""), "license": item.get("license", ""),
     }
-    for field in ("subject", "curriculum", "difficulty", "question_type", "source_type", "license"):
+    for field in ("subject", "curriculum", "question_type", "source_type", "license"):
         if not isinstance(data[field], str):
             errors.append(f"{prefix}: {field}는 문자열이어야 합니다.")
             data[field] = ""
     checks = (
         ("subject", SUBJECTS, "subject"),
         ("curriculum", COURSE_OPTIONS, "curriculum"),
-        ("difficulty", DIFFICULTIES, "difficulty"),
         ("question_type", QUESTION_TYPES, "question_type"),
         ("source_type", SOURCE_TYPES, "source_type"),
         ("license", LICENSE_CHOICES, "license"),
@@ -81,8 +80,6 @@ def _normalize_question(item, index):
         errors.append(f"{prefix}: prompt에 문제 내용이 필요합니다.")
     if not _rich_text_has_content(data["answer"]):
         errors.append(f"{prefix}: answer에 정답이 필요합니다.")
-    if isinstance(data["points"], bool) or not isinstance(data["points"], int) or not 1 <= data["points"] <= 100:
-        errors.append(f"{prefix}: points는 1~100의 정수여야 합니다.")
     for field, maximum in (("year", 2200), ("page", 10000)):
         value = data[field]
         if value is not None and (isinstance(value, bool) or not isinstance(value, int) or not 1 <= value <= maximum):
@@ -124,21 +121,21 @@ def _insert_questions(connection, questions, user_uuid):
             INSERT INTO questions (
                 user_uuid, folder_uuid, subject, grade, unit, passage, prompt,
                 examples, choices, answer, explanation, source, year, page,
-                difficulty, question_type, points, course, curriculum,
+                question_type, course, curriculum,
                 achievement_standard, source_type, exam, original_question_number,
-                source_url, license, title
+                source_url, license
             )
-            VALUES (?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             RETURNING id
             """,
             (
                 user_uuid, data["subject"], data["grade"], data["unit"], data["passage"],
                 data["prompt"], data["examples"], json.dumps(data["choices"], ensure_ascii=False),
                 data["answer"], data["explanation"], data["source"], data["year"], data["page"],
-                data["difficulty"], data["question_type"], data["points"], data["course"],
+                data["question_type"], data["course"],
                 data["curriculum"], data["achievement_standard"], data["source_type"],
                 data["exam"], data["original_question_number"], data["source_url"],
-                data["license"], data["title"],
+                data["license"],
             ),
         )
         question_id = cursor.fetchone()["id"]
