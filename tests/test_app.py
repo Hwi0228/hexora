@@ -362,7 +362,7 @@ class QuestionRegistrationTests(unittest.TestCase):
         self.assertIn("지문 수식".encode("utf-8"), dashboard_response.data)
         self.assertIn("보기 수식".encode("utf-8"), dashboard_response.data)
         self.assertIn("선택지 수식".encode("utf-8"), dashboard_response.data)
-        self.assertIn(b'data-latex="x^2"', dashboard_response.data)
+        self.assertIn(b"$x^2$", dashboard_response.data)
         self.assertIn(b'class="question-choice math-content"', dashboard_response.data)
         self.assertNotIn(b"&lt;span class=\"ql-math-inline\"", dashboard_response.data)
 
@@ -1242,6 +1242,7 @@ class EditorFrontendRegressionTests(unittest.TestCase):
         self.assertIn('data-input-source', self.editor_script)
         self.assertIn('quill.clipboard.addMatcher("span.ql-math-inline"', self.editor_script)
         self.assertIn('quill.clipboard.addMatcher("div.ql-math-block"', self.editor_script)
+        self.assertIn('quill.clipboard.addMatcher("span.ql-math-block"', self.editor_script)
         self.assertIn('quill.clipboard.addMatcher(\'span[data-type="inline-math"]\'', self.editor_script)
         self.assertIn('quill.clipboard.addMatcher(\'div[data-type="block-math"]\'', self.editor_script)
         self.assertIn('quill.deleteText(index, 1, "user")', self.editor_script)
