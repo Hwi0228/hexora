@@ -1,0 +1,38 @@
+name: Update Release Notes
+
+on:
+  push:
+    branches: [dev]
+    paths:
+      - "CHANGELOG.md"
+
+permissions:
+  contents: write
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Update GitHub Release notes
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python - <<'PY'
+          import re
+          from pathlib import Path
+
+          version = Path("VERSION").read_text(encoding="utf-8").strip()
+          changelog = Path("CHANGELOG.md").read_text(encoding="utf-8")
+          heading = re.search(rf"(?m)^## \\[{re.escape(version)}\\][^\\n]*(?:\\n|$)", changelog)
+          if heading is None:
+              raise SystemExit(f"No changelog section found for {version}")
+          remaining = changelog[heading.end():]
+          next_heading = re.search(r"(?m)^## \\[", remaining)
+          notes = remaining[:next_heading.start() if next_heading else len(remaining)].strip()
+          if not notes:
+              raise SystemExit(f"Changelog section for {version} is empty")
+          Path("release-notes.md").write_text(notes + "\\n", encoding="utf-8")
+          PY
+          gh release edit "v$(cat VERSION)" --title "HEXORA v$(cat VERSION)" --notes-file release-notes.md
