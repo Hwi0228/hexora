@@ -115,9 +115,6 @@
               <span class="section-hint"><span class="required">*</span> 필수</span>
             </div>
             <div class="fields">
-              <input type="hidden" name="title" value="{{ form_data.get('title', '') }}">
-              <input type="hidden" name="difficulty" value="{{ form_data.get('difficulty', '중') }}">
-              <input type="hidden" name="points" value="{{ form_data.get('points', 4)|default(4, true) }}">
               <label class="field">과목 <small>선택 사항</small>
                 <select name="subject">
                   <option value="">과목 선택</option>
