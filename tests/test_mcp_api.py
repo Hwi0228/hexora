@@ -159,6 +159,19 @@ class McpApiTests(unittest.TestCase):
         self.assertGreater(response.json["count"], 0)
         self.assertEqual(response.json["standards"][0]["course"], "수학Ⅱ")
 
+    def test_removed_question_metadata_fields_are_rejected(self):
+        payload = self.question(title="old title", difficulty="중", points=4)
+        response = self.client.post(
+            "/api/integrations/mcp/questions/validate",
+            json=payload,
+            headers=self.headers,
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(response.json["valid"])
+        self.assertTrue(any("difficulty" in error for error in response.json["errors"]))
+        self.assertTrue(any("points" in error for error in response.json["errors"]))
+        self.assertTrue(any("title" in error for error in response.json["errors"]))
+
     def test_invalid_payload_is_rejected(self):
         response = self.client.post(
             "/api/integrations/mcp/questions",
