@@ -87,7 +87,7 @@ class _RichTextSanitizer(HTMLParser):
 
     def handle_data(self, data):
         if self.math_skip_depth is None:
-            self.parts.append(html.escape(data))
+            self.parts.append(html.escape(data, quote=False))
 
     def finish(self):
         while self.stack:
