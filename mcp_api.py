@@ -204,6 +204,9 @@ def standards():
 def collect(payload):
     if not isinstance(payload, dict):
         return {}, ["문항 데이터는 JSON 객체여야 합니다."]
+    removed_fields = sorted(set(payload) & {"title", "difficulty", "points"})
+    if removed_fields:
+        return {}, [f"지원하지 않는 문항 필드: {', '.join(removed_fields)}"]
 
     form = MultiDict()
     for key, value in payload.items():
