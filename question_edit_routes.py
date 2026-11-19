@@ -3,7 +3,7 @@ import json
 from flask import abort, g, redirect, render_template, request, url_for
 
 from constants import NAV_ITEMS, SUBJECTS, LICENSE_CHOICES, SOURCE_TYPES
-from question_constants import QUESTION_CONTENT_FIELDS, QUESTION_TYPES, DIFFICULTIES, COURSE_OPTIONS, SUBJECT_COURSE_OPTIONS
+from question_constants import QUESTION_CONTENT_FIELDS, QUESTION_TYPES, COURSE_OPTIONS, SUBJECT_COURSE_OPTIONS
 from question_ids import format_question_number
 from database import begin_write_transaction, get_db
 from question_drafts import _delete_question_draft, _load_question_draft, _save_question_draft
@@ -35,7 +35,6 @@ def render_question_form(
             ),
             base_revision=base_revision,
             question_types=QUESTION_TYPES,
-            difficulties=DIFFICULTIES,
             source_types=SOURCE_TYPES,
             license_choices=LICENSE_CHOICES,
             curriculum_options=list(COURSE_OPTIONS.keys()),
@@ -81,11 +80,11 @@ def new_question():
             INSERT INTO questions (
                 user_uuid, folder_uuid, subject, grade, unit, passage, prompt,
                 examples, choices, answer, explanation, source, year, page,
-                difficulty, question_type, points, course, curriculum,
+                question_type, course, curriculum,
                 achievement_standard, source_type, exam, original_question_number,
-                source_url, license, title
+                source_url, license
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             RETURNING id
             """,
             (
@@ -93,10 +92,10 @@ def new_question():
                 data["unit"], data["passage"], data["prompt"], data["examples"],
                 json.dumps(data["choices"], ensure_ascii=False), data["answer"],
                 data["explanation"], data["source"], data["year"], data["page"],
-                data["difficulty"], data["question_type"], data["points"],
+                data["question_type"],
                 data["course"], data["curriculum"], data["achievement_standard"],
                 data["source_type"], data["exam"], data["original_question_number"],
-                data["source_url"], data["license"], data["title"],
+                data["source_url"], data["license"],
             ),
         )
         question_id = cursor.fetchone()["id"]
