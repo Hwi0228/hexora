@@ -369,6 +369,12 @@ const editorConfig = configNode
         return Array.from(quill.root.children).map(serializeEditorNode).join("");
       }
 
+      function serializeChoiceEditor(quill) {
+        const hasMath = Boolean(quill.root.querySelector(".ql-math-inline, .ql-math-block"));
+        if (!quill.getText().trim() && !hasMath) return "";
+        return serializeEditor(quill);
+      }
+
       sources.forEach((source) => {
         const key = source.dataset.source;
         const mount = document.querySelector('[data-editor="' + key + '"]');
@@ -434,9 +440,11 @@ const editorConfig = configNode
           quill.setContents(quill.clipboard.convert({ html: editorHtml }), "silent");
         }
         quill.on("text-change", () => {
-          source.value = key === "choices"
-            ? serializeChoices(quill)
-            : serializeEditor(quill);
+          source.value = key.startsWith("choice-")
+            ? serializeChoiceEditor(quill)
+            : key === "choices"
+              ? serializeChoices(quill)
+              : serializeEditor(quill);
         });
 
         mount.addEventListener("dblclick", (event) => {
@@ -465,10 +473,13 @@ const editorConfig = configNode
       document.documentElement.classList.add("js-editor-ready");
       form.addEventListener("submit", (event) => {
         sources.forEach((source) => {
-          const editor = editors.get(source.dataset.source);
-          if (editor) source.value = source.dataset.source === "choices"
-            ? serializeChoices(editor)
-            : serializeEditor(editor);
+          const key = source.dataset.source;
+          const editor = editors.get(key);
+          if (editor) source.value = key.startsWith("choice-")
+            ? serializeChoiceEditor(editor)
+            : key === "choices"
+              ? serializeChoices(editor)
+              : serializeEditor(editor);
         });
         if (event.submitter && event.submitter.value === "draft") return;
         const missing = ["prompt", "answer"].find((key) => {

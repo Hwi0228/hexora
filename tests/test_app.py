@@ -135,6 +135,48 @@ class QuestionRegistrationTests(unittest.TestCase):
             session_uuid = user_session["user_uuid"]
         return session_uuid
 
+    def test_five_independent_choice_fields_are_saved_in_order(self):
+        choices = [
+            "<p>첫째 $x$</p>", "<p>둘째</p>", "<p>셋째</p>",
+            "<p>넷째</p>", "<p>다섯째</p>",
+        ]
+        response = self.csrf_post(
+            self.client, "/questions/new",
+            data=self.valid_question(choices=choices, choices_format="separate"),
+        )
+        self.assertEqual(response.status_code, 302)
+        stored = json.loads(self.query_one("SELECT choices FROM questions WHERE id = 1"))
+        self.assertEqual(stored, choices)
+
+    def test_question_form_has_five_independent_choice_editors(self):
+        response = self.client.get("/questions/new")
+        self.assertEqual(response.status_code, 200)
+        for index in range(1, 6):
+            self.assertIn(f'data-editor="choice-{index}"'.encode(), response.data)
+            self.assertIn(f'data-toolbar="choice-{index}"'.encode(), response.data)
+        self.assertEqual(response.data.count(b'name="choices"'), 5)
+        self.assertIn(b'name="choices_format" value="separate"', response.data)
+
+    def test_legacy_multiline_choices_remain_accepted(self):
+        response = self.csrf_post(
+            self.client, "/questions/new",
+            data=self.valid_question(choices="기존 첫째\n기존 둘째\n기존 셋째"),
+        )
+        self.assertEqual(response.status_code, 302)
+        stored = json.loads(self.query_one("SELECT choices FROM questions WHERE id = 1"))
+        self.assertEqual(stored, ["기존 첫째", "기존 둘째", "기존 셋째"])
+
+    def test_separate_choice_fields_reject_gaps(self):
+        response = self.csrf_post(
+            self.client, "/questions/new",
+            data=self.valid_question(
+                choices=["첫 번째", "", "세 번째", "", ""],
+                choices_format="separate",
+            ),
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("선택지는 ①부터 순서대로".encode(), response.data)
+
     def test_temporary_draft_is_private_and_does_not_create_a_public_question_or_revision(self):
         response = self.csrf_post(
             self.client,
@@ -1300,9 +1342,11 @@ class EditorFrontendRegressionTests(unittest.TestCase):
         root = Path(__file__).resolve().parents[1]
         template = (root / "static/templates/question_form.html").read_text(encoding="utf-8")
         stylesheet = (root / "static/styles/pages/legacy-question_form.css").read_text(encoding="utf-8")
-        self.assertIn('if (editor) source.value = source.dataset.source === "choices"', self.editor_script)
+        self.assertIn('if (editor) source.value = key.startsWith("choice-")', self.editor_script)
+        self.assertIn("serializeChoiceEditor(editor)", self.editor_script)
         self.assertIn("serializeChoices(editor)", self.editor_script)
         self.assertIn("serializeEditor(editor)", self.editor_script)
+        self.assertIn('key === "choices"', self.editor_script)
         self.assertIn('document.documentElement.classList.add("js-editor-ready")', self.editor_script)
         self.assertIn('document.documentElement.classList.remove("js-editor-ready")', self.editor_script)
         self.assertIn('element.hidden = true', self.editor_script)

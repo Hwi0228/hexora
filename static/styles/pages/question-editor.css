@@ -15,3 +15,17 @@
 .rich-editor .ql-editor b {
   font-weight: 700 !important;
 }
+
+
+/* Independent multiple-choice editors (①–⑤). */
+.choice-fields { display:grid; grid-template-columns:minmax(0,1fr); gap:12px; }
+.choice-field { min-width:0; padding:12px; border:1px solid var(--border,#d8e0e8); border-radius:10px; background:var(--surface,#fff); }
+.choice-field-label { display:flex; align-items:center; gap:9px; margin-bottom:8px; color:var(--text,#17212f); font-size:13px; font-weight:650; }
+.choice-number { display:inline-flex; width:27px; height:27px; align-items:center; justify-content:center; flex:0 0 27px; border-radius:7px; background:var(--surface-muted,#eef2f7); color:var(--text,#17212f); font-size:14px; }
+.choice-field .rich-toolbar { border-radius:7px 7px 0 0; }
+.choice-field .ql-container.ql-snow { min-height:64px; border-radius:0 0 7px 7px; }
+.choice-field .ql-editor, .choice-field .rich-source { min-height:64px; }
+@media (min-width:900px) {
+  .choice-fields { grid-template-columns:repeat(2,minmax(0,1fr)); }
+  .choice-field:last-child:nth-child(odd) { grid-column:1/-1; }
+}
