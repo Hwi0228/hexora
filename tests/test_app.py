@@ -865,15 +865,15 @@ class QuestionRegistrationTests(unittest.TestCase):
             self.client,
             "/questions/new",
             data=self.valid_question(
-                prompt=r"<p>인라인 \\(x+1\\) 블록 \\[x+2\\]</p>"
+                prompt=r"<p>인라인 \(x+1\) 블록 \[x+2\]</p>"
             ),
         )
         self.assertEqual(response.status_code, 302)
         stored = self.query_one("SELECT prompt FROM questions LIMIT 1")
         self.assertIn("$x+1$", stored)
-        self.assertIn("$x+2$", stored)
-        self.assertNotIn(r"\\(", stored)
-        self.assertNotIn(r"\\[", stored)
+        self.assertIn("$$x+2$$", stored)
+        self.assertNotIn(r"\(", stored)
+        self.assertNotIn(r"\[", stored)
 
     def test_question_text_is_html_escaped(self):
         self.csrf_post(
