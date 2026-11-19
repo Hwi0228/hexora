@@ -261,13 +261,13 @@ const editorConfig = configNode
         });
       }
 
-      // Persist inline math as $...$ and block math as $...$. Quill's HTML embeds are only
+      // Persist inline math as $...$ and block math as $$...$$. Quill's HTML embeds are only
       // an editing representation; no editor markup is stored in the database.
       function serializeEditorNode(node) {
         const clone = node.cloneNode(true);
         const replaceMath = (mathNode) => {
           const displayMode = mathNode.classList.contains("ql-math-block");
-          const delimiter = displayMode ? "$" : "$";
+          const delimiter = displayMode ? "$$" : "$";
           mathNode.replaceWith(document.createTextNode(
             delimiter + (mathNode.dataset.latex || "") + delimiter
           ));
