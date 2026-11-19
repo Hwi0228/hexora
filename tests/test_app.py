@@ -795,7 +795,8 @@ class QuestionRegistrationTests(unittest.TestCase):
         prompt_html = (
             '<p>인라인 수식 '
             '<span class="ql-math-inline" data-latex="x^2 + 1" data-input-format="hancom" data-input-source="{x} over {y}">'
-            '<span class="katex">rendered inline markup</span></span></p>'
+            '<span class="katex">rendered inline markup</span></span> '
+            '<span class="ql-math-inline" data-latex="f&#x27;(2)"></span></p>'
             '<div class="ql-math-block" data-latex="y = x + 2">'
             '<span class="katex-display">rendered block markup</span></div>'
         )
@@ -808,6 +809,7 @@ class QuestionRegistrationTests(unittest.TestCase):
 
         stored_prompt = self.query_one("SELECT prompt FROM questions LIMIT 1")
         self.assertIn("$x^2 + 1$", stored_prompt)
+        self.assertIn("$f&#x27;(2)$", stored_prompt)
         self.assertIn("$$y = x + 2$$", stored_prompt)
         self.assertNotIn("data-latex", stored_prompt)
         self.assertNotIn("data-input-format", stored_prompt)
