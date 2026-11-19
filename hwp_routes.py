@@ -58,16 +58,16 @@ def hwp_parser_page():
                         cursor = connection.execute(
                             """
                             INSERT INTO questions (
-                                user_uuid, folder_uuid, subject, grade, unit, title,
+                                user_uuid, folder_uuid, subject, grade, unit,
                                 prompt, choices, answer, explanation, source, year,
                                 source_type, license
                             )
-                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                             RETURNING id
                             """,
                             (
                                 g.user["uuid"], None, metadata["subject"],
-                                metadata["grade"], metadata["unit"], "",
+                                metadata["grade"], metadata["unit"],
                                 imported["question"],
                                 json.dumps(imported["choices"], ensure_ascii=False),
                                 imported["answer"], imported["explanation"],
@@ -77,16 +77,13 @@ def hwp_parser_page():
                         )
                         question_id = cursor.fetchone()["id"]
                         snapshot = {
-                            "title": "",
                             "subject": metadata["subject"],
                             "grade": metadata["grade"],
                             "course": "",
                             "curriculum": "2015 개정 교육과정",
                             "unit": metadata["unit"],
                             "achievement_standard": "",
-                            "difficulty": "중",
                             "question_type": "객관식" if imported["choices"] else "단답형",
-                            "points": 4,
                             "passage": "",
                             "prompt": imported["question"],
                             "examples": "",
