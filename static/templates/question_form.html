@@ -107,6 +107,7 @@
               action="{{ url_for('edit_question', question_id=question.id) if mode == 'edit' else url_for('new_question') }}">
           <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
           <input type="hidden" name="unit" value="{{ form_data.get('unit', '') }}">
+          <input type="hidden" name="choices_format" value="separate">
           {% if mode == 'edit' %}<input type="hidden" name="base_revision" value="{{ base_revision }}">{% endif %}
 
           <section class="form-section">
@@ -200,20 +201,30 @@
                 </div>
               </div>
               <div class="field full">
-                <div class="field-label">선택지 <span class="choice-help">한 문단에 하나씩 작성 · LaTeX 및 한컴 한/글 수식 삽입 지원</span></div>
-                <div class="rich-field">
-                  <div class="rich-toolbar" data-toolbar="choices">
-                    <button class="tool-button ql-bold" type="button" aria-label="굵게">B</button>
-                    <button class="tool-button ql-italic" type="button" aria-label="기울임"><i>I</i></button>
-                    <button class="tool-button ql-underline" type="button" aria-label="밑줄"><u>U</u></button>
-                    <span class="tool-divider"></span>
-                    <button class="tool-button ql-inlineMath" type="button">∑ 수식</button>
-                    <button class="tool-button ql-blockMath" type="button">∑ 블록</button>
-                  </div>
-                  <div class="rich-editor choices-editor" data-editor="choices"></div>
-                  <textarea class="rich-source choices-source" name="choices" data-source="choices" placeholder="① 첫 번째 선택지&#10;② 두 번째 선택지&#10;③ 세 번째 선택지">{{ form_data.get('choices', '') }}</textarea>
-                  <div class="math-help">각 문단을 선택지 하나로 저장합니다. 수식 버튼에서 LaTeX 또는 한컴 수식을 입력할 수 있습니다.</div>
+                <div class="field-label">선택지 <span class="choice-help">①~⑤를 각각 별도 입력 · LaTeX 및 한컴 한/글 수식 지원</span></div>
+                <div class="choice-fields">
+                  {% for choice_index in range(5) %}
+                    <div class="choice-field">
+                      <label class="choice-field-label" for="choice-editor-{{ choice_index + 1 }}">
+                        <span class="choice-number">{{ ['①', '②', '③', '④', '⑤'][choice_index] }}</span>
+                        <span>선택지 {{ choice_index + 1 }}</span>
+                      </label>
+                      <div class="rich-field">
+                        <div class="rich-toolbar" data-toolbar="choice-{{ choice_index + 1 }}">
+                          <button class="tool-button ql-bold" type="button" aria-label="굵게">B</button>
+                          <button class="tool-button ql-italic" type="button" aria-label="기울임"><i>I</i></button>
+                          <button class="tool-button ql-underline" type="button" aria-label="밑줄"><u>U</u></button>
+                          <span class="tool-divider"></span>
+                          <button class="tool-button ql-inlineMath" type="button">∑ 수식</button>
+                          <button class="tool-button ql-blockMath" type="button">∑ 블록</button>
+                        </div>
+                        <div class="rich-editor" id="choice-editor-{{ choice_index + 1 }}" data-editor="choice-{{ choice_index + 1 }}"></div>
+                        <textarea class="rich-source" name="choices" data-source="choice-{{ choice_index + 1 }}" placeholder="선택지 {{ choice_index + 1 }}의 내용을 입력하세요.">{{ form_data.get('choices', [])[choice_index] }}</textarea>
+                      </div>
+                    </div>
+                  {% endfor %}
                 </div>
+                <div class="math-help">각 필드는 하나의 선택지로 저장됩니다. 비워 둔 선택지는 저장하지 않으며, 선택지 순서는 입력한 순서대로 유지됩니다.</div>
               </div>
             </div>
           </section>

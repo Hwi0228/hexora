@@ -21,7 +21,11 @@ def _collect_question_data(form):
         "examples": "",
         "choices": [
             sanitize_rich_html(value.strip())
-            for value in form.get("choices", "").splitlines()
+            for value in (
+                form.getlist("choices")
+                if form.get("choices_format") == "separate"
+                else form.get("choices", "").splitlines()
+            )
             if value.strip()
         ],
         "answer": sanitize_rich_html(form.get("answer", "")),
@@ -40,6 +44,18 @@ def _collect_question_data(form):
         "folder_uuid": form.get("folder_uuid", "").strip() or None,
     }
     errors = []
+    if form.get("choices_format") == "separate":
+        submitted_choices = form.getlist("choices")
+        nonempty_positions = [
+            index for index, value in enumerate(submitted_choices) if value.strip()
+        ]
+        if len(submitted_choices) != 5:
+            errors.append("선택지는 ①~⑤ 입력 필드를 사용해 주세요.")
+        elif nonempty_positions and any(
+            not submitted_choices[index].strip()
+            for index in range(nonempty_positions[-1] + 1)
+        ):
+            errors.append("선택지는 ①부터 순서대로 입력해 주세요.")
     if data["subject"] not in SUBJECTS:
         errors.append("과목을 선택해 주세요.")
     if data["curriculum"] not in COURSE_OPTIONS:
@@ -106,6 +122,7 @@ def _collect_question_data(form):
 def _form_values_from_data(data):
     values = dict(data or {})
     choices = values.get("choices") or []
-    if not isinstance(choices, str):
-        values["choices"] = "\n".join(choices)
+    if isinstance(choices, str):
+        choices = choices.splitlines()
+    values["choices"] = (list(choices) + [""] * 5)[:5]
     return values

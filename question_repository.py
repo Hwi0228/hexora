@@ -31,7 +31,7 @@ def _question_form_values(question):
             raw_choices = json.loads(raw_choices)
         except json.JSONDecodeError:
             raw_choices = []
-    values["choices"] = "\n".join(raw_choices)
+    values["choices"] = (list(raw_choices) + [""] * 5)[:5]
     base_link = get_db().execute(
         "SELECT related_question_id FROM question_links WHERE question_id = ? "
         "AND relation_type = 'variant' AND related_question_id IS NOT NULL "

@@ -20,6 +20,10 @@ def render_question_form(
 ):
     _, folder_options = get_folder_data("수학", g.user["uuid"])
     form_data = dict(form_data or {})
+    raw_choices = form_data.get("choices") or []
+    if isinstance(raw_choices, str):
+        raw_choices = raw_choices.splitlines()
+    form_data["choices"] = (list(raw_choices) + [""] * 5)[:5]
     return (
         render_template(
             "question_form.html",
