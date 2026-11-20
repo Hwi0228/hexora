@@ -69,7 +69,7 @@ class HwpParserRouteTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertIn("HWP 파싱".encode(), response.data)
         self.assertIn(b'name="document"', response.data)
-        self.assertIn(b'accept=".hwp,.hwpx,.xml,application/xml,text/xml"', response.data)
+        self.assertIn(b'accept=".hwp,.hwpx,.pdf,.xml,application/pdf,application/xml,text/xml"', response.data)
         self.assertIn(b'href="/hwp"', self.client.get("/").data)
 
     def test_existing_question_data_survives_explanation_migration_and_preserves_fractions(self):
@@ -174,6 +174,31 @@ class HwpParserRouteTests(unittest.TestCase):
         self.assertNotIn(b"data-latex=", response.data)
         
         self.assertIn("JSON 다운로드".encode(), response.data)
+
+    def test_uploading_pdf_uses_pdf_parser(self):
+        parsed = [{
+            "number": 1,
+            "source_number": 3,
+            "source_page": 2,
+            "question": "PDF 문제 본문",
+            "choices": ["하나", "둘"],
+            "answer": "②",
+            "explanation": "풀이",
+        }]
+        with patch("hwp_routes.parse_questions_from_pdf_bytes", return_value=parsed) as parser:
+            response = self.client.post(
+                "/hwp",
+                data={
+                    "_csrf_token": self.csrf_token(),
+                    "document": (io.BytesIO(b"%PDF-test"), "exam.pdf"),
+                },
+                content_type="multipart/form-data",
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("PDF 문제 본문".encode(), response.data)
+        self.assertIn("원본 PDF 2쪽".encode(), response.data)
+        parser.assert_called_once()
 
     def test_uploading_hwpx_uses_rhwp_parser(self):
         parsed = [{
