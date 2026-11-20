@@ -1,6 +1,7 @@
 """Database connection lifecycle and backend selection."""
 
 import sqlite3
+import threading
 from pathlib import Path
 
 from flask import current_app, g
@@ -23,6 +24,55 @@ from postgres_backend import (
     _translate_qmark_placeholders,
 )
 from postgres_schema import POSTGRES_SCHEMA_STATEMENTS, initialize_postgres_database
+
+
+# Schema initialization is process-local and keyed by the actual database.
+# SQLite's in-memory databases are connection-local, so they must be initialized
+# for every connection.
+_SCHEMA_INITIALIZATION_LOCK = threading.Lock()
+_INITIALIZED_DATABASES = set()
+
+
+def _schema_initialization_key(backend, database):
+    if backend == "postgresql":
+        return backend, database
+
+    if database == ":memory:":
+        return None
+
+    database_path = Path(database).resolve()
+    try:
+        stat = database_path.stat()
+    except OSError:
+        # The connection has already been opened, so this is only a defensive
+        # fallback for unusual SQLite URI/path configurations.
+        return backend, str(database_path)
+
+    # Including the inode prevents a deleted and recreated SQLite file at the
+    # same path from incorrectly inheriting the previous file's ready state.
+    return backend, str(database_path), stat.st_dev, stat.st_ino
+
+
+def _initialize_schema_once(connection, backend, database):
+    key = _schema_initialization_key(backend, database)
+    if key is None:
+        initialize_database(connection)
+        return
+
+    if key in _INITIALIZED_DATABASES:
+        return
+
+    with _SCHEMA_INITIALIZATION_LOCK:
+        if key in _INITIALIZED_DATABASES:
+            return
+
+        if backend == "postgresql":
+            initialize_postgres_database(connection)
+        else:
+            initialize_database(connection)
+
+        # Mark ready only after the initializer has completed successfully.
+        _INITIALIZED_DATABASES.add(key)
 
 
 def begin_write_transaction(connection, lock_table=None):
@@ -67,7 +117,7 @@ def get_db():
             )
             connection = PostgresConnection(raw_connection)
             try:
-                initialize_postgres_database(connection)
+                _initialize_schema_once(connection, "postgresql", database_url)
             except Exception:
                 connection.close()
                 raise
@@ -78,13 +128,14 @@ def get_db():
             connection = sqlite3.connect(database)
             connection.row_factory = sqlite3.Row
             try:
-                initialize_database(connection)
+                _initialize_schema_once(connection, "sqlite", database)
                 connection.execute("PRAGMA foreign_keys = ON")
             except Exception:
                 connection.close()
                 raise
             g.db = connection
     return g.db
+
 
 def close_db(_error=None):
     connection = g.pop("db", None)
